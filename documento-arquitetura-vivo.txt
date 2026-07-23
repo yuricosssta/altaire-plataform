@@ -1,0 +1,27 @@
+## SPRINT 01 - 23/07/2026 ##
+Resumo da Sprint: Configuração e Estabilização da Arquitetura Docker
+1. Resolução de Falhas de Build e Execução (Backend NestJS)
+
+Alinhamento de Multi-stage Build: Correção da divergência de diretórios de trabalho (WORKDIR) entre os estágios builder e runner, resolvendo o erro de arquivos ausentes (package.json, dist, node_modules) na geração da imagem final.
+
+Ajuste do Entrypoint: Atualização da instrução CMD para refletir o espelhamento da estrutura de pastas gerada pelo compilador TypeScript, apontando o executável estritamente para dist/src/main.js.
+
+2. Acessibilidade de Rede
+
+Mapeamento de Portas: Inclusão da diretiva ports nos arquivos do Docker Compose, vinculando as redes internas dos contêineres à rede host para liberar o acesso ao frontend (porta 3000) e backend (porta 3001) via localhost.
+
+3. Otimização e Segurança de Imagens (Produção)
+
+Redução de Content Size comprovada através do uso da imagem base node:22-alpine e da exclusão de dependências de desenvolvimento via pnpm prune --prod.
+
+Padronização do uso do Corepack nativo do Node para execução e travamento de versão do pnpm (pnpm install --frozen-lockfile).
+
+Mitigação de vulnerabilidades com a remoção dos privilégios administrativos (root) do contêiner final em favor da execução sob o usuário do sistema restrito appuser.
+
+4. Estruturação do Ambiente de Desenvolvimento (Local)
+
+Isolamento de Estágios: Implementação do Dockerfile.dev para interromper o build antes da compilação estática (dist/), preservando ferramentas de desenvolvimento.
+
+Hot Reload: Configuração de bind mounts via docker-compose.dev.yml para leitura do código local em tempo real, aliada a volumes anônimos (/app/node_modules) para blindar conflitos de arquitetura de pacotes entre o sistema operacional base (host) e o Linux Alpine (contêiner).
+
+Padronização de CLI: Configuração da variável COMPOSE_FILE=docker-compose.dev.yml no arquivo .env na raiz do projeto (protegido por .gitignore), reduzindo a orquestração do ambiente de desenvolvimento ao comando primário docker-compose up.

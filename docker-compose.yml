@@ -1,0 +1,22 @@
+# docker-compose.yml
+services:
+  backend:
+    build: ./BackEnd
+    env_file: ./BackEnd/.env
+    ports:
+      - "3001:3001"
+    networks: [app-network]
+
+  frontend:
+    build: ./FrontEnd
+    env_file: ./FrontEnd/.env
+    ports:
+      - "3000:3000"
+    depends_on: [backend]
+    networks: [app-network]
+
+networks:
+  app-network:
+    driver: bridge
+
+# docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
