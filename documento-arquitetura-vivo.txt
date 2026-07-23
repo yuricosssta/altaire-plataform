@@ -1,3 +1,30 @@
+## SPRINT 02 - 23/07/2026 ##
+**Resumo Técnico de Fechamento**
+
+**Decisões de Arquitetura**
+
+* Transição de domínio e escopo: Pivotagem da base visual e semântica de um sistema PropTech (Cazuá) para o ecossistema SaaS Educacional e Automação de Vendas (Altaire).
+* Estruturação do Front-end: Estabelecimento do Next.js (App Router) acoplado aos provedores essenciais de infraestrutura (Redux Toolkit para estado, ThemeProvider para controle Dark/Light e Sonner para notificações).
+* Integridade Visual e Acessibilidade (Regra 60-30-10): Configuração centralizada no nível raiz (`globals.css`) para garantir renderização consistente do Dark Mode premium, mitigando o uso disperso de classes utilitárias de cinza.
+* Padronização Tipográfica: Resolução de bloqueio de licenciamento tipográfico com a adoção da fonte `DM Serif Display` em substituição à `Callum`, preservando a hierarquia de autoridade sem custos adicionais.
+
+**Definições de Infraestrutura e UI**
+
+* **Assets e Estáticos:** Dependência criada no diretório `/public` para a injeção dos arquivos responsivos de marca (`logo-altaire-light.png` e `logo-altaire-dark.png`).
+* **Componentes de Roteamento e Layout:**
+* `src/app/layout.tsx`: Otimização dos metadados SEO, injeção de fontes dinâmicas e empacotamento de Providers estruturais.
+* `src/app/page.tsx`: Orquestração arquitetural da página inicial.
+
+
+* **Componentes de UI / Landing Page:**
+* `HeroSection.tsx`: Estruturação da seção de topo (above the fold) com CTAs de alta conversão.
+* `LandingPageHeader.tsx`: Navbar desacoplada com lógica de navegação para fluxos de autenticação (`/login` e `/signup`).
+* `FeatureSection.tsx`: Componente de apresentação de soluções focado nas dores de estagnação e falta de direcionamento.
+* `ProductsSection.tsx`: Módulo de segmentação da esteira de ofertas (Formação, SaaS, Comunidade) com destaque visual condicional para o produto principal.
+* `LogoBloco.tsx`: Container de marca refatorado para suportar alternância de tema nativa (via `dark:block` e `dark:hidden`) eliminando o risco de *hydration mismatch*.
+
+
+
 ## SPRINT 01 - 23/07/2026 ##
 Resumo da Sprint: Configuração e Estabilização da Arquitetura Docker
 1. Resolução de Falhas de Build e Execução (Backend NestJS)
