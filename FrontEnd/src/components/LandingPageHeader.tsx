@@ -49,7 +49,7 @@ export const FEATURES = [
 
 export function LandingPageHeader() {
   return (
-    <header className="sticky top-0 z-50 w-full border-b border-border bg-background/95 backdrop-blur">
+    <header className="sticky top-0 z-50 w-full border-b border-border bg-background/30 backdrop-blur">
       <div className="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
         {/* Renderiza o Logo - Requer atualização interna do SVG/Texto para "Altaire" */}
         <LogoBloco orientation="horizontal"/>
