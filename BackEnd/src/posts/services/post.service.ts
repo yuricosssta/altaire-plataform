@@ -1,0 +1,67 @@
+//src/posts/services/post.service.ts
+
+import { Injectable, NotFoundException } from '@nestjs/common';
+import { PostRepository } from '../repositories/post.repository';
+import { IPost } from '../schemas/models/post.interface';
+
+export interface PaginatedPostsResult {
+  data: IPost[];
+  total: number;
+  page: number;
+  limit: number;
+  totalPages: number;
+}
+
+@Injectable()
+export class PostService {
+  constructor(private readonly postRepository: PostRepository) { }
+
+  async getAllPosts(page: number, limit: number, organizationId?: string, term?: string): Promise<PaginatedPostsResult> {
+    const skip = (page - 1) * limit;
+
+    const [posts, total] = await Promise.all([
+      this.postRepository.getAllPosts({ limit, skip, organizationId, term }),
+      this.postRepository.getTotalPostsCount(organizationId, term),
+    ]);
+
+    const totalPages = Math.ceil(total / limit);
+
+    return {
+      data: posts,
+      total,
+      page,
+      limit,
+      totalPages,
+    };
+  }
+
+  async searchPost(term: string) {
+    const post = this.postRepository.searchPost(term);
+    return post;
+  }
+
+  async getPost(postId: string) {
+    const post = await this.postRepository.getPost(postId);
+    if (!post) throw new NotFoundException('Post não encontrado');
+    return post;
+  }
+
+  async createPost(post: IPost) {
+    const newPost = await this.postRepository.createPost({
+      ...post
+    });
+    return newPost;
+  }
+
+  async updatePost(postId: string, post: Partial<IPost>) {
+    const updatedPost = await this.postRepository.updatePost(postId, post);
+    if (!updatedPost) throw new NotFoundException('Post não encontrado');
+    return updatedPost;
+  }
+
+  async deletePost(postId: string, orgId?: any) {
+    const deletedPost = await this.postRepository.deletePost(postId);
+    if (!deletedPost) throw new NotFoundException('Post não encontrado');
+    return { message: `Post com id ${postId} deletado com sucesso.` };
+  }
+}

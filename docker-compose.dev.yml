@@ -1,0 +1,33 @@
+# docker-compose.dev.yml
+services:
+  backend:
+    build:
+      context: ./BackEnd
+      dockerfile: Dockerfile.dev
+    ports:
+      - "3001:3001"
+    volumes:
+      - ./BackEnd:/app
+      - /app/node_modules
+    env_file: ./BackEnd/.env
+    networks:
+      - app-network
+
+  frontend:
+    build:
+      context: ./FrontEnd
+      dockerfile: Dockerfile.dev
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./FrontEnd:/app
+      - /app/node_modules
+    env_file: ./FrontEnd/.env
+    depends_on:
+      - backend
+    networks:
+      - app-network
+
+networks:
+  app-network:
+    driver: bridge

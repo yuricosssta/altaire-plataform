@@ -1,0 +1,29 @@
+name: NestJS CI
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    steps:
+      # Checkout do código do repositório
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      # Configuração do Node.js
+      - name: Set up Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: 20
+
+      # Instalar dependências do projeto
+      - name: Install dependencies
+        run: npm install
+
+      # Executar os testes do Jest
+      - name: Run tests
+        run: npm run test

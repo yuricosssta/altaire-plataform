@@ -1,0 +1,12 @@
+services:
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "3001:3001"
+    env_file:
+      - .env
+    # NENHUM volume de código é montado aqui.
+    # O contêiner irá usar o código que foi copiado para a pasta /dist durante o build.
+    # O comando "command" também não é sobrescrito, então ele usará o CMD do Dockerfile: ["node", "dist/main"]

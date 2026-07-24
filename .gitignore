@@ -1,0 +1,49 @@
+NotasDesenvolvedor.txt
+
+# Arquivos de ambiente
+.env
+.env.local
+.env*.local
+
+# Dependências
+**/node_modules/
+**/.pnp
+.pnp.js
+
+# Builds e compilados
+**/dist/
+**/build/
+**/.next/
+**/out/
+**/coverage/
+
+# Logs
+**/*.log
+**/logs/
+
+# Sistema
+**/.DS_Store
+**/.env.production
+**/.env.development
+
+# IDEs
+**/.vscode/
+**/.idea/
+**/*.sublime-workspace
+
+# Docker
+**/.dockerignore
+docker-compose.override.yml
+
+# Específico do BackEnd (Node.js)
+**/.nyc_output
+**/npm-debug.log*
+**/pnpm-debug.log*
+**/yarn-debug.log*
+**/yarn-error.log*
+
+# Específico do FrontEnd (Next.js)
+**/.next/
+**/next-env.d.ts
+**/*.tsbuildinfo
+.vercel
