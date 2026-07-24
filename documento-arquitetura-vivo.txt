@@ -1,3 +1,50 @@
+## SPRINT 04 - 24/07/2026 ##
+Resumo Técnico de Fechamento
+
+Decisões de Arquitetura
+
+Padronização do Fluxo de Autenticação: Manutenção da integração com o Redux Toolkit (authSlice) na tela de login, adaptando a lógica de roteamento pós-login para preparar o sistema para a futura gestão de Workspaces/Assinaturas do ecossistema Altaire.
+
+UI/UX Premium (Regra 60-30-10): Limpeza de classes utilitárias estáticas legadas (zinc, white) e aplicação estrita das variáveis semânticas do tema (bg-background, text-foreground, bg-card), assegurando o contraste necessário para a estética de autoridade.
+
+Definições de Infraestrutura
+
+UI/Componentes Refatorados:
+
+src/app/(auth)/login/page.tsx: Reestruturação do grid de acesso. Geometria padronizada (rounded-md, h-12 em inputs) e hierarquia tipográfica corrigida com a injeção da fonte DM Serif Display (font-heading) no H1. Copywriting alterado para foco em áreas de membros e escala digital.
+
+src/components/landing/ComercialLogin.tsx: Remoção total do escopo PropTech/Engenharia. Implementação de blocos descritivos focados em Aceleração de Conteúdo e Esteiras de Vendas, apoiados por iconografia estratégica via lucide-react (Sparkles, Workflow, TrendingUp).
+
+## SPRINT 03 - 24/07/2026 ##
+Resumo Técnico de Fechamento
+
+Decisões de Arquitetura
+
+Otimização de Renderização (LCP): Substituição da estratégia de backgroundImage em CSS pelo componente nativo next/image com controle estrito de contexto de empilhamento (z-index). Isso solucionou a oclusão da imagem no Dark Mode causada pela mesclagem (mix-blend-overlay).
+
+Regra 60-30-10 (UI/UX): Fixação do design system utilizando o fundo Preto dominante, Branco/Gelo para legibilidade e Dourado (primary) para CTAs e conversão, implementado globalmente via variáveis semânticas do Tailwind.
+
+Hierarquia Tipográfica: Mapeamento consolidado das fontes DM Serif Display (H1/Títulos de impacto), Playfair Display (H2/Subtítulos) e Inter (Parágrafos), mitigando o uso restrito de licenças da fonte Callum e mantendo o design atemporal/premium.
+
+Definições de Infraestrutura
+
+Assets Estáticos: Homologação do diretório /public para o consumo correto da imagem /images/hero-background.webp e dos assets responsivos da marca (logo-altaire-light.png e logo-altaire-dark.png).
+
+Componentes Refatorados:
+
+layout.tsx: Metadados focados no ecossistema Altaire e instanciamento de provedores (Redux, Theme, Sonner).
+
+page.tsx: Composição da Landing Page.
+
+HeroSection.tsx: Camada visual principal, agora com carregamento de imagem priorizado (priority={true}).
+
+FeatureSection.tsx & ProductsSection.tsx: Blocos de conversão com copy refatorado para atacar dores de estagnação e falta de direção.
+
+LandingPageHeader.tsx & LogoBloco.tsx: Header adesivo com troca nativa de logo Dark/Light via CSS (dark:block e dark:hidden).
+
+Sugestão de Commit para a Sprint:
+feat(landing): implement Altaire premium ui architecture, resolve background image occlusion and optimize LCP
+
 ## SPRINT 02 - 23/07/2026 ##
 **Resumo Técnico de Fechamento**
 
