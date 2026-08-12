@@ -17,7 +17,7 @@ export default function ProjectWorkspacePage() {
     <main className="min-h-screen bg-background p-8 text-foreground">
       <div className="mx-auto max-w-7xl">
         <div className="mb-8 flex items-center gap-4">
-          <Link href="/editorial" className="rounded-md border border-border bg-card p-2 text-foreground transition-colors hover:text-primary">
+          <Link href="editorial" className="rounded-md border border-border bg-card p-2 text-foreground transition-colors hover:text-primary">
             <ArrowLeft className="h-5 w-5" />
           </Link>
           <div>
