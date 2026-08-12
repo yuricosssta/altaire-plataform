@@ -1,3 +1,34 @@
+## SPRINT 05 - 07/08/2026 ##
+Resumo Técnico de Fechamento
+
+Decisões de Arquitetura
+
+Isolamento de DTOs: Centralização dos contratos de validação (Zod) no diretório src/lib/dto/editorial.schema.ts. Remoção da dependência nativa do mongoose no front-end em favor de validação de ObjectIds via Regex (24 hex chars), preservando a integridade de compilação do Next.js (Client Components).
+
+Topologia de Rotas (App Router): Implementação de estrutura modular em /editorial garantindo o isolamento da estratégia. Cada projeto funciona como um contêiner hermético (/editorial/[projectId]), impedindo o vazamento de escopo entre as fases de planejamento e execução (Calendário).
+
+Gestão de Estado e Validação de Fluxo: Adoção do padrão Stepper no onboarding (react-hook-form + zodResolver) para fragmentar o EditorialOnboardingSchema. A validação condicional por etapas bloqueia a submissão de artefatos estratégicos incompletos.
+
+Ciclo de Vida de Dados: Padronização visual e de eventos para versionamento e uso de Soft Delete no histórico de linhas editoriais, transformando o documento em um ativo iterativo e recuperável.
+
+Definições de Infraestrutura e UI
+
+Acessibilidade e Componentização (Radix UI): Instalação e configuração do primitivo @radix-ui/react-tabs (src/components/ui/tabs.tsx) com mapeamento estrito das variáveis de contraste do Tailwind, respeitando a regra 60-30-10 para a manutenção do Dark Mode premium.
+
+Mapeamento Visual Estratégico: Construção de interface analítica para a técnica RETINA, convertendo o peso dos pilares de conteúdo em barras de progressão linear.
+
+Componentes Criados:
+
+src/app/editorial/page.tsx: Central de Projetos (Dashboard) com indicadores de status das linhas e calendários.
+
+src/app/editorial/[projectId]/page.tsx: Workspace de orquestração arquitetural (Gestão de Abas).
+
+src/app/editorial/[projectId]/linha-editorial/onboarding/page.tsx: Formulário guiado para construção da identidade editorial.
+
+src/app/editorial/[projectId]/linha-editorial/[versionId]/mapa/page.tsx: Visualização em blocos do Mapa Estratégico (Mensagem Central, Pilares, Tom de Voz, RETINA).
+
+src/components/editorial/EditorialVersionManager.tsx: Gerenciador de histórico, arquivamento e restauração de versões da linha editorial.
+
 ## SPRINT 04 - 24/07/2026 ##
 Resumo Técnico de Fechamento
 

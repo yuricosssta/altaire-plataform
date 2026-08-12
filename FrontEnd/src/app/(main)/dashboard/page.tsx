@@ -11,7 +11,7 @@ export default function DashboardOverviewPage() {
 
         {/* Célula Esquerda (Métricas e Ações) */}
         <div className="lg:col-span-2 flex flex-col h-full">
-          <DashboardMetrics />
+          {/* <DashboardMetrics /> */}
         </div>
 
         {/* Célula Direita (Tarefas + Activity Log) */}

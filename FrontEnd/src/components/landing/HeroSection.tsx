@@ -12,7 +12,7 @@ export function HeroSection() {
       <div className="absolute inset-0 bg-background z-0">
         
         {/* Camada 1: Imagem renderizada via Next/Image */}
-        <div className="absolute top-0 right-0 w-full md:w-2/3 h-full opacity-100 z-0">
+        <div className="absolute top-0 right-0 w-full md:w-3/5 h-full opacity-90 z-0">
           <Image
             src={HERO_BACKGROUND_IMAGE}
             alt="Altaire Negócios Digitais"
