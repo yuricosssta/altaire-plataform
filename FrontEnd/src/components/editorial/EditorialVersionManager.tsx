@@ -66,7 +66,7 @@ export function EditorialVersionManager({ projectId }: EditorialVersionManagerPr
           </p>
         </div>
         <Link
-          href={`${projectId}/linha-editorial/onboarding`}
+          href={`/dashboard/editorial/${projectId}/linha-editorial/onboarding`}
           className="flex items-center gap-2 rounded-md bg-primary px-4 py-2 font-sans text-sm font-bold text-primary-foreground transition-opacity hover:opacity-90"
         >
           <Plus className="h-4 w-4" />
@@ -112,7 +112,7 @@ export function EditorialVersionManager({ projectId }: EditorialVersionManagerPr
             <div className="flex items-center gap-2 border-t border-border pt-3 sm:border-0 sm:pt-0">
               {version.status === 'active' && (
                 <Link
-                  href={`${projectId}/linha-editorial/${version.id}/mapa`}
+                  href={`/dashboard/editorial/${projectId}/linha-editorial/${version.id}/mapa`}
                   className="rounded-md px-3 py-1.5 font-sans text-sm font-bold text-primary transition-colors hover:bg-primary/10"
                 >
                   Abrir Mapa

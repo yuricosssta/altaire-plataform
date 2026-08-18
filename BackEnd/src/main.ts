@@ -27,13 +27,13 @@ async function bootstrap() {
   app.useGlobalFilters(new HttpExceptionFilter());
 
   const config = new DocumentBuilder()
-    .setTitle('Grupo Cazua')
-    .setDescription('Gestão Inteligente de Serviços')
+    .setTitle('Altaire API')
+    .setDescription('API do ecossistema Altaire — assistente de criação de conteúdo educacional')
     .setVersion('1.0')
     .build();
   const documentFactory = () => SwaggerModule.createDocument(app, config);
   SwaggerModule.setup('api', app, documentFactory);
 
-  await app.listen(process.env.PORT || 3000);
+  await app.listen(process.env.PORT || 3001);
 }
 bootstrap();

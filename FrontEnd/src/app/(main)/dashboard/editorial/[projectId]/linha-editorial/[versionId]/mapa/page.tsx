@@ -44,7 +44,7 @@ export default function MapaLinhaEditorialPage() {
         <header className="mb-10 flex items-center justify-between">
           <div className="flex items-center gap-4">
             <Link 
-              href={`/editorial/${projectId}`} 
+              href={`/dashboard/editorial/${projectId}`} 
               className="rounded-md border border-border bg-card p-2 text-foreground transition-colors hover:text-primary"
             >
               <ArrowLeft className="h-5 w-5" />

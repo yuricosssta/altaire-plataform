@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { Plus, Folder, Calendar, PenTool, Clock } from 'lucide-react';
+import { Folder, Calendar, PenTool, Clock } from 'lucide-react';
 
 // Mock baseado no DTO ProjectCardSchema validado na etapa anterior
 const mockProjects = [
@@ -38,20 +38,21 @@ export default function EditorialDashboardPage() {
               Gerencie suas linhas e calendários editoriais.
             </p>
           </div>
-          <Link
-            href="editorial/novo"
+          {/* TODO: Criar rota /dashboard/editorial/novo quando a página de criação de projeto editorial existir */}
+          {/* <Link
+            href="/dashboard/editorial/novo"
             className="flex items-center gap-2 rounded-md bg-primary px-6 py-3 font-sans text-sm font-bold text-primary-foreground transition-opacity hover:opacity-90"
           >
             <Plus className="h-5 w-5" />
             Novo Projeto
-          </Link>
+          </Link> */}
         </header>
 
         <section className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
           {mockProjects.map((project) => (
             <Link
               key={project.id}
-              href={`editorial/${project.id}`}
+              href={`/dashboard/editorial/${project.id}`}
               className="group flex flex-col rounded-md border border-border bg-card p-6 transition-all hover:border-primary"
             >
               <div className="mb-4 flex items-start justify-between">

@@ -82,7 +82,7 @@ export default function EditorialOnboardingPage() {
   const onSubmit = async (data: OnboardingFormData) => {
     console.log('Payload validado pronto para envio:', data);
     // TODO: Implementar mutação via BFF/Server Action e redirecionar para o Mapa (Tela 3)
-    router.push(`/editorial/${projectId}/linha-editorial/v1/mapa`);
+    router.push(`/dashboard/editorial/${projectId}/linha-editorial/v1/mapa`);
   };
 
   const CurrentIcon = STEPS[currentStep].icon;
@@ -92,7 +92,7 @@ export default function EditorialOnboardingPage() {
       <div className="w-full max-w-3xl">
         <header className="mb-10 flex items-center justify-between">
           <div className="flex items-center gap-4">
-            <Link href={`/editorial/${projectId}`} className="rounded-md border border-border bg-card p-2 text-foreground transition-colors hover:text-primary">
+            <Link href={`/dashboard/editorial/${projectId}`} className="rounded-md border border-border bg-card p-2 text-foreground transition-colors hover:text-primary">
               <ArrowLeft className="h-5 w-5" />
             </Link>
             <div>
