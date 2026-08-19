@@ -168,15 +168,7 @@ export default function EditorialOnboardingPage() {
         </div>
 
         {/* Container do Formulário */}
-        <form
-          onSubmit={handleSubmit(onSubmit)}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter' && (e.target as HTMLElement).tagName === 'INPUT') {
-              e.preventDefault();
-            }
-          }}
-          className="rounded-md border border-border bg-card p-8 shadow-sm"
-        >
+        <form onSubmit={handleSubmit(onSubmit)} className="rounded-md border border-border bg-card p-8 shadow-sm">
           <div className="mb-6 border-b border-border pb-4 flex items-center gap-3">
             <CurrentIcon className="h-6 w-6 text-primary" />
             <h2 className="font-serif text-2xl text-foreground">{STEPS[currentStep].title}</h2>
@@ -345,7 +337,8 @@ export default function EditorialOnboardingPage() {
               </button>
             ) : (
               <button
-                type="submit"
+                type="button"
+                onClick={() => void handleSubmit(onSubmit)()}
                 disabled={isSubmitting}
                 className="flex items-center gap-2 rounded-md bg-primary px-8 py-2 font-sans text-sm font-bold text-primary-foreground transition-opacity hover:opacity-90 disabled:opacity-50"
               >
