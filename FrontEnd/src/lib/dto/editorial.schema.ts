@@ -56,6 +56,36 @@ export const EditorialVersionSchema = z.object({
   updatedAt: z.date(),
 });
 
+export const EditorialVersionUpdateSchema = z.object({
+  name: z.string().min(1, 'O nome da versão não pode ficar vazio.').optional(),
+  status: z.enum(['active', 'archived']).optional(),
+});
+
+export const EditorialMapaSchema = z.object({
+  versionId: objectIdSchema,
+  versionNumber: z.number().int().positive(),
+  name: z.string().min(1, 'O nome do mapa é obrigatório.'),
+  mensagemCentral: z.string(),
+  pilares: z.array(
+    z.object({
+      title: z.string(),
+      description: z.string(),
+    }),
+  ),
+  tomDeVoz: z.object({
+    traits: z.array(z.string()),
+    rules: z.array(z.string()),
+  }),
+  retina: z.array(
+    z.object({
+      label: z.string(),
+      weight: z.number().min(0).max(100),
+    }),
+  ),
+});
+
 export type ProjectCardDTO = z.infer<typeof ProjectCardSchema>;
 export type OnboardingFormDTO = z.infer<typeof EditorialOnboardingSchema>;
 export type EditorialVersionDTO = z.infer<typeof EditorialVersionSchema>;
+export type EditorialVersionUpdateDTO = z.infer<typeof EditorialVersionUpdateSchema>;
+export type EditorialMapaDTO = z.infer<typeof EditorialMapaSchema>;

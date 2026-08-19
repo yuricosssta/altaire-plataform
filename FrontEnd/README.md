@@ -1,38 +1,48 @@
-# Escola Desafio FrontEnd
+# Altaire FrontEnd
 
-Aplicação web para administração e publicação de posts educacionais, construída com [Next.js](https://nextjs.org), [Redux Toolkit](https://redux-toolkit.js.org/), [Axios](https://axios-http.com/) e [TailwindCSS](https://tailwindcss.com/).
+Aplicação web do **Altaire** — SaaS educacional que atua como assistente de criação de conteúdo. Construída com [Next.js](https://nextjs.org) (App Router), [Redux Toolkit](https://redux-toolkit.js.org/), [TailwindCSS](https://tailwindcss.com/), Shadcn/Radix UI e [Axios](https://axios-http.com/).
+
+> Frontend do ecossistema Altaire. O backend NestJS fica em `BackEnd/` (porta 3001).
 
 ---
 
 ## 🚀 Como começar
 
+O projeto usa **pnpm** (via corepack/pnpm@9). Não use `npm`.
+
 1. **Instale as dependências**
    ```bash
-   npm install
+   pnpm install
    ```
 
-2. **Configure a URL da API**
-   - Edite o arquivo `.env`:
+2. **Configure as variáveis de ambiente**
+   - Edite o arquivo `.env` (veja a [seção de variáveis](#-variáveis-de-ambiente)):
      ```
-     NEXT_PUBLIC_API_BASE_URL=http://localhost:3000/api
+     NEXT_PUBLIC_API_BASE_URL=http://localhost:3001
      ```
 
 3. **Inicie o servidor de desenvolvimento**
    ```bash
-   npm run dev
+   pnpm dev
    ```
    Acesse [http://localhost:3000](http://localhost:3000) no navegador.
+
+> Requer o backend em execução em `http://localhost:3001` (Swagger em `/api`).
 
 ---
 
 ## 🛠️ Tecnologias Utilizadas
 
-- **Next.js** (App Router)
-- **React 19**
-- **Redux Toolkit** (`@reduxjs/toolkit`, `react-redux`)
-- **Axios** (requisições HTTP)
-- **TailwindCSS** (estilização)
-- **TypeScript**
+- **Next.js 15** (App Router, `output: standalone`)
+- **React 18** + TypeScript
+- **Redux Toolkit** (`@reduxjs/toolkit`, `react-redux`) — estado global
+- **TailwindCSS v4** + **Shadcn/Radix UI** + **lucide-react** — UI/UX
+- **react-hook-form** + **zod** — formulários (Stepper)
+- **Axios** — cliente HTTP centralizado (JWT + headers de tenant)
+- **TanStack Query** — cache de dados do servidor
+- **OpenLayers** (`ol`) — mapas
+- **Recharts** — gráficos
+- **markdown-it / react-markdown** — edição e renderização de Markdown
 
 ---
 
@@ -40,46 +50,68 @@ Aplicação web para administração e publicação de posts educacionais, const
 
 ```
 src/
-  app/           # Páginas e layouts do Next.js
-  components/    # Componentes reutilizáveis (Navbar, PostForm, etc)
-  lib/           # Configurações de API e Redux
-  types/         # Tipos TypeScript (ex: IPost)
+  app/
+    (auth)/          # login, signup, forgot-password, reset-password
+    (main)/          # dashboard: editorial, planning, resources, marketing, people,
+                     #   projects, storage, master-admin, settings, account
+    api/             # BFF (route handlers) e axiosInstance.ts
+    layout.tsx       # fonts e tema (--font-heading, Playfair, Inter)
+  components/
+    ui/              # componentes Shadcn/Radix
+    landing/         # landing page
+    editorial/       # editor de conteúdo (Markdown)
+    planning/        # planejamento
+    resources/       # recursos
+    dashboard/       # layout e widgets do dashboard
+    auth/            # formulários de autenticação
+  lib/
+    redux/           # store e slices (auth, organizations, ...)
+    api/             # utilitários de API (BFF/server)
+    dto/             # schemas Zod (ex: editorial.schema.ts)
+  providers/         # providers (Redux, tema, React Query)
+  types/             # tipos TypeScript
+  validations/       # schemas de validação
 ```
 
 ---
 
 ## 🧩 Funcionalidades
 
-- Autenticação e logout via Redux
-- Cadastro, edição e listagem de posts
-- Integração com backend via Axios
-- Formulários dinâmicos e responsivos
-- Navegação protegida para administradores
+- Autenticação com **JWT** (login, cadastro, recuperação de senha) via Redux
+- **Multi-organização**: headers `x-org-id` / `x-org-role` injetados automaticamente pelo axios central
+- Dashboard com módulos de **editorial**, **planning**, **resources**, **marketing**, **people**, **projects**, **storage** e **master-admin**
+- **BFF** via route handlers em `src/app/api/*` — o frontend nunca chama o backend NestJS diretamente
+- Edição de conteúdo em **Markdown** com pré-visualização
+- Tema **dark/light** com variáveis semânticas (`bg-background`, `text-foreground`, `primary` = dourado)
+- Navegação protegida para áreas autenticadas
 
 ---
 
 ## 📦 Variáveis de Ambiente
 
-- `NEXT_PUBLIC_API_BASE_URL`: URL base da API backend
+| Variável | Descrição | Default |
+| --- | --- | --- |
+| `NEXT_PUBLIC_API_BASE_URL` | URL base do backend (pública/client) | `http://localhost:3001` |
+| `INTERNAL_API_URL` | URL do backend usada pelo BFF na rede Docker | `http://backend:3001` |
+| `NEXT_PUBLIC_INITIAL_MAP_CENTER` | Centro inicial do mapa (lat,long) | `-43.7,-21.2` |
+| `NEXT_PUBLIC_SUMMARY_API_URL` | URL da API de resumo (opcional) | — |
 
 ---
 
 ## 🐳 Docker
 
-Para rodar com Docker:
+**Desenvolvimento** (a partir da raiz do repositório):
 
-1. **Build e execute o container**
-   ```bash
-   docker-compose up --build
-   ```
-2. O app estará disponível em [http://localhost:8080](http://localhost:8080)
+```bash
+docker compose up
+```
+
+O `.env` da raiz define `COMPOSE_FILE=docker-compose.dev.yml`. O frontend sobe em [http://localhost:3000](http://localhost:3000) e o backend em [http://localhost:3001](http://localhost:3001).
+
+**Produção**: o `Dockerfile` gera a imagem standalone (`pnpm run build` com `output: 'standalone'`) e expõe a porta `3000`.
 
 ---
 
 ## 📄 Licença
 
 MIT
-
----
-
-> Desenvolvido para fins educacionais.

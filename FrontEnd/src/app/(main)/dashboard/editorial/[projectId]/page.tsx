@@ -1,29 +1,43 @@
 //src/app/(main)/dashboard/editorial/[projectId]/page.tsx
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { PenTool, CalendarDays, ArrowLeft } from 'lucide-react';
 import Link from 'next/link';
 import { EditorialVersionManager } from '@/components/editorial/EditorialVersionManager';
+import { editorialService } from '@/lib/services/editorialService';
 
 export default function ProjectWorkspacePage() {
   const params = useParams();
   const projectId = params.projectId;
   const [activeTab, setActiveTab] = useState('linha-editorial');
+  const [projectName, setProjectName] = useState('Projeto Estratégico');
+
+  useEffect(() => {
+    editorialService
+      .listProjects()
+      .then((projects) => {
+        const project = projects.find((item) => item.id === projectId);
+        if (project) setProjectName(project.name);
+      })
+      .catch(() => {
+        // Mantém o título padrão caso a API falhe
+      });
+  }, [projectId]);
 
   return (
     <main className="min-h-screen bg-background p-8 text-foreground">
       <div className="mx-auto max-w-7xl">
         <div className="mb-8 flex items-center gap-4">
-          <Link href="editorial" className="rounded-md border border-border bg-card p-2 text-foreground transition-colors hover:text-primary">
+          <Link href="/dashboard/editorial" className="rounded-md border border-border bg-card p-2 text-foreground transition-colors hover:text-primary">
             <ArrowLeft className="h-5 w-5" />
           </Link>
           <div>
             <p className="font-sans text-sm text-primary uppercase tracking-widest">Workspace</p>
             <h1 className="font-serif text-3xl text-foreground">
-              Projeto Estratégico {/* Substituir por fetch real baseado no projectId */}
+              {projectName}
             </h1>
           </div>
         </div>
