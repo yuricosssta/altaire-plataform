@@ -46,6 +46,15 @@ export const mockProjects: ProjectCardDTO[] = [
 
 export const mockVersions: EditorialVersionDTO[] = [
   {
+    id: '64f1b2c3e4b0a1c2d3e4f5b1',
+    projectId: '64f1b2c3e4b0a1c2d3e4f5a7',
+    versionNumber: 1,
+    name: 'Lançamento Semente',
+    status: 'active',
+    createdAt: new Date('2026-07-25T10:00:00Z'),
+    updatedAt: new Date('2026-08-01T14:00:00Z'),
+  },
+  {
     id: '64f1b2c3e4b0a1c2d3e4f5a8',
     projectId: '64f1b2c3e4b0a1c2d3e4f5a6',
     versionNumber: 3,

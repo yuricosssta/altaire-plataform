@@ -105,3 +105,198 @@ export type OnboardingFormDTO = z.infer<typeof EditorialOnboardingSchema>;
 export type EditorialVersionDTO = z.infer<typeof EditorialVersionSchema>;
 export type EditorialVersionUpdateDTO = z.infer<typeof EditorialVersionUpdateSchema>;
 export type EditorialMapaDTO = z.infer<typeof EditorialMapaSchema>;
+
+// ===== Calendário Editorial =====
+
+export const ContentFormatSchema = z.enum([
+  'reel',
+  'long_video',
+  'carousel',
+  'static_post',
+  'live',
+  'stories_sequence',
+]);
+
+export const RetinaTypeSchema = z.enum([
+  'relacionamento',
+  'engajamento',
+  'transformacao',
+  'interacao',
+  'nivel_consciencia',
+  'autoridade',
+]);
+
+export const PlatformSchema = z.enum(['instagram', 'youtube', 'tiktok', 'linkedin']);
+
+export const CalendarStatusSchema = z.enum(['planned', 'in_production', 'recorded', 'published']);
+
+export const CalendarObjectiveSchema = z.enum([
+  'increase_audience',
+  'warmup_sales',
+  'reinforce_authority',
+  'increase_relationship',
+  'improve_engagement',
+  'support_launch',
+]);
+
+export const PeriodTypeSchema = z.enum([
+  'two_weeks',
+  'one_month',
+  'four_weeks_warmup',
+  'pre_launch',
+  'custom',
+]);
+
+export const ProductionCapacitySchema = z.object({
+  reelsPerWeek: z.coerce.number().int().min(0),
+  longVideosPerWeek: z.coerce.number().int().min(0),
+  carouselsPerWeek: z.coerce.number().int().min(0),
+  staticPostsPerWeek: z.coerce.number().int().min(0),
+  livesPerWeek: z.coerce.number().int().min(0),
+  storySequencesPerDay: z.coerce.number().int().min(0),
+});
+
+export const CalendarPeriodSchema = z.object({
+  type: PeriodTypeSchema,
+  label: z.string(),
+  startDate: z.coerce.date(),
+  endDate: z.coerce.date(),
+});
+
+export const CalendarItemSchema = z.object({
+  id: objectIdSchema,
+  date: z.coerce.date(),
+  format: ContentFormatSchema,
+  retinaType: RetinaTypeSchema,
+  platforms: z.array(PlatformSchema).min(1),
+  objective: z.string(),
+  suggestedTime: z.string(),
+  theme: z.string().optional(),
+  referenceUrl: z.string().optional(),
+  status: CalendarStatusSchema,
+  provisionalName: z.string().optional(),
+  strategicObjective: z.string().optional(),
+  pillar: z.string().optional(),
+  painDesireObjection: z.string().optional(),
+  observations: z.string().optional(),
+  exampleUrl: z.string().optional(),
+});
+
+export const StorySequenceSchema = z.object({
+  id: objectIdSchema,
+  date: z.coerce.date(),
+  sequenceIndex: z.number().int().min(1),
+  storiesCount: z.number().int().min(1),
+  focus: z.string(),
+  retinaType: RetinaTypeSchema,
+  suggestedTime: z.string(),
+  status: CalendarStatusSchema,
+  theme: z.string().optional(),
+});
+
+export const CalendarDaySchema = z.object({
+  date: z.coerce.date(),
+  items: z.array(CalendarItemSchema),
+  storySequences: z.array(StorySequenceSchema),
+});
+
+export const ReviewSuggestionSchema = z.object({
+  id: objectIdSchema,
+  type: z.enum(['increase', 'reduce', 'adjust', 'frequency']),
+  title: z.string(),
+  description: z.string(),
+  impact: z.enum(['high', 'medium', 'low']),
+});
+
+export const EditorialCalendarSchema = z.object({
+  id: objectIdSchema,
+  projectId: objectIdSchema,
+  editorialVersionId: objectIdSchema,
+  name: z.string().min(1),
+  period: CalendarPeriodSchema,
+  platforms: z.array(PlatformSchema).min(1),
+  capacity: ProductionCapacitySchema,
+  objective: CalendarObjectiveSchema,
+  status: z.enum(['active', 'archived']),
+  days: z.array(CalendarDaySchema),
+  reviewSuggestions: z.array(ReviewSuggestionSchema).optional(),
+  createdAt: z.coerce.date(),
+  updatedAt: z.coerce.date(),
+});
+
+export const CalendarSetupSchema = z
+  .object({
+    editorialVersionId: objectIdSchema,
+    periodType: PeriodTypeSchema,
+    startDate: z.coerce.date(),
+    endDate: z.coerce.date().optional(),
+    platforms: z.array(PlatformSchema).min(1, 'Selecione ao menos uma plataforma.'),
+    capacity: ProductionCapacitySchema,
+    objective: CalendarObjectiveSchema,
+    customName: z.string().optional(),
+  })
+  .superRefine((data, ctx) => {
+    if (data.periodType === 'custom') {
+      if (!data.endDate) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['endDate'],
+          message: 'Informe a data final para período personalizado.',
+        });
+      } else if (data.endDate <= data.startDate) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['endDate'],
+          message: 'A data final deve ser posterior à inicial.',
+        });
+      }
+    }
+  });
+
+export const CalendarPatchSchema = z.object({
+  name: z.string().min(1, 'O nome não pode ficar vazio.').optional(),
+  status: z.enum(['active', 'archived']).optional(),
+  editorialVersionId: objectIdSchema.optional(),
+  capacity: ProductionCapacitySchema.optional(),
+  objective: CalendarObjectiveSchema.optional(),
+});
+
+export const CalendarDuplicateSchema = z.object({
+  periodType: PeriodTypeSchema.optional(),
+  startDate: z.coerce.date().optional(),
+  endDate: z.coerce.date().optional(),
+});
+
+export const CalendarItemUpdateSchema = z.object({
+  provisionalName: z.string().optional(),
+  theme: z.string().optional(),
+  painDesireObjection: z.string().optional(),
+  suggestedTime: z.string().optional(),
+  observations: z.string().optional(),
+  referenceUrl: z.string().optional(),
+  exampleUrl: z.string().optional(),
+  pillar: z.string().optional(),
+  strategicObjective: z.string().optional(),
+  status: CalendarStatusSchema.optional(),
+  retinaType: RetinaTypeSchema.optional(),
+  platforms: z.array(PlatformSchema).optional(),
+  objective: z.string().optional(),
+});
+
+export type ContentFormat = z.infer<typeof ContentFormatSchema>;
+export type RetinaType = z.infer<typeof RetinaTypeSchema>;
+export type Platform = z.infer<typeof PlatformSchema>;
+export type CalendarStatus = z.infer<typeof CalendarStatusSchema>;
+export type CalendarObjective = z.infer<typeof CalendarObjectiveSchema>;
+export type PeriodType = z.infer<typeof PeriodTypeSchema>;
+export type ProductionCapacity = z.infer<typeof ProductionCapacitySchema>;
+export type CalendarPeriod = z.infer<typeof CalendarPeriodSchema>;
+export type CalendarItem = z.infer<typeof CalendarItemSchema>;
+export type StorySequence = z.infer<typeof StorySequenceSchema>;
+export type CalendarDay = z.infer<typeof CalendarDaySchema>;
+export type ReviewSuggestion = z.infer<typeof ReviewSuggestionSchema>;
+export type EditorialCalendar = z.infer<typeof EditorialCalendarSchema>;
+export type CalendarSetup = z.infer<typeof CalendarSetupSchema>;
+export type CalendarPatch = z.infer<typeof CalendarPatchSchema>;
+export type CalendarDuplicate = z.infer<typeof CalendarDuplicateSchema>;
+export type CalendarItemUpdate = z.infer<typeof CalendarItemUpdateSchema>;
