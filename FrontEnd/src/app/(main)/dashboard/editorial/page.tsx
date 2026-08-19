@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { Folder, Calendar, PenTool, Clock, Loader2 } from 'lucide-react';
 import { ProjectCardDTO } from '@/lib/dto/editorial.schema';
 import { editorialService } from '@/lib/services/editorialService';
+import { NewProjectDialog } from '@/components/editorial/NewProjectDialog';
 
 export default function EditorialDashboardPage() {
   const [projects, setProjects] = useState<ProjectCardDTO[]>([]);
@@ -30,6 +31,10 @@ export default function EditorialDashboardPage() {
     };
   }, []);
 
+  const handleProjectCreated = (project: ProjectCardDTO) => {
+    setProjects((prev) => [project, ...prev]);
+  };
+
   return (
     <main className="min-h-screen bg-background p-8 text-foreground">
       <div className="mx-auto max-w-7xl">
@@ -42,6 +47,7 @@ export default function EditorialDashboardPage() {
               Gerencie suas linhas e calendários editoriais.
             </p>
           </div>
+          <NewProjectDialog onCreated={handleProjectCreated} />
         </header>
 
         {isLoading && (
@@ -59,7 +65,8 @@ export default function EditorialDashboardPage() {
 
         {!isLoading && !error && projects.length === 0 && (
           <div className="rounded-md border border-border bg-card p-10 text-center font-sans text-muted-foreground">
-            Nenhum projeto editorial encontrado.
+            <p className="mb-2 text-lg font-bold text-foreground">Nenhum projeto editorial encontrado</p>
+            <p>Crie seu primeiro projeto para começar a construir sua linha editorial.</p>
           </div>
         )}
 

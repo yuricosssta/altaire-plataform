@@ -26,24 +26,38 @@ export const EditorialOnboardingSchema = z.object({
     offer: z.string().min(2, 'Oferta é obrigatória'),
     promise: z.string().min(2, 'Promessa principal é obrigatória'),
     roma: z.string(),
+    differentials: z.string(),
   }),
   audienceData: z.object({
     icp: z.string().min(10, 'Descreva o ICP com mais detalhes'),
     pains: z.string(),
     desires: z.string(),
+    objections: z.string(),
+    myths: z.string(),
   }),
   brandingData: z.object({
     puv: z.string(),
     muv: z.string(),
     bigIdea: z.string(),
+    positioningPhrase: z.string(),
     communicationStyle: z.string().min(2, 'Estilo de comunicação é obrigatório'),
+    brandPersonality: z.string(),
   }),
   capacityData: z.object({
     shortVideos: z.coerce.number().min(0),
     longVideos: z.coerce.number().min(0),
     carousels: z.coerce.number().min(0),
     staticPosts: z.coerce.number().min(0),
+    weeklyLives: z.coerce.number().min(0),
+    dailyStories: z.coerce.number().min(0),
   }),
+});
+
+export const ProjectCreateSchema = z.object({
+  name: z.string().min(2, 'O nome do projeto é obrigatório.'),
+  niche: z.string().min(2, 'O nicho é obrigatório.'),
+  subniche: z.string().min(2, 'O subnicho é obrigatório.'),
+  currentObjective: z.string().min(2, 'Defina o objetivo atual do projeto.'),
 });
 
 export const EditorialVersionSchema = z.object({
@@ -65,6 +79,7 @@ export const EditorialMapaSchema = z.object({
   versionId: objectIdSchema,
   versionNumber: z.number().int().positive(),
   name: z.string().min(1, 'O nome do mapa é obrigatório.'),
+  positioningPhrase: z.string().optional(),
   mensagemCentral: z.string(),
   pilares: z.array(
     z.object({
@@ -85,6 +100,7 @@ export const EditorialMapaSchema = z.object({
 });
 
 export type ProjectCardDTO = z.infer<typeof ProjectCardSchema>;
+export type ProjectCreateDTO = z.infer<typeof ProjectCreateSchema>;
 export type OnboardingFormDTO = z.infer<typeof EditorialOnboardingSchema>;
 export type EditorialVersionDTO = z.infer<typeof EditorialVersionSchema>;
 export type EditorialVersionUpdateDTO = z.infer<typeof EditorialVersionUpdateSchema>;

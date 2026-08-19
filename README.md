@@ -1,6 +1,10 @@
-# Altaire Plataform
+# Plataforma Altaire
 
-SaaS educacional — assistente de criação de conteúdo. Dois apps independentes (sem package.json raiz):
+A plataforma é um SaaS educacional em que auxiliará o usuário na criação de sua identidade visual em ambientes virtuais com a criação de conteúdos publicitários assistidos por IA. O resultado pode ser conferido e testado pelo link a seguir: 
+[Plataforma Altaire](https://altaire-plataform.vercel.app/)
+
+
+ Dois apps independentes (sem package.json raiz):
 
 - `BackEnd/` — API NestJS 10 (TypeScript, MongoDB/Mongoose, Zod, EventEmitter2)
 - `FrontEnd/` — Next.js 15 App Router (Redux Toolkit, Tailwind v4, Shadcn/Radix)

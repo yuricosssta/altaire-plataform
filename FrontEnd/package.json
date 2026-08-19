@@ -6,7 +6,9 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "typecheck": "tsc --noEmit",
+    "verify": "bash scripts/verify.sh"
   },
   "dependencies": {
     "@headlessui/react": "2.2.9",
@@ -69,6 +71,8 @@
     "@types/react-dom": "19.1.9",
     "@types/remarkable": "2.0.8",
     "autoprefixer": "10.4.21",
+    "eslint": "^8.57.1",
+    "eslint-config-next": "15.4.10",
     "postcss": "8.5.6",
     "tailwindcss": "4.1.11",
     "typescript": "^5"
