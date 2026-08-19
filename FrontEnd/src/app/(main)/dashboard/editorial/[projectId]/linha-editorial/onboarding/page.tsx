@@ -115,6 +115,8 @@ export default function EditorialOnboardingPage() {
   };
 
   const onSubmit = async (data: OnboardingFormData) => {
+    if (currentStep !== STEPS.length - 1) return;
+
     try {
       const { version } = await editorialService.submitOnboarding(projectId as string, data);
       toast.success('Mapa editorial gerado com sucesso!');
@@ -124,7 +126,7 @@ export default function EditorialOnboardingPage() {
     }
   };
 
-  const CurrentIcon = STEPS[currentStep].icon;
+  const CurrentIcon = STEPS[currentStep]?.icon;
 
   return (
     <main className="min-h-screen bg-background p-8 text-foreground flex flex-col items-center">
@@ -166,7 +168,15 @@ export default function EditorialOnboardingPage() {
         </div>
 
         {/* Container do Formulário */}
-        <form onSubmit={handleSubmit(onSubmit)} className="rounded-md border border-border bg-card p-8 shadow-sm">
+        <form
+          onSubmit={handleSubmit(onSubmit)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' && (e.target as HTMLElement).tagName === 'INPUT') {
+              e.preventDefault();
+            }
+          }}
+          className="rounded-md border border-border bg-card p-8 shadow-sm"
+        >
           <div className="mb-6 border-b border-border pb-4 flex items-center gap-3">
             <CurrentIcon className="h-6 w-6 text-primary" />
             <h2 className="font-serif text-2xl text-foreground">{STEPS[currentStep].title}</h2>
