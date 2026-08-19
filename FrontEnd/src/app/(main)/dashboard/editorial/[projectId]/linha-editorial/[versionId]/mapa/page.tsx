@@ -89,6 +89,11 @@ export default function MapaLinhaEditorialPage() {
               <Flag className="h-6 w-6 text-primary" />
               <h2 className="font-serif text-2xl text-foreground">Mensagem Central</h2>
             </div>
+            {mapa!.positioningPhrase && (
+              <blockquote className="mb-6 rounded-md border-l-4 border-primary bg-background p-4 font-serif text-xl italic leading-relaxed text-foreground">
+                “{mapa!.positioningPhrase}”
+              </blockquote>
+            )}
             <p className="font-sans text-lg leading-relaxed text-muted-foreground">
               {mapa!.mensagemCentral}
             </p>

@@ -7,6 +7,7 @@ import {
   EditorialVersionDTO,
   OnboardingFormDTO,
   ProjectCardDTO,
+  ProjectCreateDTO,
 } from '@/lib/dto/editorial.schema';
 
 const OBJECT_ID_REGEX = /^[0-9a-fA-F]{24}$/;
@@ -77,6 +78,8 @@ export const mockMapa: EditorialMapaDTO = {
   versionId: '64f1b2c3e4b0a1c2d3e4f5a8',
   versionNumber: 3,
   name: 'Campanha de Crescimento',
+  positioningPhrase:
+    'Autoridade real não se compra, se constrói com execução estratégica.',
   mensagemCentral:
     'A estagnação profissional não é falta de esforço, é falta de alinhamento estratégico. Defendemos a construção de autoridade baseada em execução real e metodologias validadas, combatendo o "achismo" no mercado digital.',
   pilares: [
@@ -117,6 +120,20 @@ export const mockMapa: EditorialMapaDTO = {
 
 export function mockVersionsForProject(projectId: string): EditorialVersionDTO[] {
   return mockVersions.filter((version) => version.projectId === projectId);
+}
+
+export function mockCreateProject(data: ProjectCreateDTO): ProjectCardDTO {
+  const now = new Date();
+  return {
+    id: generateObjectId(),
+    name: data.name,
+    niche: data.niche,
+    subniche: data.subniche,
+    currentObjective: data.currentObjective,
+    editorialLineStatus: 'pending',
+    calendarStatus: 'pending',
+    updatedAt: now,
+  };
 }
 
 export function mockVersionById(versionId: string): EditorialVersionDTO | undefined {
@@ -172,15 +189,23 @@ export function mockMapaFromOnboarding(
   version: EditorialVersionDTO,
   data: OnboardingFormDTO,
 ): EditorialMapaDTO {
+  const positioningPhrase = data.brandingData.positioningPhrase;
   return {
     versionId: version.id,
     versionNumber: version.versionNumber,
     name: `${data.nicheData.niche} — ${data.offerData.product}`,
-    mensagemCentral: data.offerData.promise,
+    positioningPhrase: positioningPhrase,
+    mensagemCentral: positioningPhrase || data.offerData.promise,
     pilares: [
       {
         title: data.brandingData.bigIdea || 'Ideia central da marca',
-        description: data.brandingData.puv || data.offerData.roma || '',
+        description:
+          data.offerData.differentials || data.brandingData.puv || data.offerData.roma || '',
+      },
+      {
+        title: 'Quebra de mitos do mercado',
+        description:
+          data.audienceData.myths || 'Desconstruir crenças falsas que travam o público-alvo.',
       },
       {
         title: 'Educação prática',
@@ -192,13 +217,20 @@ export function mockMapaFromOnboarding(
       },
       {
         title: 'Narrativas de autoridade',
-        description: data.audienceData.pains || 'Estudos de caso e resultados.',
+        description:
+          data.audienceData.pains || 'Estudos de caso e resultados reais da execução.',
       },
     ],
     tomDeVoz: {
-      traits: [data.brandingData.communicationStyle || 'Direto', 'Professoral', 'Elegante'],
+      traits: [
+        data.brandingData.communicationStyle || 'Direto',
+        data.brandingData.brandPersonality || 'Professoral',
+        'Elegante',
+      ],
       rules: [
-        'Evite jargões excessivos sem explicação imediata.',
+        data.audienceData.objections
+          ? `Antecipe objeções do ICP sem rodeios: ${data.audienceData.objections}.`
+          : 'Evite jargões excessivos sem explicação imediata.',
         'Nunca faça promessas de ganhos fáceis.',
         'Abra raciocínios com dados ou constatações contraintuitivas.',
       ],

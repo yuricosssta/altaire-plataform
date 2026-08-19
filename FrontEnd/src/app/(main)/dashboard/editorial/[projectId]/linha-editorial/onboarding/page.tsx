@@ -7,7 +7,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { toast } from 'sonner';
-import { ArrowLeft, ArrowRight, Check, Target, Users, Zap, MessageSquare, Activity } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Check, Target, Zap, Compass, Users, MessageSquare, Activity } from 'lucide-react';
 import Link from 'next/link';
 import { editorialService } from '@/lib/services/editorialService';
 
@@ -22,23 +22,30 @@ const EditorialOnboardingSchema = z.object({
     offer: z.string().min(2, 'Oferta é obrigatória'),
     promise: z.string().min(2, 'Promessa principal é obrigatória'),
     roma: z.string(),
+    differentials: z.string(),
   }),
   audienceData: z.object({
     icp: z.string().min(10, 'Descreva o ICP com mais detalhes'),
     pains: z.string(),
     desires: z.string(),
+    objections: z.string(),
+    myths: z.string(),
   }),
   brandingData: z.object({
     puv: z.string(),
     muv: z.string(),
     bigIdea: z.string(),
+    positioningPhrase: z.string(),
     communicationStyle: z.string().min(2, 'Estilo de comunicação é obrigatório'),
+    brandPersonality: z.string(),
   }),
   capacityData: z.object({
     shortVideos: z.coerce.number().min(0),
     longVideos: z.coerce.number().min(0),
     carousels: z.coerce.number().min(0),
     staticPosts: z.coerce.number().min(0),
+    weeklyLives: z.coerce.number().min(0),
+    dailyStories: z.coerce.number().min(0),
   }),
 });
 
@@ -46,11 +53,37 @@ type OnboardingFormData = z.infer<typeof EditorialOnboardingSchema>;
 
 const STEPS = [
   { id: 'niche', title: 'Nicho', icon: Target, fields: ['nicheData.niche', 'nicheData.subniche'] },
-  { id: 'offer', title: 'Oferta', icon: Zap, fields: ['offerData.product', 'offerData.offer', 'offerData.promise', 'offerData.roma'] },
-  { id: 'audience', title: 'Público', icon: Users, fields: ['audienceData.icp', 'audienceData.pains', 'audienceData.desires'] },
-  { id: 'branding', title: 'Marca', icon: MessageSquare, fields: ['brandingData.puv', 'brandingData.muv', 'brandingData.bigIdea', 'brandingData.communicationStyle'] },
-  { id: 'capacity', title: 'Capacidade', icon: Activity, fields: ['capacityData.shortVideos', 'capacityData.longVideos', 'capacityData.carousels', 'capacityData.staticPosts'] },
+  { id: 'offer', title: 'Oferta', icon: Zap, fields: ['offerData.product', 'offerData.offer'] },
+  {
+    id: 'positioning',
+    title: 'Posicionamento',
+    icon: Compass,
+    fields: ['offerData.promise', 'offerData.roma', 'offerData.differentials', 'brandingData.puv', 'brandingData.muv', 'brandingData.bigIdea', 'brandingData.positioningPhrase'],
+  },
+  {
+    id: 'audience',
+    title: 'Público',
+    icon: Users,
+    fields: ['audienceData.icp', 'audienceData.pains', 'audienceData.desires', 'audienceData.objections', 'audienceData.myths'],
+  },
+  {
+    id: 'branding',
+    title: 'Comunicação',
+    icon: MessageSquare,
+    fields: ['brandingData.communicationStyle', 'brandingData.brandPersonality'],
+  },
+  {
+    id: 'capacity',
+    title: 'Capacidade',
+    icon: Activity,
+    fields: ['capacityData.shortVideos', 'capacityData.longVideos', 'capacityData.carousels', 'capacityData.staticPosts', 'capacityData.weeklyLives', 'capacityData.dailyStories'],
+  },
 ];
+
+const inputClassName =
+  'w-full rounded-md border border-border bg-background px-4 py-2 font-sans text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary';
+const labelClassName = 'font-sans text-sm font-bold text-foreground';
+const errorClassName = 'text-xs text-red-500';
 
 export default function EditorialOnboardingPage() {
   const router = useRouter();
@@ -71,7 +104,7 @@ export default function EditorialOnboardingPage() {
   const processNextStep = async () => {
     const fieldsToValidate = STEPS[currentStep].fields as any;
     const isStepValid = await trigger(fieldsToValidate);
-    
+
     if (isStepValid && currentStep < STEPS.length - 1) {
       setCurrentStep((prev) => prev + 1);
     }
@@ -119,7 +152,7 @@ export default function EditorialOnboardingPage() {
             return (
               <div key={step.id} className="relative z-10 flex flex-col items-center gap-2 bg-background px-2">
                 <div className={`flex h-10 w-10 items-center justify-center rounded-full border-2 transition-colors ${
-                  isActive ? 'border-primary bg-primary/10 text-primary' : 
+                  isActive ? 'border-primary bg-primary/10 text-primary' :
                   isCompleted ? 'border-primary bg-primary text-primary-foreground' : 'border-border bg-card text-muted-foreground'
                 }`}>
                   {isCompleted ? <Check className="h-5 w-5" /> : <step.icon className="h-4 w-4" />}
@@ -140,66 +173,143 @@ export default function EditorialOnboardingPage() {
           </div>
 
           <div className="space-y-6">
+            {/* Etapa 1 — Nicho */}
             {currentStep === 0 && (
               <>
                 <div className="space-y-2">
-                  <label className="font-sans text-sm font-bold text-foreground">Nicho Principal</label>
-                  <input {...register('nicheData.niche')} className="w-full rounded-md border border-border bg-background px-4 py-2 font-sans text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary" placeholder="Ex: Finanças, Saúde, Tecnologia" />
-                  {errors.nicheData?.niche && <p className="text-xs text-red-500">{errors.nicheData.niche.message}</p>}
+                  <label className={labelClassName}>Nicho Principal</label>
+                  <input {...register('nicheData.niche')} className={inputClassName} placeholder="Ex: Finanças, Saúde, Tecnologia" />
+                  {errors.nicheData?.niche && <p className={errorClassName}>{errors.nicheData.niche.message}</p>}
                 </div>
                 <div className="space-y-2">
-                  <label className="font-sans text-sm font-bold text-foreground">Subnicho Exato</label>
-                  <input {...register('nicheData.subniche')} className="w-full rounded-md border border-border bg-background px-4 py-2 font-sans text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary" placeholder="Ex: Algorithmic Trading para iniciantes" />
-                  {errors.nicheData?.subniche && <p className="text-xs text-red-500">{errors.nicheData.subniche.message}</p>}
+                  <label className={labelClassName}>Subnicho Exato</label>
+                  <input {...register('nicheData.subniche')} className={inputClassName} placeholder="Ex: Algorithmic Trading para iniciantes" />
+                  {errors.nicheData?.subniche && <p className={errorClassName}>{errors.nicheData.subniche.message}</p>}
                 </div>
               </>
             )}
 
+            {/* Etapa 2 — Oferta */}
             {currentStep === 1 && (
               <>
                 <div className="space-y-2">
-                  <label className="font-sans text-sm font-bold text-foreground">Produto</label>
-                  <input {...register('offerData.product')} className="w-full rounded-md border border-border bg-background px-4 py-2 font-sans focus-visible:ring-primary" />
+                  <label className={labelClassName}>Produto</label>
+                  <input {...register('offerData.product')} className={inputClassName} placeholder="Ex: Mentoria de Trading" />
+                  {errors.offerData?.product && <p className={errorClassName}>{errors.offerData.product.message}</p>}
                 </div>
                 <div className="space-y-2">
-                  <label className="font-sans text-sm font-bold text-foreground">Promessa Principal</label>
-                  <textarea {...register('offerData.promise')} rows={3} className="w-full rounded-md border border-border bg-background px-4 py-2 font-sans focus-visible:ring-primary resize-none" placeholder="Qual resultado concreto essa oferta promete?" />
-                </div>
-                <div className="space-y-2">
-                  <label className="font-sans text-sm font-bold text-foreground">ROMA</label>
-                  <input {...register('offerData.roma')} className="w-full rounded-md border border-border bg-background px-4 py-2 font-sans focus-visible:ring-primary" />
+                  <label className={labelClassName}>Oferta Clara</label>
+                  <input {...register('offerData.offer')} className={inputClassName} placeholder="Ex: Pacote lançamento com bônus de sessão individual" />
+                  {errors.offerData?.offer && <p className={errorClassName}>{errors.offerData.offer.message}</p>}
                 </div>
               </>
             )}
 
+            {/* Etapa 3 — Posicionamento */}
             {currentStep === 2 && (
               <>
                 <div className="space-y-2">
-                  <label className="font-sans text-sm font-bold text-foreground">Perfil do Cliente Ideal (ICP)</label>
-                  <textarea {...register('audienceData.icp')} rows={4} className="w-full rounded-md border border-border bg-background px-4 py-2 font-sans focus-visible:ring-primary resize-none" placeholder="Descreva quem é o seu cliente ideal..." />
-                  {errors.audienceData?.icp && <p className="text-xs text-red-500">{errors.audienceData.icp.message}</p>}
+                  <label className={labelClassName}>Promessa Principal</label>
+                  <textarea {...register('offerData.promise')} rows={3} className={`${inputClassName} resize-none`} placeholder="Qual resultado concreto essa oferta promete?" />
+                  {errors.offerData?.promise && <p className={errorClassName}>{errors.offerData.promise.message}</p>}
+                </div>
+                <div className="space-y-2">
+                  <label className={labelClassName}>ROMA</label>
+                  <input {...register('offerData.roma')} className={inputClassName} placeholder="Ex: Resultado, Oferta, Mecânica, Alavancas" />
+                </div>
+                <div className="space-y-2">
+                  <label className={labelClassName}>Diferenciais</label>
+                  <textarea {...register('offerData.differentials')} rows={2} className={`${inputClassName} resize-none`} placeholder="O que torna essa marca ou especialista único?" />
+                </div>
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                  <div className="space-y-2">
+                    <label className={labelClassName}>PUV</label>
+                    <input {...register('brandingData.puv')} className={inputClassName} placeholder="Proposta Única de Valor" />
+                  </div>
+                  <div className="space-y-2">
+                    <label className={labelClassName}>MUV</label>
+                    <input {...register('brandingData.muv')} className={inputClassName} placeholder="Mecânica Única de Venda" />
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <label className={labelClassName}>Big Idea</label>
+                  <input {...register('brandingData.bigIdea')} className={inputClassName} placeholder="A grande ideia que sustenta a comunicação" />
+                </div>
+                <div className="space-y-2">
+                  <label className={labelClassName}>Frase de Posicionamento</label>
+                  <textarea {...register('brandingData.positioningPhrase')} rows={2} className={`${inputClassName} resize-none`} placeholder="Como a marca quer ser percebida em uma frase" />
                 </div>
               </>
             )}
 
+            {/* Etapa 4 — Público */}
             {currentStep === 3 && (
               <>
                 <div className="space-y-2">
-                  <label className="font-sans text-sm font-bold text-foreground">Estilo de Comunicação</label>
-                  <input {...register('brandingData.communicationStyle')} className="w-full rounded-md border border-border bg-background px-4 py-2 font-sans focus-visible:ring-primary" placeholder="Ex: Direto, provocador, elegante" />
+                  <label className={labelClassName}>Perfil do Cliente Ideal (ICP)</label>
+                  <textarea {...register('audienceData.icp')} rows={4} className={`${inputClassName} resize-none`} placeholder="Descreva quem é o seu cliente ideal..." />
+                  {errors.audienceData?.icp && <p className={errorClassName}>{errors.audienceData.icp.message}</p>}
+                </div>
+                <div className="space-y-2">
+                  <label className={labelClassName}>Dores</label>
+                  <textarea {...register('audienceData.pains')} rows={2} className={`${inputClassName} resize-none`} placeholder="Quais dores dominam a mente do ICP?" />
+                </div>
+                <div className="space-y-2">
+                  <label className={labelClassName}>Desejos</label>
+                  <textarea {...register('audienceData.desires')} rows={2} className={`${inputClassName} resize-none`} placeholder="O que o ICP mais deseja alcançar?" />
+                </div>
+                <div className="space-y-2">
+                  <label className={labelClassName}>Objeções</label>
+                  <textarea {...register('audienceData.objections')} rows={2} className={`${inputClassName} resize-none`} placeholder="Quais objeções travam a decisão de compra?" />
+                </div>
+                <div className="space-y-2">
+                  <label className={labelClassName}>Mitos do Mercado</label>
+                  <textarea {...register('audienceData.myths')} rows={2} className={`${inputClassName} resize-none`} placeholder="Quais mitos o mercado repete e sua marca combate?" />
                 </div>
               </>
             )}
 
+            {/* Etapa 5 — Comunicação */}
             {currentStep === 4 && (
-              <div className="grid grid-cols-2 gap-4">
+              <>
                 <div className="space-y-2">
-                  <label className="font-sans text-sm font-bold text-foreground">Vídeos Curtos (Semana)</label>
-                  <input type="number" {...register('capacityData.shortVideos')} className="w-full rounded-md border border-border bg-background px-4 py-2 font-sans focus-visible:ring-primary" />
+                  <label className={labelClassName}>Estilo de Comunicação</label>
+                  <input {...register('brandingData.communicationStyle')} className={inputClassName} placeholder="Ex: Direto, provocador, elegante" />
+                  {errors.brandingData?.communicationStyle && <p className={errorClassName}>{errors.brandingData.communicationStyle.message}</p>}
                 </div>
                 <div className="space-y-2">
-                  <label className="font-sans text-sm font-bold text-foreground">Carrosséis (Semana)</label>
-                  <input type="number" {...register('capacityData.carousels')} className="w-full rounded-md border border-border bg-background px-4 py-2 font-sans focus-visible:ring-primary" />
+                  <label className={labelClassName}>Personalidade da Marca / Pessoa</label>
+                  <textarea {...register('brandingData.brandPersonality')} rows={3} className={`${inputClassName} resize-none`} placeholder="Como a marca fala, como ela se comporta, qual a persona por trás da comunicação?" />
+                </div>
+              </>
+            )}
+
+            {/* Etapa 6 — Capacidade */}
+            {currentStep === 5 && (
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <label className={labelClassName}>Reels / Vídeos Curtos (Semana)</label>
+                  <input type="number" min={0} {...register('capacityData.shortVideos')} className={inputClassName} />
+                </div>
+                <div className="space-y-2">
+                  <label className={labelClassName}>Vídeos Longos (Semana)</label>
+                  <input type="number" min={0} {...register('capacityData.longVideos')} className={inputClassName} />
+                </div>
+                <div className="space-y-2">
+                  <label className={labelClassName}>Carrosséis (Semana)</label>
+                  <input type="number" min={0} {...register('capacityData.carousels')} className={inputClassName} />
+                </div>
+                <div className="space-y-2">
+                  <label className={labelClassName}>Posts Estáticos (Semana)</label>
+                  <input type="number" min={0} {...register('capacityData.staticPosts')} className={inputClassName} />
+                </div>
+                <div className="space-y-2">
+                  <label className={labelClassName}>Lives (Semana)</label>
+                  <input type="number" min={0} {...register('capacityData.weeklyLives')} className={inputClassName} />
+                </div>
+                <div className="space-y-2">
+                  <label className={labelClassName}>Sequências de Stories (Dia)</label>
+                  <input type="number" min={0} {...register('capacityData.dailyStories')} className={inputClassName} />
                 </div>
               </div>
             )}
@@ -214,7 +324,7 @@ export default function EditorialOnboardingPage() {
             >
               <ArrowLeft className="h-4 w-4" /> Anterior
             </button>
-            
+
             {currentStep < STEPS.length - 1 ? (
               <button
                 type="button"

@@ -6,6 +6,7 @@ import {
   EditorialVersionUpdateDTO,
   OnboardingFormDTO,
   ProjectCardDTO,
+  ProjectCreateDTO,
 } from '@/lib/dto/editorial.schema';
 
 const localClient = axios.create({ baseURL: '/api' });
@@ -51,6 +52,14 @@ export const editorialService = {
       ...project,
       updatedAt: project.updatedAt ? new Date(project.updatedAt) : undefined,
     }));
+  },
+
+  createProject: async (data: ProjectCreateDTO): Promise<ProjectCardDTO> => {
+    const response = await localClient.post('/editorial/projects', data);
+    return {
+      ...response.data,
+      updatedAt: response.data.updatedAt ? new Date(response.data.updatedAt) : undefined,
+    };
   },
 
   listVersions: async (projectId: string): Promise<EditorialVersionDTO[]> => {
