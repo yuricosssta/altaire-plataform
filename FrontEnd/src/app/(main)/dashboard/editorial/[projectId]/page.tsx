@@ -7,6 +7,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { PenTool, CalendarDays, ArrowLeft } from 'lucide-react';
 import Link from 'next/link';
 import { EditorialVersionManager } from '@/components/editorial/EditorialVersionManager';
+import { CalendarManager } from '@/components/editorial/calendar/CalendarManager';
 import { editorialService } from '@/lib/services/editorialService';
 
 export default function ProjectWorkspacePage() {
@@ -68,8 +69,7 @@ export default function ProjectWorkspacePage() {
           </TabsContent>
 
           <TabsContent value="calendario-editorial" className="rounded-md border border-border bg-card p-6">
-            <h2 className="font-serif text-2xl text-foreground mb-4">Agenda de Conteúdos</h2>
-            <p className="font-sans text-muted-foreground">Módulo de execução e frequência em desenvolvimento.</p>
+            <CalendarManager projectId={projectId as string} />
           </TabsContent>
         </Tabs>
       </div>
