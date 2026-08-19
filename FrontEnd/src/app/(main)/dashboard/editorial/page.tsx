@@ -1,31 +1,35 @@
-import Link from 'next/link';
-import { Folder, Calendar, PenTool, Clock } from 'lucide-react';
+// src/app/(main)/dashboard/editorial/page.tsx
+'use client';
 
-// Mock baseado no DTO ProjectCardSchema validado na etapa anterior
-const mockProjects = [
-  {
-    id: '64f1b2c3e4b0a1c2d3e4f5a6',
-    name: 'Autoridade Imperial — Orgânico',
-    niche: 'Desenvolvimento Pessoal',
-    subniche: 'Alta Performance',
-    currentObjective: 'Aquecimento de Audiência',
-    editorialLineStatus: 'active',
-    calendarStatus: 'pending',
-    updatedAt: new Date('2026-08-01T10:00:00Z'),
-  },
-  {
-    id: '64f1b2c3e4b0a1c2d3e4f5a7',
-    name: 'Produto X — Lançamento Semente',
-    niche: 'Finanças',
-    subniche: 'Algorithmic Trading',
-    currentObjective: 'Conversão',
-    editorialLineStatus: 'active',
-    calendarStatus: 'active',
-    updatedAt: new Date('2026-08-05T14:30:00Z'),
-  },
-];
+import { useEffect, useState } from 'react';
+import Link from 'next/link';
+import { Folder, Calendar, PenTool, Clock, Loader2 } from 'lucide-react';
+import { ProjectCardDTO } from '@/lib/dto/editorial.schema';
+import { editorialService } from '@/lib/services/editorialService';
 
 export default function EditorialDashboardPage() {
+  const [projects, setProjects] = useState<ProjectCardDTO[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let active = true;
+    editorialService
+      .listProjects()
+      .then((data) => {
+        if (active) setProjects(data);
+      })
+      .catch((err: any) => {
+        if (active) setError(err?.response?.data?.error || err?.message || 'Falha ao carregar projetos.');
+      })
+      .finally(() => {
+        if (active) setIsLoading(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
+
   return (
     <main className="min-h-screen bg-background p-8 text-foreground">
       <div className="mx-auto max-w-7xl">
@@ -38,18 +42,29 @@ export default function EditorialDashboardPage() {
               Gerencie suas linhas e calendários editoriais.
             </p>
           </div>
-          {/* TODO: Criar rota /dashboard/editorial/novo quando a página de criação de projeto editorial existir */}
-          {/* <Link
-            href="/dashboard/editorial/novo"
-            className="flex items-center gap-2 rounded-md bg-primary px-6 py-3 font-sans text-sm font-bold text-primary-foreground transition-opacity hover:opacity-90"
-          >
-            <Plus className="h-5 w-5" />
-            Novo Projeto
-          </Link> */}
         </header>
 
+        {isLoading && (
+          <div className="flex items-center justify-center gap-3 py-20 font-sans text-muted-foreground">
+            <Loader2 className="h-5 w-5 animate-spin text-primary" />
+            Carregando projetos...
+          </div>
+        )}
+
+        {!isLoading && error && (
+          <div className="rounded-md border border-border bg-card p-6 font-sans text-sm text-red-500">
+            {error}
+          </div>
+        )}
+
+        {!isLoading && !error && projects.length === 0 && (
+          <div className="rounded-md border border-border bg-card p-10 text-center font-sans text-muted-foreground">
+            Nenhum projeto editorial encontrado.
+          </div>
+        )}
+
         <section className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
-          {mockProjects.map((project) => (
+          {projects.map((project) => (
             <Link
               key={project.id}
               href={`/dashboard/editorial/${project.id}`}
@@ -98,7 +113,7 @@ export default function EditorialDashboardPage() {
                 </div>
                 <div className="flex items-center gap-2 pt-2 text-xs text-muted-foreground">
                   <Clock className="h-3 w-3" />
-                  Atualizado em {project.updatedAt.toLocaleDateString('pt-BR')}
+                  Atualizado em {project.updatedAt?.toLocaleDateString('pt-BR')}
                 </div>
               </div>
             </Link>

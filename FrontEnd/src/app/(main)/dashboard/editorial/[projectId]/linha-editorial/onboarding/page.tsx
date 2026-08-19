@@ -6,8 +6,10 @@ import { useParams, useRouter } from 'next/navigation';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
+import { toast } from 'sonner';
 import { ArrowLeft, ArrowRight, Check, Target, Users, Zap, MessageSquare, Activity } from 'lucide-react';
 import Link from 'next/link';
+import { editorialService } from '@/lib/services/editorialService';
 
 // Schema replicado para validação do formulário
 const EditorialOnboardingSchema = z.object({
@@ -80,9 +82,13 @@ export default function EditorialOnboardingPage() {
   };
 
   const onSubmit = async (data: OnboardingFormData) => {
-    console.log('Payload validado pronto para envio:', data);
-    // TODO: Implementar mutação via BFF/Server Action e redirecionar para o Mapa (Tela 3)
-    router.push(`/dashboard/editorial/${projectId}/linha-editorial/v1/mapa`);
+    try {
+      const { version } = await editorialService.submitOnboarding(projectId as string, data);
+      toast.success('Mapa editorial gerado com sucesso!');
+      router.push(`/dashboard/editorial/${projectId}/linha-editorial/${version.id}/mapa`);
+    } catch (error: any) {
+      toast.error(error?.message || 'Falha ao gerar o mapa editorial.');
+    }
   };
 
   const CurrentIcon = STEPS[currentStep].icon;
