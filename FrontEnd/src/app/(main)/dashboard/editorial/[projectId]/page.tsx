@@ -4,10 +4,11 @@
 import { useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { PenTool, CalendarDays, ArrowLeft } from 'lucide-react';
+import { PenTool, CalendarDays, Lightbulb, ArrowLeft } from 'lucide-react';
 import Link from 'next/link';
 import { EditorialVersionManager } from '@/components/editorial/EditorialVersionManager';
 import { CalendarManager } from '@/components/editorial/calendar/CalendarManager';
+import { ThemesManager } from '@/components/themes/ThemesManager';
 import { editorialService } from '@/lib/services/editorialService';
 
 export default function ProjectWorkspacePage() {
@@ -44,7 +45,7 @@ export default function ProjectWorkspacePage() {
         </div>
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className="mb-8 grid w-full max-w-md grid-cols-2 rounded-md bg-card border border-border p-1">
+          <TabsList className="mb-8 grid w-full max-w-3xl grid-cols-3 rounded-md bg-card border border-border p-1">
             <TabsTrigger 
               value="linha-editorial"
               className="flex items-center gap-2 rounded-sm px-4 py-2 font-sans text-sm font-bold data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=inactive]:text-muted-foreground"
@@ -59,6 +60,13 @@ export default function ProjectWorkspacePage() {
               <CalendarDays className="h-4 w-4" />
               Calendário
             </TabsTrigger>
+            <TabsTrigger 
+              value="temas"
+              className="flex items-center gap-2 rounded-sm px-4 py-2 font-sans text-sm font-bold data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=inactive]:text-muted-foreground"
+            >
+              <Lightbulb className="h-4 w-4" />
+              Temas
+            </TabsTrigger>
           </TabsList>
 
           <TabsContent value="linha-editorial" className="rounded-md border border-border bg-card p-6">
@@ -70,6 +78,10 @@ export default function ProjectWorkspacePage() {
 
           <TabsContent value="calendario-editorial" className="rounded-md border border-border bg-card p-6">
             <CalendarManager projectId={projectId as string} />
+          </TabsContent>
+
+          <TabsContent value="temas" className="rounded-md border border-border bg-card p-6">
+            <ThemesManager projectId={projectId as string} />
           </TabsContent>
         </Tabs>
       </div>
