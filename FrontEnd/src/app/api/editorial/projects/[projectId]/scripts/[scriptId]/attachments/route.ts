@@ -23,6 +23,9 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   });
   if (result.ok) return NextResponse.json(result.data, { status: 201 });
 
+  const fileEntry = formData?.get('file');
+  const fileName = fileEntry instanceof File ? fileEntry.name : '';
+
   return NextResponse.json(
     {
       id: Math.random().toString(36).slice(2),
@@ -31,7 +34,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       title: jsonData.title || 'Novo anexo',
       description: jsonData.description || '',
       createdAt: new Date(),
-      fileName: formData?.get('file')?.name || '',
+      fileName,
       mimeType: 'application/pdf',
       source: 'roteiro',
     },
