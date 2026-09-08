@@ -1,6 +1,6 @@
 // src/app/api/editorial/projects/route.ts
 import { NextRequest, NextResponse } from 'next/server';
-import { proxyEditorialRequest, normalizeList } from '../_proxy';
+import { proxyEditorialRequest, normalizeList } from '@/app/api/editorial/_proxy';
 import { mockCreateProject, mockProjects } from '@/lib/mocks/editorial.mock';
 import { ProjectCardSchema, ProjectCreateSchema } from '@/lib/dto/editorial.schema';
 

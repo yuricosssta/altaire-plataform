@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { proxyEditorialRequest } from '../../../_proxy';
+import { proxyEditorialRequest } from '@/app/api/editorial/_proxy';
 import { mockScripts } from '@/lib/mocks/scripts.mock';
 
 export async function POST(request: NextRequest, { params }: { params: Promise<{ projectId: string; scriptId: string }> }) {

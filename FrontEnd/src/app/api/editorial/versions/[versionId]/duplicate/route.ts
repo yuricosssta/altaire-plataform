@@ -1,6 +1,6 @@
 // src/app/api/editorial/versions/[versionId]/duplicate/route.ts
 import { NextRequest, NextResponse } from 'next/server';
-import { proxyEditorialRequest } from '../../../_proxy';
+import { proxyEditorialRequest } from '@/app/api/editorial/_proxy';
 import { mockDuplicateVersion, mockVersionById } from '@/lib/mocks/editorial.mock';
 import { EditorialVersionSchema } from '@/lib/dto/editorial.schema';
 

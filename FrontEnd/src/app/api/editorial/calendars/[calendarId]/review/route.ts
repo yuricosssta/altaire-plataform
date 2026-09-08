@@ -1,6 +1,6 @@
 // src/app/api/editorial/calendars/[calendarId]/review/route.ts
 import { NextRequest, NextResponse } from 'next/server';
-import { proxyEditorialRequest } from '../../../_proxy';
+import { proxyEditorialRequest } from '@/app/api/editorial/_proxy';
 import { buildReviewSuggestions, mockCalendarById } from '@/lib/mocks/calendar.mock';
 import { ReviewSuggestionSchema } from '@/lib/dto/editorial.schema';
 

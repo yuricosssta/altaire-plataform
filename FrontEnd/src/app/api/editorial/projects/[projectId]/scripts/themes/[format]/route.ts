@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { proxyEditorialRequest } from '../../../_proxy';
+import { proxyEditorialRequest } from '@/app/api/editorial/_proxy';
 import { mockThemesForScript } from '@/lib/mocks/scripts.mock';
 import type { ScriptFormat } from '@/lib/dto/editorial.schema';
 

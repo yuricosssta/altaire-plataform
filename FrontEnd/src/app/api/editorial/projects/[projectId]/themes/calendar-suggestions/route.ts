@@ -1,6 +1,6 @@
 // src/app/api/editorial/projects/[projectId]/themes/calendar-suggestions/route.ts
 import { NextRequest, NextResponse } from 'next/server';
-import { proxyEditorialRequest } from '../../../../_proxy';
+import { proxyEditorialRequest } from '@/app/api/editorial/_proxy';
 import { CalendarSuggestionsRequestSchema, SlotSuggestionSchema } from '@/lib/dto/themes.schema';
 import { mockSuggestions } from '@/lib/mocks/themes.mock';
 

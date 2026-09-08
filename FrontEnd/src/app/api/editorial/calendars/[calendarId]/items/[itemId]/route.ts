@@ -1,6 +1,6 @@
 // src/app/api/editorial/calendars/[calendarId]/items/[itemId]/route.ts
 import { NextRequest, NextResponse } from 'next/server';
-import { proxyEditorialRequest } from '../../../../_proxy';
+import { proxyEditorialRequest } from '@/app/api/editorial/_proxy';
 import { mockCalendarById, mockUpdateCalendarItem } from '@/lib/mocks/calendar.mock';
 import { CalendarItemUpdateSchema, CalendarItemSchema } from '@/lib/dto/editorial.schema';
 

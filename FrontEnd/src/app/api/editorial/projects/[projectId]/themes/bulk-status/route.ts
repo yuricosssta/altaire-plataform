@@ -1,6 +1,6 @@
 // src/app/api/editorial/projects/[projectId]/themes/bulk-status/route.ts
 import { NextRequest, NextResponse } from 'next/server';
-import { proxyEditorialRequest } from '../../../../_proxy';
+import { proxyEditorialRequest } from '@/app/api/editorial/_proxy';
 import { BulkStatusSchema, ThemeSchema } from '@/lib/dto/themes.schema';
 import { mockBulkStatus } from '@/lib/mocks/themes.mock';
 
