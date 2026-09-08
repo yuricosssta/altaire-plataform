@@ -1,6 +1,6 @@
 // src/app/api/editorial/projects/[projectId]/themes/calendars/[calendarId]/balance/route.ts
 import { NextRequest, NextResponse } from 'next/server';
-import { proxyEditorialRequest } from '../../../../../../_proxy';
+import { proxyEditorialRequest } from '@/app/api/editorial/_proxy';
 import { BalanceReportSchema } from '@/lib/dto/themes.schema';
 import { mockBalance } from '@/lib/mocks/themes.mock';
 

@@ -1,6 +1,6 @@
 // src/app/api/editorial/projects/[projectId]/themes/calendars/[calendarId]/simulate/route.ts
 import { NextRequest, NextResponse } from 'next/server';
-import { proxyEditorialRequest } from '../../../../../../_proxy';
+import { proxyEditorialRequest } from '@/app/api/editorial/_proxy';
 import { RebalanceResultSchema, SimulateRequestSchema } from '@/lib/dto/themes.schema';
 import { mockSimulate } from '@/lib/mocks/themes.mock';
 

@@ -300,3 +300,298 @@ export type CalendarSetup = z.infer<typeof CalendarSetupSchema>;
 export type CalendarPatch = z.infer<typeof CalendarPatchSchema>;
 export type CalendarDuplicate = z.infer<typeof CalendarDuplicateSchema>;
 export type CalendarItemUpdate = z.infer<typeof CalendarItemUpdateSchema>;
+
+// ===== Função 03 – Roteiros por Formato =====
+
+export const ScriptFormatSchema = z.enum([
+  'video_curto',
+  'video_longo',
+  'live',
+  'carrossel',
+  'post_estatico',
+  'stories_sequence',
+]);
+
+export const ScriptModeSchema = z.enum(['seguranca', 'conexao']);
+
+export const ScriptStatusSchema = z.enum(['rascunho', 'pronto', 'publicado', 'teste_ab']);
+
+export const ScriptBlockTypeSchema = z.enum([
+  'gancho',
+  'agitacao',
+  'miolo',
+  'retencao',
+  'cta',
+  'introducao',
+  'contextualizacao',
+  'bloco_ensino',
+  'recompensa',
+  'cta_final',
+  'acolhimento',
+  'ancoragem',
+  'onda',
+  'pico',
+  'qa_encerramento',
+  'slide_capa',
+  'slide_contextualizacao',
+  'slide_miolo',
+  'slide_recompensa',
+  'slide_cta',
+  'outdoor',
+  'bloco_1_gancho',
+  'bloco_2_contextualizacao',
+  'bloco_3_desenvolvimento',
+  'bloco_4_objecao',
+  'bloco_5_cta',
+  'manha',
+  'almoco',
+  'tarde',
+  'noite',
+]);
+
+export const ScriptBlockSchema = z.object({
+  id: objectIdSchema,
+  order: z.number().int().min(0),
+  type: ScriptBlockTypeSchema,
+  title: z.string().optional(),
+  content: z.string(),
+  visualDirection: z.string().optional(),
+  modeSpecificData: z.record(z.unknown()).optional(),
+  timeRange: z.string().optional(),
+});
+
+export const TitleSuggestionSchema = z.object({
+  id: objectIdSchema,
+  title: z.string(),
+  hookType: z.enum(['erro', 'metodo', 'estatistica', 'mito', 'bastidor', 'pergunta', 'promessa', 'outro']).optional(),
+});
+
+export const ThumbnailPromptSchema = z.object({
+  id: objectIdSchema,
+  promptEn: z.string(),
+  description: z.string().optional(),
+  format: z.enum(['9:16', '16:9', '4:5']).optional(),
+});
+
+export const ComplementaryMaterialSchema = z.object({
+  id: objectIdSchema,
+  type: z.enum(['pdf_checklist', 'pdf_guia', 'pdf_workbook', 'planilha_xlsx', 'video_extra']),
+  title: z.string(),
+  promise: z.string(),
+  structure: z.array(z.string()),
+  fileId: objectIdSchema.optional(),
+  downloadUrl: z.string().optional(),
+  status: z.enum(['gerando', 'pronto', 'erro']).default('gerando'),
+});
+
+export const ExplanationMaterialSchema = z.object({
+  id: objectIdSchema,
+  type: z.enum(['mapa_mental', 'pdf_explicativo', 'planilha_apoio']),
+  title: z.string(),
+  content: z.string(),
+  fileId: objectIdSchema.optional(),
+  downloadUrl: z.string().optional(),
+  status: z.enum(['gerando', 'pronto', 'erro']).default('gerando'),
+});
+
+export const ScriptAttachmentSchema = z.object({
+  id: objectIdSchema,
+  scriptId: objectIdSchema,
+  type: z.enum(['brand_story', 'referencia_validada', 'estudo_tema', 'material_existente']),
+  title: z.string(),
+  description: z.string().optional(),
+  fileId: objectIdSchema.optional(),
+  fileName: z.string().optional(),
+  fileUrl: z.string().optional(),
+  mimeType: z.string().optional(),
+  parsedContent: z.string().optional(),
+  source: z.enum(['platform', 'project', 'roteiro']).optional(),
+  formatTag: ScriptFormatSchema.optional(),
+  createdAt: z.coerce.date(),
+});
+
+export const ScriptBriefingSchema = z.object({
+  bloco1: z.object({
+    format: ScriptFormatSchema,
+    platform: PlatformSchema,
+    retinaType: RetinaTypeSchema,
+    objective: z.string(),
+    theme: z.string(),
+    materialQualified: z.boolean(),
+    duration: z.string().optional(),
+    projectContext: z.object({
+      niche: z.string(),
+      subniche: z.string(),
+      offer: z.string(),
+      roma: z.string(),
+      puv: z.string(),
+      muv: z.string(),
+      icp: z.object({
+        pains: z.string(),
+        desires: z.string(),
+        objections: z.string(),
+        myths: z.string(),
+        vocabulary: z.string(),
+        awarenessLevel: z.string(),
+      }),
+      editorialLine: z.object({
+        pillars: z.array(z.string()),
+        toneOfVoice: z.string(),
+        positioning: z.string(),
+        narrativeType: z.string(),
+        retinaDistribution: z.record(z.number()),
+      }),
+    }),
+  }),
+  bloco2: z.object({
+    mandatoryExamples: z.array(z.string()).optional(),
+    scriptMode: ScriptModeSchema.optional(),
+  }),
+  bloco3: z.object({
+    location: z.string().optional(),
+    equipment: z.array(z.string()).optional(),
+    technicalNotes: z.string().optional(),
+    toneNuance: z.string().optional(),
+  }),
+  bloco4: z.object({
+    activateComplementaryMaterial: z.boolean().default(false),
+    materialFocus: z.string().optional(),
+    forcedMaterialType: ComplementaryMaterialSchema.shape.type.optional(),
+  }),
+});
+
+export const ScriptVersionSchema = z.object({
+  id: objectIdSchema,
+  scriptId: objectIdSchema,
+  versionNumber: z.number().int().positive(),
+  comment: z.string().optional(),
+  blocks: z.array(ScriptBlockSchema),
+  caption: z.string().optional(),
+  titles: z.array(TitleSuggestionSchema).optional(),
+  thumbnailPrompts: z.array(ThumbnailPromptSchema).optional(),
+  complementaryMaterials: z.array(ComplementaryMaterialSchema).optional(),
+  explanationMaterials: z.array(ExplanationMaterialSchema).optional(),
+  createdAt: z.coerce.date(),
+  createdBy: objectIdSchema,
+});
+
+export const ScriptSchema = z.object({
+  id: objectIdSchema,
+  projectId: objectIdSchema,
+  calendarSlotId: objectIdSchema.optional(),
+  themeId: objectIdSchema.optional(),
+  format: ScriptFormatSchema,
+  version: z.number().int().positive().default(1),
+  mode: ScriptModeSchema,
+  status: ScriptStatusSchema.default('rascunho'),
+  title: z.string().optional(),
+  provisionalName: z.string().optional(),
+  blocks: z.array(ScriptBlockSchema),
+  caption: z.string().optional(),
+  titles: z.array(TitleSuggestionSchema).optional(),
+  thumbnailPrompts: z.array(ThumbnailPromptSchema).optional(),
+  complementaryMaterials: z.array(ComplementaryMaterialSchema).optional(),
+  explanationMaterials: z.array(ExplanationMaterialSchema).optional(),
+  briefing: ScriptBriefingSchema.optional(),
+  attachments: z.array(ScriptAttachmentSchema).optional(),
+  createdAt: z.coerce.date(),
+  updatedAt: z.coerce.date(),
+  createdBy: objectIdSchema,
+});
+
+export const CalendarSlotForScriptSchema = z.object({
+  id: objectIdSchema,
+  date: z.coerce.date(),
+  format: ScriptFormatSchema,
+  retinaType: RetinaTypeSchema,
+  platforms: z.array(PlatformSchema),
+  objective: z.string(),
+  suggestedTime: z.string(),
+  theme: z.string().optional(),
+  provisionalName: z.string().optional(),
+  strategicObjective: z.string().optional(),
+  pillar: z.string().optional(),
+  painDesireObjection: z.string().optional(),
+  materialQualified: z.boolean().default(false),
+  status: CalendarStatusSchema,
+});
+
+export const ThemeForScriptSchema = z.object({
+  id: objectIdSchema,
+  title: z.string(),
+  angle: z.string(),
+  approach: z.enum(['erro', 'metodo', 'historia', 'bastidor', 'estudo_caso', 'outro']),
+  pillar: z.string().optional(),
+  references: z.array(z.string()).optional(),
+  formatCompatibility: z.array(ScriptFormatSchema),
+  createdAt: z.coerce.date(),
+});
+
+export const BrandStorySchema = z.object({
+  id: objectIdSchema,
+  organizationId: objectIdSchema,
+  userId: objectIdSchema,
+  originStory: z.string(),
+  keyTurnarounds: z.array(z.string()),
+  failures: z.array(z.string()),
+  achievements: z.array(z.string()),
+  values: z.array(z.string()),
+  lifestyle: z.string(),
+  usableStories: z.array(z.object({
+    title: z.string(),
+    content: z.string(),
+    tags: z.array(z.string()),
+  })),
+  updatedAt: z.coerce.date(),
+});
+
+export const GenerationRequestSchema = z.object({
+  scriptId: objectIdSchema,
+  briefing: ScriptBriefingSchema,
+  attachments: z.array(ScriptAttachmentSchema),
+  brandStory: BrandStorySchema.optional(),
+});
+
+export const GenerationProgressSchema = z.object({
+  phase: z.enum([
+    'analyzing',
+    'generating_blocks',
+    'generating_caption',
+    'generating_titles_thumbnails',
+    'generating_materials',
+    'consolidating',
+    'complete',
+    'error',
+  ]),
+  message: z.string(),
+  percent: z.number().min(0).max(100),
+});
+
+export const GenerationResultSchema = z.object({
+  blocks: z.array(ScriptBlockSchema),
+  caption: z.string(),
+  titles: z.array(TitleSuggestionSchema),
+  thumbnailPrompts: z.array(ThumbnailPromptSchema),
+  complementaryMaterials: z.array(ComplementaryMaterialSchema),
+  explanationMaterials: z.array(ExplanationMaterialSchema),
+});
+
+export type ScriptFormat = z.infer<typeof ScriptFormatSchema>;
+export type ScriptMode = z.infer<typeof ScriptModeSchema>;
+export type ScriptStatus = z.infer<typeof ScriptStatusSchema>;
+export type ScriptBlockType = z.infer<typeof ScriptBlockTypeSchema>;
+export type ScriptBlock = z.infer<typeof ScriptBlockSchema>;
+export type TitleSuggestion = z.infer<typeof TitleSuggestionSchema>;
+export type ThumbnailPrompt = z.infer<typeof ThumbnailPromptSchema>;
+export type ComplementaryMaterial = z.infer<typeof ComplementaryMaterialSchema>;
+export type ExplanationMaterial = z.infer<typeof ExplanationMaterialSchema>;
+export type ScriptAttachment = z.infer<typeof ScriptAttachmentSchema>;
+export type ScriptBriefing = z.infer<typeof ScriptBriefingSchema>;
+export type ScriptVersion = z.infer<typeof ScriptVersionSchema>;
+export type Script = z.infer<typeof ScriptSchema>;
+export type CalendarSlotForScript = z.infer<typeof CalendarSlotForScriptSchema>;
+export type ThemeForScript = z.infer<typeof ThemeForScriptSchema>;
+export type BrandStory = z.infer<typeof BrandStorySchema>;
+export type GenerationRequest = z.infer<typeof GenerationRequestSchema>;
+export type GenerationProgress = z.infer<typeof GenerationProgressSchema>;
+export type GenerationResult = z.infer<typeof GenerationResultSchema>;

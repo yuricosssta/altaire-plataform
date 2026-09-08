@@ -1,6 +1,6 @@
 // src/app/api/editorial/projects/[projectId]/themes/calendars/[calendarId]/rebalance/route.ts
 import { NextRequest, NextResponse } from 'next/server';
-import { proxyEditorialRequest } from '../../../../../../_proxy';
+import { proxyEditorialRequest } from '@/app/api/editorial/_proxy';
 import { RebalanceRequestSchema, RebalanceResultSchema } from '@/lib/dto/themes.schema';
 import { mockRebalance } from '@/lib/mocks/themes.mock';
 

@@ -1,6 +1,6 @@
 // src/app/api/editorial/projects/[projectId]/themes/[themeId]/generate-more/route.ts
 import { NextRequest, NextResponse } from 'next/server';
-import { proxyEditorialRequest } from '../../../../../_proxy';
+import { proxyEditorialRequest } from '@/app/api/editorial/_proxy';
 import { GenerateMoreSchema, ThemeSchema } from '@/lib/dto/themes.schema';
 import { mockGenerateMore } from '@/lib/mocks/themes.mock';
 

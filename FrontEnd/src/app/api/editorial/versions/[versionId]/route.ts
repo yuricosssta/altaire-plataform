@@ -1,6 +1,6 @@
 // src/app/api/editorial/versions/[versionId]/route.ts
 import { NextRequest, NextResponse } from 'next/server';
-import { proxyEditorialRequest } from '../../_proxy';
+import { proxyEditorialRequest } from '@/app/api/editorial/_proxy';
 import { mockPatchVersion, mockVersionById } from '@/lib/mocks/editorial.mock';
 import { EditorialVersionUpdateSchema, EditorialVersionSchema } from '@/lib/dto/editorial.schema';
 
