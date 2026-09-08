@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { proxyEditorialRequest } from '@/app/api/editorial/_proxy';
+import { mockScripts } from '@/lib/mocks/scripts.mock';
 
 export async function GET(request: NextRequest, { params }: { params: Promise<{ projectId: string; scriptId: string }> }) {
   const { projectId, scriptId } = await params;
