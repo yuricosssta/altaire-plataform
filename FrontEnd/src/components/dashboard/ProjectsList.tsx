@@ -1,7 +1,7 @@
 //src/components/dashboard/ProjectsList.tsx
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useCallback, useState, useEffect } from "react";
 import {
   Plus, MapPin, Calendar, Clock, AlertCircle, HardHat, CheckCircle, FileText, Flame, Activity, Loader2, Lock, Search, UserCircle, ArrowUpDown, SlidersHorizontal, PauseCircle
 } from "lucide-react";
@@ -68,9 +68,10 @@ export function ProjectsList() {
         console.error("Erro ao carregar preferências de abas", e);
       }
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const handleToggleTabVisibility = (tabId: string) => {
+  const handleToggleTabVisibility = useCallback((tabId: string) => {
     let newPreferences;
     if (visibleTabs.includes(tabId)) {
       if (visibleTabs.length === 1) return; 
@@ -84,9 +85,9 @@ export function ProjectsList() {
     if (!newPreferences.includes(activeTab) && newPreferences.length > 0) {
       setActiveTab(newPreferences[0] as TabType);
     }
-  };
+  }, [visibleTabs, activeTab]);
 
-  const fetchProjects = async () => {
+  const fetchProjects = useCallback(async () => {
     if (!orgId || !token) return;
 
     try {
@@ -132,11 +133,11 @@ export function ProjectsList() {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [orgId, token]);
 
   useEffect(() => {
     fetchProjects();
-  }, [orgId, token]);
+  }, [orgId, token, fetchProjects]);
 
   useEffect(() => {
     if (urlTab && allAvailableTabs.includes(urlTab)) {
@@ -145,6 +146,7 @@ export function ProjectsList() {
         handleToggleTabVisibility(urlTab);
       }
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [urlTab]);
 
   const isUserAssigned = (assignedMembers: any[]) => {

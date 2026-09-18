@@ -1,4 +1,4 @@
-import axiosInstance from '@/app/api/axiosInstance';
+import http from '@/lib/http';
 
 // Interface para a resposta da API
 interface TranscriptionResponse {
@@ -11,7 +11,7 @@ export const transcribeAudioAPI = async (file: File): Promise<string> => {
 
   try {
     //'/transcription'
-    const response = await axiosInstance.post<TranscriptionResponse>('/transcription/upload', formData, {
+    const response = await http.post<TranscriptionResponse>('/transcription/upload', formData, {
       headers: {
         'Content-Type': 'multipart/form-data',
       },

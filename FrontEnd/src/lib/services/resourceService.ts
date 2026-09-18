@@ -1,5 +1,5 @@
 //src/lib/services/resourceService.ts
-import axiosInstance from '../../app/api/axiosInstance';
+import http from '@/lib/http';
 
 // --- ENUMS ---
 export enum ResourceType {
@@ -106,12 +106,12 @@ export interface CancelTransactionData {
 export const resourceService = {
   // --- EQUIPE DO ALMOXARIFADO ---
   getWarehouseTeam: async (orgId: string): Promise<string[]> => {
-    const response = await axiosInstance.get(`/organizations/${orgId}/resources/team`);
+    const response = await http.get(`/organizations/${orgId}/resources/team`);
     return response.data;
   },
 
   assignWarehouseMember: async (orgId: string, userId: string, orgRole: string): Promise<any> => {
-    const response = await axiosInstance.post(
+    const response = await http.post(
       `/organizations/${orgId}/resources/team/assign`,
       { userId },
       { headers: { 'x-org-role': orgRole } }
@@ -120,7 +120,7 @@ export const resourceService = {
   },
 
   removeWarehouseMember: async (orgId: string, userId: string, orgRole: string): Promise<any> => {
-    const response = await axiosInstance.post(
+    const response = await http.post(
       `/organizations/${orgId}/resources/team/remove`,
       { userId },
       { headers: { 'x-org-role': orgRole } }
@@ -130,26 +130,26 @@ export const resourceService = {
 
   // --- CATÁLOGO ---
   createResource: async (orgId: string, data: CreateResourceData, orgRole?: string): Promise<Resource> => {
-    const response = await axiosInstance.post(`/organizations/${orgId}/resources`, data, {
+    const response = await http.post(`/organizations/${orgId}/resources`, data, {
       headers: orgRole ? { 'x-org-role': orgRole } : undefined
     });
     return response.data;
   },
 
   listResources: async (orgId: string): Promise<Resource[]> => {
-    const response = await axiosInstance.get(`/organizations/${orgId}/resources`);
+    const response = await http.get(`/organizations/${orgId}/resources`);
     return response.data;
   },
 
   updateResource: async (orgId: string, resourceId: string, data: Partial<CreateResourceData>, orgRole?: string): Promise<Resource> => {
-    const response = await axiosInstance.patch(`/organizations/${orgId}/resources/${resourceId}`, data, {
+    const response = await http.patch(`/organizations/${orgId}/resources/${resourceId}`, data, {
       headers: orgRole ? { 'x-org-role': orgRole } : undefined
     });
     return response.data;
   },
 
   inactivateResource: async (orgId: string, resourceId: string, orgRole?: string): Promise<Resource> => {
-    const response = await axiosInstance.patch(`/organizations/${orgId}/resources/${resourceId}/inactivate`, {}, {
+    const response = await http.patch(`/organizations/${orgId}/resources/${resourceId}/inactivate`, {}, {
       headers: orgRole ? { 'x-org-role': orgRole } : undefined
     });
     return response.data;
@@ -157,20 +157,20 @@ export const resourceService = {
 
   // --- REQUISIÇÃO PELA OBRA ---
   requestAllocation: async (orgId: string, projectId: string, data: AllocateResourceData): Promise<ResourceTransaction> => {
-    const response = await axiosInstance.post(`/organizations/${orgId}/resources/request/${projectId}`, data);
+    const response = await http.post(`/organizations/${orgId}/resources/request/${projectId}`, data);
     return response.data;
   },
 
   // --- GESTÃO DO ALMOXARIFADO (Aprovar/Rejeitar RM) ---
   approveRequest: async (orgId: string, transactionId: string, data: ApproveRequestData, orgRole?: string): Promise<ResourceTransaction> => {
-    const response = await axiosInstance.post(`/organizations/${orgId}/resources/transactions/${transactionId}/approve`, data, {
+    const response = await http.post(`/organizations/${orgId}/resources/transactions/${transactionId}/approve`, data, {
       headers: orgRole ? { 'x-org-role': orgRole } : undefined
     });
     return response.data;
   },
 
   rejectRequest: async (orgId: string, transactionId: string, data: RejectRequestData, orgRole?: string): Promise<ResourceTransaction> => {
-    const response = await axiosInstance.post(`/organizations/${orgId}/resources/transactions/${transactionId}/reject`, data, {
+    const response = await http.post(`/organizations/${orgId}/resources/transactions/${transactionId}/reject`, data, {
       headers: orgRole ? { 'x-org-role': orgRole } : undefined
     });
     return response.data;
@@ -178,7 +178,7 @@ export const resourceService = {
 
   // --- SAÍDA DIRETA (Almoxarifado -> Obra) ---
   allocateDirectly: async (orgId: string, projectId: string, data: AllocateResourceData, orgRole?: string): Promise<ResourceTransaction> => {
-    const response = await axiosInstance.post(`/organizations/${orgId}/resources/allocate-direct/${projectId}`, data, {
+    const response = await http.post(`/organizations/${orgId}/resources/allocate-direct/${projectId}`, data, {
       headers: orgRole ? { 'x-org-role': orgRole } : undefined
     });
     return response.data;
@@ -186,14 +186,14 @@ export const resourceService = {
 
   // --- ENTRADAS E DEVOLUÇÕES DE ESTOQUE ---
   addStock: async (orgId: string, data: AddStockData, orgRole?: string): Promise<ResourceTransaction> => {
-    const response = await axiosInstance.post(`/organizations/${orgId}/resources/stock`, data, {
+    const response = await http.post(`/organizations/${orgId}/resources/stock`, data, {
       headers: orgRole ? { 'x-org-role': orgRole } : undefined
     });
     return response.data;
   },
 
   returnFromProject: async (orgId: string, projectId: string, data: AllocateResourceData, orgRole?: string): Promise<ResourceTransaction> => {
-    const response = await axiosInstance.post(`/organizations/${orgId}/resources/return/${projectId}`, data, {
+    const response = await http.post(`/organizations/${orgId}/resources/return/${projectId}`, data, {
       headers: orgRole ? { 'x-org-role': orgRole } : undefined
     });
     return response.data;
@@ -201,7 +201,7 @@ export const resourceService = {
 
   // --- AUDITORIA (Estorno) ---
   cancelTransaction: async (orgId: string, transactionId: string, data: CancelTransactionData, orgRole?: string): Promise<ResourceTransaction> => {
-    const response = await axiosInstance.post(`/organizations/${orgId}/resources/transactions/${transactionId}/cancel`, data, {
+    const response = await http.post(`/organizations/${orgId}/resources/transactions/${transactionId}/cancel`, data, {
       headers: orgRole ? { 'x-org-role': orgRole } : undefined
     });
     return response.data;
@@ -209,12 +209,12 @@ export const resourceService = {
 
   // --- LIVRO RAZÃO & FINANCEIRO ---
   listTransactions: async (orgId: string): Promise<ResourceTransaction[]> => {
-    const response = await axiosInstance.get(`/organizations/${orgId}/resources/transactions`);
+    const response = await http.get(`/organizations/${orgId}/resources/transactions`);
     return response.data;
   },
 
   getProjectStatement: async (orgId: string, projectId: string): Promise<ProjectStatement> => {
-    const response = await axiosInstance.get(`/organizations/${orgId}/resources/statement/${projectId}`);
+    const response = await http.get(`/organizations/${orgId}/resources/statement/${projectId}`);
     return response.data;
   },
 };

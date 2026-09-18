@@ -11,13 +11,10 @@ export class AuthService {
   constructor(
     private usersService: UsersService,
     private jwtService: JwtService,
-    private configService: ConfigService
-  ) { }
+    private configService: ConfigService,
+  ) {}
 
-  async signIn(
-    email: string,
-    pass: string
-  ): Promise<{ access_token: string }> {
+  async signIn(email: string, pass: string): Promise<{ access_token: string }> {
     const user = await this.usersService.findOne(email);
 
     if (!user) {
@@ -63,5 +60,4 @@ export class AuthService {
       access_token: await this.jwtService.signAsync(payload),
     };
   }
-
 }

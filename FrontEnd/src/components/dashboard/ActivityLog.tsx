@@ -1,6 +1,7 @@
 //src/components/dashboard/ActivityLog.tsx
 "use client";
 
+import Image from "next/image";
 import React, { useState, useEffect } from "react";
 import { Plus, Edit2, MessageSquare, AlertCircle, FileText, Loader2 } from "lucide-react";
 import { useSelector } from "react-redux";
@@ -122,7 +123,7 @@ export function ActivityLog() {
                     <div className="relative flex-shrink-0 mt-0.5">
                       <div className="flex h-9 w-9 items-center justify-center rounded-full bg-accent text-accent-foreground font-semibold text-xs border border-border">
                         {event.authorId?.avatarUrl ? (
-                          <img src={event.authorId.avatarUrl} alt={authorName} className="h-full w-full rounded-full object-cover" />
+                          <Image src={event.authorId.avatarUrl} alt={authorName} width={36} height={36} className="h-full w-full rounded-full object-cover" />
                         ) : initials}
                       </div>
                       <div className="absolute -bottom-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-background border border-border shadow-sm">
@@ -138,7 +139,7 @@ export function ActivityLog() {
                         <span className="font-medium">{projectCode} {projectTitle}</span>
                       </p>
                       <p className="text-xs text-muted-foreground mt-1 truncate">
-                        "{event.description}"
+                        &ldquo;{event.description}&rdquo;
                       </p>
                       <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground mt-1.5 block">
                         {getRelativeTime(event.createdAt)}

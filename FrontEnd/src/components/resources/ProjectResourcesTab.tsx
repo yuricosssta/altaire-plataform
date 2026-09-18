@@ -42,7 +42,7 @@ export function ProjectResourcesTab({ orgId, projectId, hasPermission }: Project
     } finally {
       setIsLoading(false);
     }
-  }, [orgId, projectId, dispatch]);
+  }, [orgId, projectId]);
 
   const allocatedResources = statement?.items?.map(item => ({
     id: item.resourceId,

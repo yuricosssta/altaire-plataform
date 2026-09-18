@@ -6,7 +6,7 @@ import { X, Loader2, MapPin, AlignLeft, Calendar, Navigation, FileText, Map as M
 import { useSelector } from "react-redux";
 import { RootState } from "@/lib/redux/store";
 import { selectCurrentOrg } from "@/lib/redux/slices/organizationSlice";
-import axiosInstance from "@/app/api/axiosInstance";
+import http from "@/lib/http";
 import { UpgradeModal } from "./UpgradeModal";
 
 // Importações do OpenLayers
@@ -117,6 +117,7 @@ export function CreateProjectModal({ isOpen, onClose, onSuccess }: CreateProject
         mapInstance.current = null;
       }
     };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [showMap]);
 
   const handleGetLocation = () => {
@@ -152,7 +153,7 @@ export function CreateProjectModal({ isOpen, onClose, onSuccess }: CreateProject
         ...(formData.endDate && { endDate: formData.endDate }),
       };
 
-      await axiosInstance.post(
+      await http.post(
         `/organizations/${orgId}/projects`,
         payload
       );

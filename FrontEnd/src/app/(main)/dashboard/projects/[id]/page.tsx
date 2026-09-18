@@ -1,7 +1,7 @@
 //src/app/(main)/dashboard/projects/[id]/page.tsx
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useSelector } from "react-redux";
 import { RootState } from "@/lib/redux/store";
@@ -60,7 +60,7 @@ export default function ProjectDetailsPage() {
   const [isParecerOpen, setIsParecerOpen] = useState(false);
   const [isTeamDrawerOpen, setIsTeamDrawerOpen] = useState(false);
 
-  const fetchDetails = async (showFullLoader = true) => {
+  const fetchDetails = useCallback(async (showFullLoader = true) => {
     if (!orgId || !token || !projectId) return;
     try {
       if (showFullLoader) setIsLoading(true);
@@ -74,11 +74,11 @@ export default function ProjectDetailsPage() {
     } finally {
       if (showFullLoader) setIsLoading(false);
     }
-  };
+  }, [orgId, token, projectId, router]);
 
   useEffect(() => {
     fetchDetails(true);
-  }, [orgId, token, projectId]);
+  }, [fetchDetails]);
 
   const currentUserId = String(user?.sub || (user as any)?._id || (user as any)?.id || "");
   const currentUserName = user?.name || (user as any)?.displayName || "Usuário";

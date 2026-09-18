@@ -1,5 +1,5 @@
 //src/lib/services/storageService.ts
-import axiosInstance from "@/app/api/axiosInstance";
+import http from "@/lib/http";
 import axios from "axios";
 import imageCompression from 'browser-image-compression';
 
@@ -22,7 +22,7 @@ export async function uploadFileToR2(file: File): Promise<string> {
     }
 
     // Pede a URL assinada (Agora enviando o tamanho do arquivo já reduzido)
-    const authResponse = await axiosInstance.post('/storage/presigned-url', {
+    const authResponse = await http.post('/storage/presigned-url', {
       fileName: fileToUpload.name,
       fileType: fileToUpload.type,
       sizeBytes: fileToUpload.size 
@@ -38,7 +38,7 @@ export async function uploadFileToR2(file: File): Promise<string> {
     });
 
     // Avisa a portaria que o arquivo subiu para contabilizar os Megabytes reais
-    await axiosInstance.post('/storage/confirm-upload', {
+    await http.post('/storage/confirm-upload', {
       fileUrl: fileUrl,
       fileName: fileToUpload.name,
       mimeType: fileToUpload.type,

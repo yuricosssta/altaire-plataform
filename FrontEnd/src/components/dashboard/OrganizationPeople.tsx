@@ -1,7 +1,7 @@
 //src/components/dashboard/OrganizationPeople.tsx
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useCallback, useState, useEffect } from "react";
 import { useSelector } from "react-redux";
 import { UserPlus, Settings, Loader2, Save, Trash2, ShieldAlert, X } from "lucide-react";
 import { selectCurrentOrg } from "@/lib/redux/slices/organizationSlice";
@@ -44,7 +44,7 @@ export function OrganizationPeople() {
   const [editRole, setEditRole] = useState("");
   const [isUpdatingAction, setIsUpdatingAction] = useState(false);
 
-  const fetchMembers = async () => {
+  const fetchMembers = useCallback(async () => {
     if (!orgId) return;
     try {
       setIsLoading(true);
@@ -55,11 +55,11 @@ export function OrganizationPeople() {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [orgId]);
 
   useEffect(() => {
     if (token && orgId) fetchMembers();
-  }, [token, orgId]);
+  }, [token, orgId, fetchMembers]);
 
   const handleCreateUser = async (e: React.FormEvent) => {
     e.preventDefault();

@@ -1,5 +1,5 @@
 // src/lib/services/planningService.ts
-import axiosInstance from '../../app/api/axiosInstance';
+import http from '@/lib/http';
 
 // --- INTERFACES DE DTOs ---
 export interface UploadPlanningPayload {
@@ -85,7 +85,7 @@ const planningService = {
     formData.append('referenceYear', String(metadata.referenceYear));
     formData.append('grupo', metadata.grupo);
 
-    const response = await axiosInstance.post('/planning/upload', formData, {
+    const response = await http.post('/planning/upload', formData, {
       headers: { 'Content-Type': 'multipart/form-data' },
     });
     return response.data;
@@ -109,7 +109,7 @@ const planningService = {
     formData.append('referenceYear', String(metadata.referenceYear));
     formData.append('grupo', metadata.grupo);
 
-    const response = await axiosInstance.post('/planning/upload-costs', formData, {
+    const response = await http.post('/planning/upload-costs', formData, {
       headers: { 'Content-Type': 'multipart/form-data' },
     });
     return response.data;
@@ -138,7 +138,7 @@ const planningService = {
     if (query.page) params.append('page', String(query.page));
     if (query.limit) params.append('limit', String(query.limit));
 
-    const response = await axiosInstance.get(`/planning/search?${params.toString()}`);
+    const response = await http.get(`/planning/search?${params.toString()}`);
 
     return response.data !== undefined ? response.data : response;
   },
@@ -157,7 +157,7 @@ const planningService = {
     if (query.grupo) params.append('grupo', query.grupo);
     if (query.groupBy) params.append('groupBy', query.groupBy);
 
-    const response = await axiosInstance.get(`/planning/grouped?${params.toString()}`);
+    const response = await http.get(`/planning/grouped?${params.toString()}`);
     return response.data;
   },
 
@@ -176,7 +176,7 @@ const planningService = {
     if (query?.referenceMonth) params.append('referenceMonth', String(query.referenceMonth));
     if (query?.referenceYear) params.append('referenceYear', String(query.referenceYear));
 
-    const response = await axiosInstance.get(
+    const response = await http.get(
       `/planning/composition/${encodeURIComponent(codigoComposicao)}/items?${params.toString()}`
     );
 

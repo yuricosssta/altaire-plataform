@@ -1,6 +1,6 @@
 //src/lib/redux/slices/userSlice.ts
 import { createSlice, createAsyncThunk, PayloadAction } from '@reduxjs/toolkit';
-import axiosInstance from '@/app/api/axiosInstance';
+import http from '@/lib/http';
 import { IUser } from '../../../types/user';
 import { logout, sessionExpired } from './authSlice'; 
 
@@ -21,7 +21,7 @@ const initialState: UserState = {
 export const fetchUserProfile = createAsyncThunk<IUser>(
   'user/fetchProfile',
   async () => {
-    const response = await axiosInstance.get('/users/profile');
+    const response = await http.get('/users/profile');
     return response.data;
   }
 );
@@ -29,7 +29,7 @@ export const fetchUserProfile = createAsyncThunk<IUser>(
 export const fetchUsers = createAsyncThunk<IUser[]>(
   'user/fetchUsers',
   async () => {
-    const response = await axiosInstance.get('/users');
+    const response = await http.get('/users');
     return response.data;
   }
 );

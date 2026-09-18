@@ -1,6 +1,7 @@
 //src/components/dashboard/EmitParecerModal.tsx
 "use client";
 
+import Image from "next/image";
 import React, { useState, useEffect, useRef } from "react";
 import { X, Loader2, Activity, ArrowRightCircle, Flame, Navigation, MapPin, Map as MapIcon, Check, Calendar, Briefcase, Paperclip, Trash2, FileText } from "lucide-react";
 import { useSelector } from "react-redux";
@@ -449,7 +450,7 @@ export function EmitParecerModal({ isOpen, onClose, onSuccess, project }: EmitPa
                             {url.toLowerCase().endsWith('.pdf') ? (
                               <FileText className="w-8 h-8 text-muted-foreground" />
                             ) : (
-                              <img src={url} alt="Anexo" className="w-full h-full object-cover" />
+                              <Image src={url} alt="Anexo" width={200} height={200} className="w-full h-full object-cover" />
                             )}
                             <button type="button" onClick={() => removeAttachment(i)} className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity text-white">
                               <Trash2 className="w-5 h-5" />

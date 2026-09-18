@@ -1,7 +1,7 @@
 //src/app/(main)/dashboard/resources/page.tsx
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useCallback, useState, useEffect } from "react";
 import { Package, ClipboardList, History, Plus, ArrowDownToLine, Send, Users, ShieldAlert } from "lucide-react";
 import { ResourceCatalog } from "@/components/resources/ResourceCatalog";
 import { CreateResourceModal } from "@/components/resources/CreateResourceModal";
@@ -38,7 +38,7 @@ export default function ResourcesPage() {
     const isAdminOrOwner = orgRole === 'OWNER' || orgRole === 'ADMIN';
     const currentUserId = String(user?.sub || (user as any)?._id || (user as any)?.id || "");
 
-    const fetchTeam = async () => {
+    const fetchTeam = useCallback(async () => {
         if (!orgId) return;
         try {
             const team = await resourceService.getWarehouseTeam(orgId);
@@ -46,11 +46,11 @@ export default function ResourcesPage() {
         } catch (error) {
             console.error("Erro ao buscar equipe do almoxarifado:", error);
         }
-    };
+    }, [orgId]);
 
     useEffect(() => {
         fetchTeam();
-    }, [orgId, refreshKey]);
+    }, [orgId, refreshKey, fetchTeam]);
 
     const isAssigned = warehouseTeam.includes(currentUserId);
     const hasWriteAccess = isAdminOrOwner || isAssigned;

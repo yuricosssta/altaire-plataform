@@ -130,7 +130,7 @@ export function ResourceCatalog({ refreshKey }: ResourceCatalogProps) {
       <div className="flex flex-col items-center justify-center h-64 text-muted-foreground space-y-3">
         <Box className="w-12 h-12 opacity-20" />
         <p className="text-sm font-medium">Nenhum recurso ativo no almoxarifado.</p>
-        <p className="text-xs opacity-70">Utilize o botão "Novo Recurso" para iniciar o catálogo.</p>
+        <p className="text-xs opacity-70">Utilize o botão &ldquo;Novo Recurso&rdquo; para iniciar o catálogo.</p>
       </div>
     );
   }

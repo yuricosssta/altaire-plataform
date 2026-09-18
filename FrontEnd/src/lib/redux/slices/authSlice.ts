@@ -3,7 +3,7 @@ import { createSlice, createAsyncThunk, PayloadAction } from '@reduxjs/toolkit';
 import axios from 'axios';
 import { RootState } from '../store';
 import { jwtDecode } from 'jwt-decode';
-import axiosInstance from '@/app/api/axiosInstance';
+import http from '@/lib/http';
 
 interface UserPayload {
   sub: string;
@@ -64,7 +64,7 @@ export const renewToken = createAsyncThunk<AuthResponse>(
   'auth/renewToken',
   async (_, { rejectWithValue }) => {
     try {
-      const response = await axiosInstance.post('/auth/refresh');
+      const response = await http.post('/auth/refresh');
       return response.data;
     } catch (error: any) {
       return rejectWithValue(error.response?.data || 'Erro ao renovar token');
