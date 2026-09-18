@@ -38,10 +38,10 @@ import { PlanningModule } from './planning/planning.module';
     ProjectsModule,
     StorageModule,
     ResourcesModule,
-    SharedModule, 
+    SharedModule,
     PlanningModule,
   ],
   controllers: [AppController],
-  providers: [AppService],// { provide: APP_GUARD, useClass: AuthGuard }],
+  providers: [AppService], // { provide: APP_GUARD, useClass: AuthGuard }],
 })
 export class AppModule {}

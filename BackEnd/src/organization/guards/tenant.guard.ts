@@ -5,32 +5,39 @@ import {
   Injectable,
   ForbiddenException,
   BadRequestException,
-  UnauthorizedException
+  UnauthorizedException,
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
-import { OrganizationMember, OrganizationMemberDocument } from '../schemas/organization-member.schema';
+import {
+  OrganizationMember,
+  OrganizationMemberDocument,
+} from '../schemas/organization-member.schema';
 
 @Injectable()
 export class TenantGuard implements CanActivate {
   constructor(
     @InjectModel(OrganizationMember.name)
     private memberModel: Model<OrganizationMemberDocument>,
-  ) { }
+  ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const request = context.switchToHttp().getRequest();
     const user = request.user;
 
     if (!user || (!user.sub && !user.userId)) {
-      console.error('TenantGuard: Usuário não encontrado no request. Verifique se o AuthGuard foi executado.');
+      console.error(
+        'TenantGuard: Usuário não encontrado no request. Verifique se o AuthGuard foi executado.',
+      );
       throw new ForbiddenException('Usuário não autenticado.');
     }
     const userIdStr = user.sub || user.userId;
 
-
     if (!(Types.ObjectId as any).isValid(userIdStr)) {
-      console.error('TenantGuard: ID do usuário no token não é um ObjectId válido:', userIdStr);
+      console.error(
+        'TenantGuard: ID do usuário no token não é um ObjectId válido:',
+        userIdStr,
+      );
       throw new UnauthorizedException('Token de usuário inválido.');
     }
 
@@ -40,13 +47,17 @@ export class TenantGuard implements CanActivate {
     }
 
     if (!(Types.ObjectId as any).isValid(orgIdHeader)) {
-      throw new BadRequestException(`ID da organização inválido: ${orgIdHeader}`);
+      throw new BadRequestException(
+        `ID da organização inválido: ${orgIdHeader}`,
+      );
     }
 
-    const membership = await this.memberModel.findOne({
-      userId: new (Types.ObjectId as any)(userIdStr),
-      organizationId: new (Types.ObjectId as any)(orgIdHeader),
-    }).exec();
+    const membership = await this.memberModel
+      .findOne({
+        userId: new (Types.ObjectId as any)(userIdStr),
+        organizationId: new (Types.ObjectId as any)(orgIdHeader),
+      })
+      .exec();
 
     if (!membership) {
       throw new ForbiddenException('Acesso negado a esta organização.');

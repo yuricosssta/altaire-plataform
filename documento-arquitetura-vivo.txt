@@ -1,3 +1,22 @@
+## SPRINT 06 - 18/09/2026 ##
+Resumo Técnico de Fechamento
+
+Decisões de Arquitetura
+
+Configuração de ESLint com Restrição de Camadas (Backend): Implementação de regras arquiteturais via no-restricted-imports com overrides por diretório, garantindo o Princípio da Inversão de Dependência:
+- Services: Bloqueio total de imports de mongoose, @nestjs/mongoose e */schemas/*. Service não pode conhecer o tipo de banco de dados.
+- Controllers: Bloqueio de imports de mongoose, repositories e schemas. Controller é camada fina de HTTP que só se comunica com Service.
+- Repositories: Bloqueio de imports de services (inversão de dependência).
+- Módulos legados (projects, planning): Mesmas restrições como warn em vez de error, sinalizando necessidade de migração para Repository pattern sem quebrar CI.
+
+Configuração de ESLint com Restrição de BFF (Frontend): Criação de .eslintrc.js com extensão next/core-web-vitals e regra no-restricted-imports:
+- axiosInstance (via @/app/api/axiosInstance): Warn — sinaliza uso de padrão legado de chamada direta ao NestJS. Novos módulos devem usar route handlers em src/app/api/ (BFF) com axios.create({ baseURL: "/api" }).
+- mongoose: Warn — reforça a regra de nunca importar mongoose no frontend (ObjectId validado via regex 24 hex).
+
+Remoção da regra de naming-convention com prefixo I para interfaces no backend, alinhando à convenção NestJS (sem prefixo) e ao código existente (ex: PostRepository, ResourceRepository).
+
+Criação de .eslintignore no backend (dist/, node_modules/) e frontend (.next/, node_modules/, next-env.d.ts).
+
 ## SPRINT 05 - 07/08/2026 ##
 Resumo Técnico de Fechamento
 
