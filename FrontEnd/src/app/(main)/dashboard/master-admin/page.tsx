@@ -1,7 +1,7 @@
 //src/app/(main)/dashboard/master-admin/page.tsx
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import { useSelector } from "react-redux";
 import { RootState } from "@/lib/redux/store";
 import axios from "axios";
@@ -39,7 +39,7 @@ export default function MasterAdminPage() {
   const [searchTerm, setSearchTerm] = useState("");
   const [expandedRow, setExpandedRow] = useState<string | null>(null);
 
-  const fetchAllOrgs = async () => {
+  const fetchAllOrgs = useCallback(async () => {
     try {
       setIsLoading(true);
       const response = await axios.get(
@@ -53,11 +53,11 @@ export default function MasterAdminPage() {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [token]);
 
   useEffect(() => {
     if (token) fetchAllOrgs();
-  }, [token]);
+  }, [token, fetchAllOrgs]);
 
   const handleUpdatePlan = async (orgId: string, newPlan: string) => {
     if (!confirm(`Tem certeza que deseja alterar o plano desta empresa para ${newPlan}?`)) return;

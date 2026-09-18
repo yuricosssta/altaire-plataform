@@ -1,11 +1,12 @@
 // src/components/dashboard/settings/BrandingSettings.tsx
 "use client";
 
+import Image from "next/image";
 import React, { useState } from "react";
 import { UploadCloud, Loader2, CheckCircle } from "lucide-react";
 import { useSelector, useDispatch } from "react-redux";
 import { RootState } from "@/lib/redux/store";
-import axiosInstance from "@/app/api/axiosInstance";
+import http from "@/lib/http";
 import { updateCurrentOrgSettings } from "@/lib/redux/slices/organizationSlice";
 import { uploadFileToR2 } from "@/lib/services/storageService"; // IMPORT NOVO
 
@@ -41,7 +42,7 @@ export function BrandingSettings() {
         [fieldName]: fileUrl
       };
 
-      await axiosInstance.patch(`/organizations/${orgId}/settings`, {
+      await http.patch(`/organizations/${orgId}/settings`, {
         settings: updatedSettings
       });
 
@@ -78,7 +79,7 @@ export function BrandingSettings() {
             </div>
           ) : currentImage ? (
             <>
-              <img src={currentImage} alt={title} className="w-full h-full object-contain p-2" />
+              <Image src={currentImage} alt={title} fill className="object-contain p-2" unoptimized />
               <div className="absolute inset-0 bg-black/60 opacity-0 hover:opacity-100 flex items-center justify-center transition-opacity">
                 <label className="cursor-pointer px-4 py-2 bg-primary text-primary-foreground text-sm font-bold rounded-md shadow-md">
                   Trocar Imagem

@@ -1,6 +1,7 @@
 //src/components/dashboard/MyProfile.tsx
 "use client";
 
+import Image from "next/image";
 import React, { useState, useEffect } from "react";
 import { useSelector, useDispatch } from "react-redux";
 import { User, Lock, Save, Loader2, Mail, ShieldCheck } from "lucide-react";
@@ -107,7 +108,7 @@ export function MyProfile() {
           </div>
           <button className="flex items-center justify-center w-14 h-14 rounded-full bg-accent border border-border overflow-hidden shadow-sm">
             {userAvatar ? (
-              <img src={userAvatar} alt={userName} className="w-full h-full object-cover" />
+              <Image src={userAvatar} alt={userName} width={56} height={56} className="w-full h-full object-cover" unoptimized />
             ) : (
               <span className="text-lg font-bold text-accent-foreground uppercase">{userName.charAt(0)}</span>
             )}

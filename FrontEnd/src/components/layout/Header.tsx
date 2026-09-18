@@ -1,6 +1,7 @@
 //src/components/layout/Header.tsx
 "use client";
 
+import Image from "next/image";
 import React, { useState, useRef, useEffect } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { usePathname } from "next/navigation";
@@ -90,7 +91,7 @@ export function Header() {
           className="flex items-center justify-center w-8 h-8 rounded-full bg-accent border border-border hover:ring-2 hover:ring-muted transition-all overflow-hidden focus:outline-none"
         >
           {displayUser?.avatarUrl ? (
-            <img src={displayUser.avatarUrl} alt="Avatar" className="w-full h-full object-cover" />
+            <Image src={displayUser.avatarUrl} alt="Avatar" width={32} height={32} className="w-full h-full object-cover" unoptimized />
           ) : (
             <div className="flex items-center justify-center w-full h-full bg-primary/10 text-primary font-bold text-xs uppercase">
               {displayUser?.name ? displayUser.name.charAt(0) : <User className="w-4 h-4" />}

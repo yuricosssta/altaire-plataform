@@ -2,6 +2,7 @@
 "use client";
 
 import React, { useState, useRef, useEffect } from "react";
+import Image from "next/image";
 import {
   MessageSquare, ArrowRightCircle, FileText, ClipboardList, Activity, Clock,
   LinkIcon, MoreVertical, FileDown
@@ -185,7 +186,7 @@ export function TimelineEventCard({ event, isLatest, onExportPdf }: TimelineEven
                         <span className="text-[8px] font-bold mt-1 text-muted-foreground">PDF</span>
                       </>
                     ) : (
-                      <img src={link} alt="Anexo" className="w-full h-full object-cover opacity-80 group-hover:opacity-100 transition-opacity" />
+                      <Image src={link} alt="Anexo" width={200} height={200} className="w-full h-full object-cover opacity-80 group-hover:opacity-100 transition-opacity" />
                     )}
                   </a>
                 );

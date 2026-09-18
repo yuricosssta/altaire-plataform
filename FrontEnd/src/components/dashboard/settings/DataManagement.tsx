@@ -9,7 +9,7 @@ import {
   Download, Upload, FileSpreadsheet, CheckCircle2,
   Trash2, AlertTriangle, Save, Loader2, X
 } from "lucide-react";
-import axiosInstance from "@/app/api/axiosInstance";
+import http from "@/lib/http";
 import Papa from 'papaparse';
 import { UpgradeModal } from "../UpgradeModal";
 
@@ -145,7 +145,7 @@ export function DataManagement() {
     try {
       setIsSubmitting(true);
 
-      await axiosInstance.post(`/organizations/${orgId}/projects/bulk-import`, {
+      await http.post(`/organizations/${orgId}/projects/bulk-import`, {
         projects: draftRows
       });
 

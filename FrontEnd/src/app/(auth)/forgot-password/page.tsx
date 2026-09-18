@@ -4,7 +4,7 @@
 import { useState } from "react";
 import { Mail, ArrowLeft, Loader2, CheckCircle } from "lucide-react";
 import Link from "next/link";
-import axiosInstance from "@/app/api/axiosInstance";
+import http from "@/lib/http";
 
 export default function ForgotPasswordPage() {
   const [email, setEmail] = useState("");
@@ -15,7 +15,7 @@ export default function ForgotPasswordPage() {
     e.preventDefault();
     setIsLoading(true);
     try {
-      await axiosInstance.post("/users/forgot-password", { email });
+      await http.post("/users/forgot-password", { email });
       setIsSuccess(true);
     } catch (error) {
       setIsSuccess(true); // evita vazamento de e-mails

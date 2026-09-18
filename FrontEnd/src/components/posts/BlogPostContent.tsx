@@ -1,6 +1,7 @@
 // src/components/posts/BlogPostContent.tsx
 "use client";
 
+import Image from "next/image";
 import { IPost } from "@/types/post";
 import Link from "next/link";
 import MarkdownPreview from "./MarkdownPreview";
@@ -65,9 +66,11 @@ export const BlogPostContent = ({ post }: { post: IPost | null }) => {
         {/* aspect-video para evitar deslocamento de layout */}
           {isImageValid && (
             <div className="relative w-full aspect-video overflow-hidden rounded-md border border-border bg-muted mb-10 shadow-sm">
-              <img
+              <Image
                 src={post.image || "https://placehold.co/1200x600"}
                 alt={post.title}
+                width={1200}
+                height={600}
                 className="w-full h-full object-cover"
               />
             </div>)}

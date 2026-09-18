@@ -5,7 +5,7 @@ import { useState, Suspense } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { KeyRound, ArrowRight, Loader2, CheckCircle, AlertTriangle } from "lucide-react";
 import Link from "next/link";
-import axiosInstance from "@/app/api/axiosInstance";
+import http from "@/lib/http";
 
 function ResetPasswordContent() { // isolado
   const searchParams = useSearchParams();
@@ -27,7 +27,7 @@ function ResetPasswordContent() { // isolado
 
     setIsLoading(true);
     try {
-      await axiosInstance.post("/users/reset-password", {
+      await http.post("/users/reset-password", {
         token,
         newPassword: passwords.new
       });

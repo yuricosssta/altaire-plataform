@@ -1,6 +1,7 @@
 //src/components/dashboard/ExportPdfModal.tsx
 "use client";
 
+import NextImage from "next/image";
 import React, { useState } from "react";
 import { X, Image as ImageIcon, FileText, Loader2, UploadCloud, Trash2, PenTool, Plus, UserMinus } from "lucide-react";
 import { createPortal } from "react-dom";
@@ -407,7 +408,7 @@ export function ExportPdfModal({ isOpen, onClose, event, currentOrg }: ExportPdf
                 <div className="grid grid-cols-4 gap-2 mt-4">
                   {photos.map((photo, i) => (
                     <div key={i} className="relative group rounded-md overflow-hidden bg-muted aspect-square border border-border">
-                      <img src={URL.createObjectURL(photo)} alt="Preview" className="w-full h-full object-cover" />
+                      <NextImage src={URL.createObjectURL(photo)} alt="Preview" width={200} height={200} className="w-full h-full object-cover" unoptimized />
                       <button
                         onClick={() => removePhoto(i)}
                         className="absolute inset-0 bg-black/50 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity text-white"

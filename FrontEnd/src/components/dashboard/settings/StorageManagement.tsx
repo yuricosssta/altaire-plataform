@@ -1,14 +1,14 @@
 //src/components/dashboard/settings/StorageManagement.tsx
 "use client";
 
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useCallback, useState, useEffect, useMemo } from "react";
 import {
     HardDrive, FileText, Image as ImageIcon, File,
     Trash2, ExternalLink, AlertTriangle, Loader2, ArrowUpDown
 } from "lucide-react";
 import { useSelector } from "react-redux";
 import { selectCurrentOrg } from "@/lib/redux/slices/organizationSlice";
-import axiosInstance from "@/app/api/axiosInstance";
+import http from "@/lib/http";
 
 // Limites fixos em Bytes
 const LIMITS = {
@@ -53,12 +53,12 @@ export function StorageManagement() {
     const storageLimit = LIMITS[orgPlan] || LIMITS.FREE;
 
     // Busca os arquivos e o uso total no Back-end
-    const fetchStorageData = async () => {
+    const fetchStorageData = useCallback(async () => {
         if (!orgId) return;
         try {
             setIsLoading(true);
             // Esta rota ainda vamos criar no NestJS no próximo passo!
-            const response = await axiosInstance.get(`/storage/assets`);
+            const response = await http.get(`/storage/assets`);
             setAssets(response.data.assets);
             setStorageUsed(response.data.storageUsed);
         } catch (error) {
@@ -66,11 +66,11 @@ export function StorageManagement() {
         } finally {
             setIsLoading(false);
         }
-    };
+    }, [orgId]);
 
     useEffect(() => {
         fetchStorageData();
-    }, [orgId]);
+    }, [orgId, fetchStorageData]);
 
     // Função utilitária para formatar Bytes em MB, GB
     const formatBytes = (bytes: number, decimals = 2) => {
@@ -118,7 +118,7 @@ export function StorageManagement() {
 
         try {
             setIsDeleting(asset._id);
-            await axiosInstance.delete(`/storage/assets/${asset._id}`, {
+            await http.delete(`/storage/assets/${asset._id}`, {
                 headers: { 'x-org-role': orgRole }
             });
 

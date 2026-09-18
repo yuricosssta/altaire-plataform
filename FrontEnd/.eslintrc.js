@@ -2,6 +2,7 @@ module.exports = {
   extends: 'next/core-web-vitals',
   root: true,
   env: { browser: true, es2021: true, node: true },
+  plugins: ['@typescript-eslint'],
   rules: {
     'no-restricted-imports': [
       'warn',
@@ -20,5 +21,6 @@ module.exports = {
         ],
       },
     ],
+    '@typescript-eslint/no-explicit-any': 'warn',
   },
 };

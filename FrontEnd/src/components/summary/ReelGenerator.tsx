@@ -44,7 +44,8 @@ export default function ReelGenerator() {
     if (savedResult) {
       setGeneratedContent(savedResult);
     }
-  }, [form]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Listener persistente para o formulário
   useEffect(() => {
@@ -52,7 +53,8 @@ export default function ReelGenerator() {
       localStorage.setItem(LOCAL_STORAGE_FORM_KEY, JSON.stringify(value));
     });
     return () => subscription.unsubscribe();
-  }, [form.watch]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Listener persistente para o resultado gerado
   useEffect(() => {

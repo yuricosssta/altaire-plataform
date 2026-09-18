@@ -103,7 +103,7 @@ export function EditorialVersionManager({ projectId }: EditorialVersionManagerPr
 
       {!isLoading && versions.length === 0 && (
         <div className="rounded-md border border-border bg-card p-10 text-center font-sans text-muted-foreground">
-          Nenhuma linha editorial criada ainda. Clique em "Nova Linha" para começar.
+          Nenhuma linha editorial criada ainda. Clique em &ldquo;Nova Linha&rdquo; para começar.
         </div>
       )}
 
