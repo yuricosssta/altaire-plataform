@@ -2,7 +2,7 @@
 
 API RESTful do ecossistema **Altaire** — SaaS educacional que atua como assistente de criação de conteúdo. Construída com [NestJS](https://nestjs.com/), MongoDB (Mongoose), JWT e arquitetura orientada a eventos (EventEmitter2).
 
-Integrações: OpenAI, Cloudflare R2 (SDK AWS S3), SMTP (reset de senha), transcrição de vídeo/áudio (yt-dlp) e WebSockets (Socket.io).
+Integrações: OpenAI, Cloudflare R2 (SDK AWS S3), SMTP (reset de senha).
 
 > Frontend Next.js fica em `FrontEnd/` (porta 3000).
 
@@ -66,22 +66,16 @@ Usa o `Dockerfile` multi-stage (build + `pnpm prune --prod`); entrypoint `node d
 
 ```
 src/
-  auth/           # Autenticação (JWT, Passport)
+  auth/           # Guard JWT (verificação de token)
   users/          # Usuários
   organization/   # Multi-tenancy (organizações, membros, papéis)
-  posts/          # Posts
-  projects/       # Projetos
-  planning/       # Planejamento
-  resources/      # Recursos (padrão Service/Repository)
   storage/        # Upload de arquivos (Cloudflare R2)
-  summary/        # Resumos (IA)
-  transcription/  # Transcrição de vídeo/áudio (yt-dlp)
   shared/         # Utilitários, pipes (Zod), filtros e guards
 ```
 
 Convenções da arquitetura:
 
-- **Service/Repository**: services orquestram negócio; repositories acessam Mongoose (padrão consolidado em `resources/repositories/*`).
+- **Service/Repository**: services orquestram negócio; repositories acessam Mongoose (padrão consolidado em `users/repositories/*`).
 - **Validação**: DTOs com **Zod** + `ZodValidationPipe` no controller (`shared/pipe/zod-validation.pipe.ts`).
 - **Soft delete**: registros são desativados com `isActive: false` (consultas filtram `isActive: { $ne: false }`).
 - **Eventos**: `EventEmitter2` para fluxos transversais (timeline, recursos).
@@ -89,21 +83,13 @@ Convenções da arquitetura:
 
 ## Autenticação
 
-- `POST /auth/login` — autentica e retorna um JWT:
+A autenticação é feita por uma API externa (proxy via BFF). O backend valida o JWT reencriptado pelo BFF via `AuthGuard`.
 
-```json
-{
-  "email": "admin@admin.com",
-  "password": "12345678"
-}
-```
-
-- Envie o token no header `Authorization: Bearer <token>`.
-- `GET /auth/profile` — perfil do usuário autenticado.
+Envie o token no header `Authorization: Bearer <token>`.
 
 ## Multi-tenancy
 
-Endpoints dos módulos de organização (`organization`, `posts`, `projects`, `planning`, `resources`, `summary`, `transcription`, `storage`) exigem os headers:
+Endpoints dos módulos exigem os headers:
 
 - `x-org-id` — ID da organização.
 - `x-org-role` — papel do usuário na organização (`OWNER`, `ADMIN`, etc.).

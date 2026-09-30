@@ -32,10 +32,10 @@ export class MailService {
       await this.transporter.sendMail({
         from: process.env.MAIL_FROM,
         to: email,
-        subject: 'Recuperação de Senha - Sistema Cazuá',
+        subject: 'Recuperação de Senha - Altaire',
         text: `Você solicitou a redefinição de senha. Acesse o link para criar uma nova senha: ${resetUrl}`,
         html: `
-          <h3>Sistema Cazuá</h3>
+          <h3>Altaire</h3>
           <p>Você solicitou a redefinição de sua senha.</p>
           <p><a href="${resetUrl}" target="_blank">Clique aqui para criar uma nova senha</a></p>
           <p><em>Este link é válido por 1 hora.</em></p>

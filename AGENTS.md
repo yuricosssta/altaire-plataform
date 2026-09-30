@@ -7,7 +7,7 @@ SaaS educacional (Altaire) — assistente de criação de conteúdo. Dois apps i
 - `documento-arquitetura-vivo.txt` — changelog vivo de decisões (PT-BR). Ler antes de mexer em editorial/landing/auth.
 
 ## Package manager
-Use **pnpm** (lockfiles + Dockerfiles usam corepack/pnpm@9). READMEs estão desatualizados (citam npm, "Grupo Cazua"/"Escola Desafio"). Fontes de verdade: package.json/Dockerfiles + arquitetura-vivo.
+Use **pnpm** (lockfiles + Dockerfiles usam corepack/pnpm@9). módulos ativos: users, auth (JWT guard), organization, storage, editorial. Módulos removidos: planning, projects, resources, posts, summary, transcription.
 
 ## Comandos
 - Dev completo: `docker compose up` na raiz (`.env` define `COMPOSE_FILE=docker-compose.dev.yml`; frontend :3000, backend :3001)

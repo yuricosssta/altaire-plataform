@@ -1,6 +1,6 @@
 # Altaire FrontEnd
 
-Aplicação web do **Altaire** — SaaS educacional que atua como assistente de criação de conteúdo. Construída com [Next.js](https://nextjs.org) (App Router), [Redux Toolkit](https://redux-toolkit.js.org/), [TailwindCSS](https://tailwindcss.com/), Shadcn/Radix UI e [Axios](https://axios-http.com/).
+Aplicação web do **Altaire** — SaaS educacional que atua como assistente de criação de conteúdo. Construída com [Next.js](https://nextjs.org) (App Router), [Redux Toolkit](https://redux-toolkit.js.org/), [TailwindCSS](https://tailwindcss.com/), Shadcn/Radix UI e cliente HTTP próprio.
 
 > Frontend do ecossistema Altaire. O backend NestJS fica em `BackEnd/` (porta 3001).
 
@@ -38,11 +38,7 @@ O projeto usa **pnpm** (via corepack/pnpm@9). Não use `npm`.
 - **Redux Toolkit** (`@reduxjs/toolkit`, `react-redux`) — estado global
 - **TailwindCSS v4** + **Shadcn/Radix UI** + **lucide-react** — UI/UX
 - **react-hook-form** + **zod** — formulários (Stepper)
-- **Axios** — cliente HTTP centralizado (JWT + headers de tenant)
-- **TanStack Query** — cache de dados do servidor
-- **OpenLayers** (`ol`) — mapas
-- **Recharts** — gráficos
-- **markdown-it / react-markdown** — edição e renderização de Markdown
+- **BFF** via Next.js App Router (route handlers em `src/app/api/*`) — proxy HTTP para o backend NestJS
 
 ---
 
@@ -52,16 +48,13 @@ O projeto usa **pnpm** (via corepack/pnpm@9). Não use `npm`.
 src/
   app/
     (auth)/          # login, signup, forgot-password, reset-password
-    (main)/          # dashboard: editorial, planning, resources, marketing, people,
-                     #   projects, storage, master-admin, settings, account
-    api/             # BFF (route handlers) e axiosInstance.ts
+    (main)/          # dashboard: editorial, people, storage, master-admin, settings, account
+    api/             # BFF (route handlers)
     layout.tsx       # fonts e tema (--font-heading, Playfair, Inter)
   components/
     ui/              # componentes Shadcn/Radix
     landing/         # landing page
     editorial/       # editor de conteúdo (Markdown)
-    planning/        # planejamento
-    resources/       # recursos
     dashboard/       # layout e widgets do dashboard
     auth/            # formulários de autenticação
   lib/
@@ -78,8 +71,8 @@ src/
 ## 🧩 Funcionalidades
 
 - Autenticação com **JWT** (login, cadastro, recuperação de senha) via Redux
-- **Multi-organização**: headers `x-org-id` / `x-org-role` injetados automaticamente pelo axios central
-- Dashboard com módulos de **editorial**, **planning**, **resources**, **marketing**, **people**, **projects**, **storage** e **master-admin**
+- **Multi-organização**: headers `x-org-id` / `x-org-role` injetados automaticamente
+- Dashboard com módulos de **editorial**, **people**, **storage** e **master-admin**
 - **BFF** via route handlers em `src/app/api/*` — o frontend nunca chama o backend NestJS diretamente
 - Edição de conteúdo em **Markdown** com pré-visualização
 - Tema **dark/light** com variáveis semânticas (`bg-background`, `text-foreground`, `primary` = dourado)
@@ -91,10 +84,9 @@ src/
 
 | Variável | Descrição | Default |
 | --- | --- | --- |
-| `NEXT_PUBLIC_API_BASE_URL` | URL base do backend (pública/client) | `http://localhost:3001` |
+| `NEXT_PUBLIC_API_BASE_URL` | URL base do backend NestJS | `http://localhost:3001` |
+| `AUTH_API_URL` | URL da API de autenticação externa (server-side) | — |
 | `INTERNAL_API_URL` | URL do backend usada pelo BFF na rede Docker | `http://backend:3001` |
-| `NEXT_PUBLIC_INITIAL_MAP_CENTER` | Centro inicial do mapa (lat,long) | `-43.7,-21.2` |
-| `NEXT_PUBLIC_SUMMARY_API_URL` | URL da API de resumo (opcional) | — |
 
 ---
 

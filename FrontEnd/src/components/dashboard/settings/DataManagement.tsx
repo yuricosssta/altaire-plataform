@@ -42,7 +42,7 @@ export function DataManagement() {
 
   // 1. RECUPERAR RASCUNHO SALVO
   useEffect(() => {
-    const savedDraft = localStorage.getItem("cazua_import_draft");
+    const savedDraft = localStorage.getItem("altaire_import_draft");
     if (savedDraft) {
       try {
         const parsed = JSON.parse(savedDraft);
@@ -59,7 +59,7 @@ export function DataManagement() {
   // 2. SALVAR RASCUNHO A CADA MUDANÇA
   useEffect(() => {
     if (isImporting) {
-      localStorage.setItem("cazua_import_draft", JSON.stringify(draftRows));
+      localStorage.setItem("altaire_import_draft", JSON.stringify(draftRows));
     }
   }, [draftRows, isImporting]);
 
@@ -71,7 +71,7 @@ export function DataManagement() {
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.href = url;
-    link.setAttribute("download", "cazua_template_importacao.csv");
+    link.setAttribute("download", "altaire_template_importacao.csv");
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -130,7 +130,7 @@ export function DataManagement() {
     if (confirm("Descartar importação atual? O rascunho será apagado.")) {
       setDraftRows([]);
       setIsImporting(false);
-      localStorage.removeItem("cazua_import_draft");
+      localStorage.removeItem("altaire_import_draft");
     }
   };
 
@@ -153,7 +153,7 @@ export function DataManagement() {
       setDraftRows([]);
       setIsImporting(false);
       setIsModalOpen(false);
-      localStorage.removeItem("cazua_import_draft");
+      localStorage.removeItem("altaire_import_draft");
     } catch (error: any) {
       console.error(error);
       const errorMsg = error.response?.data?.message || "Erro ao salvar no banco de dados.";

@@ -29,7 +29,7 @@ export function PersonalTasksPanel() {
     : currentOrg?.organizationId || "unknown_org";
 
   // 2. Chave de Storage Blindada (Isolamento por Empresa e Usuário)
-  const storageKey = `@cazua:tasks_${orgId}_${userId}`;
+  const storageKey = `@altaire:tasks_${orgId}_${userId}`;
 
   // Carrega as tarefas usando a chave dinâmica
   useEffect(() => {

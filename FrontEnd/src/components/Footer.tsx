@@ -15,7 +15,7 @@ export function Footer() {
         <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4 text-center">
           <LogoBloco />
           <p className="text-xs text-muted-foreground font-medium">
-            © {year} Cazuá. Gestão Inteligente de Projetos
+            © {year} Altaire. Gestão Inteligente de Conteúdo
           </p>
           <div className="text-xs text-muted-foreground space-x-3">
             <span>Privacidade</span>

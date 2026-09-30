@@ -65,7 +65,7 @@ export default function GeneralSettingsPage() {
           <section className="flex items-center justify-between border border-border bg-card p-5 rounded-sm shadow-sm">
             <div>
               <h3 className="text-sm font-semibold flex items-center gap-2">Encerrar Sessão</h3>
-              <p className="text-xs text-muted-foreground mt-1">Sair da sua conta global no Cazuá de forma segura.</p>
+              <p className="text-xs text-muted-foreground mt-1">Sair da sua conta global no Altaire de forma segura.</p>
             </div>
             <button
               onClick={handleLogout}
