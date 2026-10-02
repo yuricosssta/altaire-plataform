@@ -1,5 +1,5 @@
 import { getBackendApiUrl, getBffAuthHeader, getBffOrgHeaders } from '@/lib/api/serverUtils';
-import { error, ERROR_CODES, ErrorResponse } from '@/lib/api/response';
+import { error, ERROR_CODES, ErrorResponse, ErrorCode } from '@/lib/api/response';
 
 interface ProxyOptions {
   method?: string;
@@ -58,7 +58,7 @@ export async function proxyOrgRequest(
   }
 }
 
-function mapStatusToErrorCode(status: number): string {
+function mapStatusToErrorCode(status: number): ErrorCode {
   switch (status) {
     case 400: return ERROR_CODES.VALIDATION_ERROR;
     case 401: return ERROR_CODES.UNAUTHORIZED;

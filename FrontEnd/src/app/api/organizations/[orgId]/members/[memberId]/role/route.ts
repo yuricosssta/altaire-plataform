@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { proxyOrgRequest } from '@/app/api/organizations/_proxy';
 import { error, ERROR_CODES } from '@/lib/api/response';
-
+ 
 export async function PATCH(
   request: NextRequest,
   { params }: { params: { orgId: string; memberId: string } },
