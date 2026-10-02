@@ -97,7 +97,7 @@ export default function MasterAdminPage() {
             Painel Administrador Master
           </h1>
           <p className="text-muted-foreground mt-1 text-sm">
-            Área de risco. Gerencie o faturamento e o plano das empresas ativas no Cazuá.
+            Área de risco. Gerencie o faturamento e o plano das empresas ativas no Altaire.
           </p>
         </div>
         <div className="relative w-full md:max-w-xs">

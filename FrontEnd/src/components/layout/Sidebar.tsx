@@ -7,15 +7,9 @@ import {
   LayoutDashboard,
   Users,
   Globe,
-  BarChart3,
-  ShoppingCart,
-  Tag,
   Settings,
-  BookOpenText,
   Menu,
   Archive,
-  Banknote,
-  Megaphone,
   X
 } from "lucide-react";
 import { OrgSwitcher } from "@/components/dashboard/OrgSwitcher";
@@ -30,19 +24,8 @@ export function Sidebar() {
   ];
 
   const managementLinks = [
-    // { name: "Almoxarifado Central", href: "/dashboard/resources", icon: <Banknote className="w-4 h-4" /> },
-    // { name: "Planejamento", href: "/dashboard/planning", icon: <BarChart3 className="w-4 h-4" /> },
-    // { name: "Projetos e Demandas", href: "/dashboard/projects", icon: <LayoutDashboard className="w-4 h-4" /> },
-    { name: "Publicações", href: "/dashboard/posts", icon: <BookOpenText className="w-4 h-4" /> },
     { name: "Projetos Editoriais", href: "/dashboard/editorial", icon: <LayoutDashboard className="w-4 h-4" /> },
     { name: "Recursos Humanos", href: "/dashboard/people", icon: <Users className="w-4 h-4" /> },
-    { name: "Marketing", href: "/dashboard/marketing/reels", icon: <Megaphone className="w-4 h-4" /> },
-  ];
-
-  const monetizationLinks = [
-    { name: "Receita", href: "/dashboard/revenue", icon: <BarChart3 className="w-4 h-4" /> },
-    { name: "Pedidos", href: "/dashboard/orders", icon: <ShoppingCart className="w-4 h-4" /> },
-    { name: "Descontos", href: "/dashboard/discounts", icon: <Tag className="w-4 h-4" /> },
   ];
 
   const settingsLinks = [

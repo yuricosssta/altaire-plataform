@@ -25,13 +25,11 @@ export const fetchMyOrganizations = createAsyncThunk(
   async (_, { getState, rejectWithValue }) => {
     try {
       const state = getState() as RootState;
-      const token = state.auth.token;
-
-      if (!token) {
+      if (!state.auth.token) {
         return rejectWithValue('Usuário não autenticado');
       }
 
-      const data = await apiFetchMyOrganizations(token);
+      const data = await apiFetchMyOrganizations();
       return data;
     } catch (err: any) {
       return rejectWithValue(err);

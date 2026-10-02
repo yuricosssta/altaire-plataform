@@ -23,7 +23,7 @@ export function UpgradeModal({ isOpen, onClose, title, message }: UpgradeModalPr
 
   // Substitua pelo seu número de WhatsApp real (com DDI e DDD, ex: 5532999999999)
   const whatsappNumber = "5531993533148"; 
-  const whatsappMessage = encodeURIComponent("Olá! Atingi o limite do plano gratuito no Cazuá e gostaria de saber mais sobre o Plano PRO para minha empresa.");
+  const whatsappMessage = encodeURIComponent("Olá! Atingi o limite do plano gratuito no Altaire e gostaria de saber mais sobre o Plano PRO para minha empresa.");
   const whatsappUrl = `https://wa.me/${whatsappNumber}?text=${whatsappMessage}`;
 
   return createPortal(

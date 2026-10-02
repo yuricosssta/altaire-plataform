@@ -1,36 +1,21 @@
-// src/app/api/editorial/projects/[projectId]/onboarding/route.ts
-import { NextRequest, NextResponse } from 'next/server';
-import { proxyEditorialRequest } from '@/app/api/editorial/_proxy';
-import { mockCreateVersion, mockMapaFromOnboarding } from '@/lib/mocks/editorial.mock';
-import { EditorialOnboardingSchema } from '@/lib/dto/editorial.schema';
+import { notImplemented } from '@/app/api/editorial/_notImplemented';
 
-interface RouteContext {
-  params: Promise<{ projectId: string }>;
+export async function GET() {
+  return notImplemented('./projects/[projectId]/onboarding');
 }
 
-export async function POST(request: NextRequest, { params }: RouteContext) {
-  const { projectId } = await params;
+export async function POST() {
+  return notImplemented('./projects/[projectId]/onboarding');
+}
 
-  const body = await request.json().catch(() => null);
-  const parsed = EditorialOnboardingSchema.safeParse(body);
-  if (!parsed.success) {
-    return NextResponse.json(
-      { error: 'Payload do onboarding inválido.', details: parsed.error.flatten() },
-      { status: 400 },
-    );
-  }
+export async function PUT() {
+  return notImplemented('./projects/[projectId]/onboarding');
+}
 
-  const result = await proxyEditorialRequest(request, `/projects/${projectId}/onboarding`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(parsed.data),
-  });
+export async function DELETE() {
+  return notImplemented('./projects/[projectId]/onboarding');
+}
 
-  if (result.ok) {
-    return NextResponse.json(result.data, { status: 201 });
-  }
-
-  const version = mockCreateVersion(projectId, `${parsed.data.nicheData.niche} — ${parsed.data.offerData.product}`);
-  const mapa = mockMapaFromOnboarding(version, parsed.data);
-  return NextResponse.json({ version, mapa }, { status: 201 });
+export async function PATCH() {
+  return notImplemented('./projects/[projectId]/onboarding');
 }

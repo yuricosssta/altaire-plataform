@@ -1,28 +1,21 @@
-// src/app/api/editorial/calendars/[calendarId]/review/route.ts
-import { NextRequest, NextResponse } from 'next/server';
-import { proxyEditorialRequest } from '@/app/api/editorial/_proxy';
-import { buildReviewSuggestions, mockCalendarById } from '@/lib/mocks/calendar.mock';
-import { ReviewSuggestionSchema } from '@/lib/dto/editorial.schema';
+import { notImplemented } from '@/app/api/editorial/_notImplemented';
 
-interface RouteContext {
-  params: Promise<{ calendarId: string }>;
+export async function GET() {
+  return notImplemented('./calendars/[calendarId]/review');
 }
 
-export async function GET(request: NextRequest, { params }: RouteContext) {
-  const { calendarId } = await params;
+export async function POST() {
+  return notImplemented('./calendars/[calendarId]/review');
+}
 
-  const result = await proxyEditorialRequest(request, `/calendars/${calendarId}/review`);
+export async function PUT() {
+  return notImplemented('./calendars/[calendarId]/review');
+}
 
-  if (result.ok) {
-    return NextResponse.json(result.data);
-  }
+export async function DELETE() {
+  return notImplemented('./calendars/[calendarId]/review');
+}
 
-  const source = mockCalendarById(calendarId);
-  if (!source) {
-    return NextResponse.json({ error: 'Calendário não encontrado.' }, { status: 404 });
-  }
-
-  const fallback = buildReviewSuggestions(source.objective, source.capacity);
-  const parsed = ReviewSuggestionSchema.array().safeParse(fallback);
-  return NextResponse.json(parsed.success ? parsed.data : fallback);
+export async function PATCH() {
+  return notImplemented('./calendars/[calendarId]/review');
 }

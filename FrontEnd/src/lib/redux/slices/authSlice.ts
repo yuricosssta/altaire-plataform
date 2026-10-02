@@ -3,7 +3,6 @@ import { createSlice, createAsyncThunk, PayloadAction } from '@reduxjs/toolkit';
 import axios from 'axios';
 import { RootState } from '../store';
 import { jwtDecode } from 'jwt-decode';
-import http from '@/lib/http';
 
 interface UserPayload {
   sub: string;
@@ -53,10 +52,12 @@ const safeDecode = (token: string): UserPayload | null => {
 };
 
 export const loginUser = createAsyncThunk<AuthResponse, { email: string; password: string }>(
-  'auth/loginUser', //nome da ação
+  'auth/loginUser',
   async (credentials) => {
-    const response = await axios.post(`${process.env.NEXT_PUBLIC_API_BASE_URL}/auth/login`, credentials);
-    return response.data;
+    const response = await axios.post(`/api/auth/login`, credentials, {
+      headers: { 'Content-Type': 'application/json' },
+    });
+    return response.data.data;
   }
 );
 
@@ -64,8 +65,8 @@ export const renewToken = createAsyncThunk<AuthResponse>(
   'auth/renewToken',
   async (_, { rejectWithValue }) => {
     try {
-      const response = await http.post('/auth/refresh');
-      return response.data;
+      const response = await axios.post('/api/auth/refresh', {}, { withCredentials: true });
+      return response.data.data;
     } catch (error: any) {
       return rejectWithValue(error.response?.data || 'Erro ao renovar token');
     }

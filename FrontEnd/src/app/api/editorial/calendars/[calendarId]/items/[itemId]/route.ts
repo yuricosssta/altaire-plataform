@@ -1,45 +1,21 @@
-// src/app/api/editorial/calendars/[calendarId]/items/[itemId]/route.ts
-import { NextRequest, NextResponse } from 'next/server';
-import { proxyEditorialRequest } from '@/app/api/editorial/_proxy';
-import { mockCalendarById, mockUpdateCalendarItem } from '@/lib/mocks/calendar.mock';
-import { CalendarItemUpdateSchema, CalendarItemSchema } from '@/lib/dto/editorial.schema';
+import { notImplemented } from '@/app/api/editorial/_notImplemented';
 
-interface RouteContext {
-  params: Promise<{ calendarId: string; itemId: string }>;
+export async function GET() {
+  return notImplemented('./calendars/[calendarId]/items/[itemId]');
 }
 
-export async function PATCH(request: NextRequest, { params }: RouteContext) {
-  const { calendarId, itemId } = await params;
+export async function POST() {
+  return notImplemented('./calendars/[calendarId]/items/[itemId]');
+}
 
-  const body = await request.json().catch(() => null);
-  const parsed = CalendarItemUpdateSchema.safeParse(body);
-  if (!parsed.success) {
-    return NextResponse.json(
-      { error: 'Payload do card inválido.', details: parsed.error.flatten() },
-      { status: 400 },
-    );
-  }
+export async function PUT() {
+  return notImplemented('./calendars/[calendarId]/items/[itemId]');
+}
 
-  const result = await proxyEditorialRequest(request, `/calendars/${calendarId}/items/${itemId}`, {
-    method: 'PATCH',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(parsed.data),
-  });
+export async function DELETE() {
+  return notImplemented('./calendars/[calendarId]/items/[itemId]');
+}
 
-  if (result.ok) {
-    return NextResponse.json(result.data);
-  }
-
-  const source = mockCalendarById(calendarId);
-  if (!source) {
-    return NextResponse.json({ error: 'Calendário não encontrado.' }, { status: 404 });
-  }
-
-  const fallback = mockUpdateCalendarItem(source, itemId, parsed.data as Record<string, unknown>);
-  if (!fallback) {
-    return NextResponse.json({ error: 'Card não encontrado.' }, { status: 404 });
-  }
-
-  const validated = CalendarItemSchema.safeParse(fallback);
-  return NextResponse.json(validated.success ? validated.data : fallback);
+export async function PATCH() {
+  return notImplemented('./calendars/[calendarId]/items/[itemId]');
 }

@@ -1,21 +1,21 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { proxyEditorialRequest } from '@/app/api/editorial/_proxy';
-import { mockScripts } from '@/lib/mocks/scripts.mock';
+import { notImplemented } from '@/app/api/editorial/_notImplemented';
 
-export async function POST(request: NextRequest, { params }: { params: Promise<{ projectId: string; scriptId: string }> }) {
-  const { projectId, scriptId } = await params;
+export async function GET() {
+  return notImplemented('./projects/[projectId]/scripts/[scriptId]/duplicate');
+}
 
-  const result = await proxyEditorialRequest(request, `/projects/${projectId}/scripts/${scriptId}/duplicate`, {
-    method: 'POST',
-  });
-  if (result.ok) return NextResponse.json(result.data, { status: 201 });
+export async function POST() {
+  return notImplemented('./projects/[projectId]/scripts/[scriptId]/duplicate');
+}
 
-  const all = Object.values(mockScripts).flat();
-  const original = all.find((s) => s.id === scriptId);
-  if (!original) return NextResponse.json({ error: 'Roteiro não encontrado' }, { status: 404 });
+export async function PUT() {
+  return notImplemented('./projects/[projectId]/scripts/[scriptId]/duplicate');
+}
 
-  return NextResponse.json(
-    { ...original, id: Math.random().toString(36).slice(2), title: `${original.title} (cópia)`, version: 1, createdAt: new Date(), updatedAt: new Date() },
-    { status: 201 },
-  );
+export async function DELETE() {
+  return notImplemented('./projects/[projectId]/scripts/[scriptId]/duplicate');
+}
+
+export async function PATCH() {
+  return notImplemented('./projects/[projectId]/scripts/[scriptId]/duplicate');
 }

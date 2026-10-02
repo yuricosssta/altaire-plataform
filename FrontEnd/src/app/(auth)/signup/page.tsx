@@ -4,8 +4,7 @@
 import { useState, FormEvent } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import axios from 'axios';
-import { HardHat, Activity, ShieldCheck, CheckCircle2 } from 'lucide-react';
+import { CheckCircle2 } from 'lucide-react';
 import LogoBloco from '@/components/LogoBloco'; 
 import Spinner from '@/components/Spinner';
 import { ComercialLogin } from '@/components/landing/ComercialLogin';
@@ -31,12 +30,21 @@ export default function SignupPage() {
 
     try {
       setIsLoading(true);
-      // Bate na rota pública do seu Back-end para criar a conta global
-      await axios.post(`${process.env.NEXT_PUBLIC_API_BASE_URL}/users`, {
-        name: formData.name,
-        email: formData.email,
-        password: formData.password,
+      const res = await fetch('/api/auth/signup', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: formData.name,
+          email: formData.email,
+          password: formData.password,
+        }),
       });
+
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        const msg = body?.error?.message || body?.message || 'Não foi possível criar a conta.';
+        throw new Error(msg);
+      }
       
       setIsSuccess(true);
       
@@ -47,7 +55,7 @@ export default function SignupPage() {
       
     } catch (error: any) {
       console.error("Erro no cadastro:", error);
-      setErrorMsg(error.response?.data?.message || "Não foi possível criar a conta. Este e-mail pode já estar em uso.");
+      setErrorMsg(error.message || "Não foi possível criar a conta. Este e-mail pode já estar em uso.");
     } finally {
       setIsLoading(false);
     }

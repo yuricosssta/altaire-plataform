@@ -5,7 +5,6 @@ import { useState, Suspense } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { KeyRound, ArrowRight, Loader2, CheckCircle, AlertTriangle } from "lucide-react";
 import Link from "next/link";
-import http from "@/lib/http";
 
 function ResetPasswordContent() { // isolado
   const searchParams = useSearchParams();
@@ -27,10 +26,18 @@ function ResetPasswordContent() { // isolado
 
     setIsLoading(true);
     try {
-      await http.post("/users/reset-password", {
-        token,
-        newPassword: passwords.new
+      const res = await fetch('/api/auth/reset-password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ token, newPassword: passwords.new }),
       });
+
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        const msg = body?.error?.message || 'Erro ao redefinir senha. O link pode ter expirado.';
+        throw new Error(msg);
+      }
+
       setIsSuccess(true);
 
       setTimeout(() => {
@@ -38,7 +45,7 @@ function ResetPasswordContent() { // isolado
       }, 3000);
       
     } catch (error: any) {
-      setErrorMsg(error.response?.data?.message || "Erro ao redefinir senha. O link pode ter expirado.");
+      setErrorMsg(error.message || "Erro ao redefinir senha. O link pode ter expirado.");
     } finally {
       setIsLoading(false);
     }

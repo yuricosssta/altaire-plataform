@@ -1,38 +1,28 @@
-import { Injectable, OnModuleInit } from '@nestjs/common';
-import { InjectModel } from '@nestjs/mongoose';
-import { Model } from 'mongoose';
-import { User } from '../users/schemas/user.schema';
-import { hash } from 'bcryptjs';
+import { Injectable, UnauthorizedException } from '@nestjs/common';
+import { JwtService } from '@nestjs/jwt';
+import { UsersService } from '../users/services/user.service';
 
 @Injectable()
-// export class AuthUsersService implements OnModuleInit {
 export class AuthUsersService {
-  constructor(@InjectModel(User.name) private userModel: Model<User>) {}
+  constructor(
+    private readonly jwtService: JwtService,
+    private readonly usersService: UsersService,
+  ) {}
 
-  // async onModuleInit() {
-  //   const adminExists = await this.userModel.findOne({ email: 'admin@admin.com' });
-
-  //   if (!adminExists) {
-  //     const password = '12345678';
-  //     const hashedPassword = await hash(password, 10);
-
-  //     const adminUser = new this.userModel({
-  //       email: 'admin@admin.com',
-  //       password: hashedPassword,
-  //       name: 'Admin User',
-  //       memberships: [] // Nasce sem empresa. Cria a primeira ao logar.
-  //     });
-
-  //     await adminUser.save();
-  //     console.log('Usuário inicial (admin) criado com sucesso');
-  //   }
-  // }
-
-  async findByEmail(email: string): Promise<User | null> {
-    return await this.userModel.findOne({ email });
+  async validateUser(email: string, password: string) {
+    const user = await this.usersService.findOne(email);
+    if (!user) {
+      throw new UnauthorizedException('Credenciais inválidas');
+    }
+    return user;
   }
 
-  async findAll(): Promise<User[]> {
-    return await this.userModel.find();
+  async getUserFromToken(token: string) {
+    try {
+      const payload = await this.jwtService.verifyAsync(token);
+      return this.usersService.findById(payload.sub);
+    } catch {
+      throw new UnauthorizedException('Token inválido ou expirado');
+    }
   }
 }

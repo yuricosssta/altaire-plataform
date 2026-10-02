@@ -48,12 +48,12 @@ localClient.interceptors.request.use(
   (error) => Promise.reject(error),
 );
 
-function toTheme(theme: any): Theme {
+function toTheme(data: Record<string, unknown>): Theme {
   return {
-    ...theme,
-    createdAt: theme.createdAt ? new Date(theme.createdAt) : undefined,
-    updatedAt: theme.updatedAt ? new Date(theme.updatedAt) : undefined,
-  };
+    ...data,
+    createdAt: data.createdAt ? new Date(data.createdAt as string) : undefined,
+    updatedAt: data.updatedAt ? new Date(data.updatedAt as string) : undefined,
+  } as Theme;
 }
 
 export const themesService = {
@@ -129,7 +129,7 @@ export const themesService = {
       `/editorial/projects/${projectId}/themes/calendar-suggestions`,
       data,
     );
-    return response.data.map((s: any) => ({
+    return response.data.map((s: SlotSuggestion) => ({
       ...s,
       suggestions: s.suggestions.map(toTheme),
     }));

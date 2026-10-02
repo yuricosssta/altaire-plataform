@@ -59,7 +59,7 @@ export function ComercialLogin() {
             </div>
 
             <div className="relative z-20 mt-auto font-sans text-sm text-muted-foreground font-medium">
-                © {new Date().getFullYear()} Cazuá. Gestão inteligente de projetos.
+                © {new Date().getFullYear()} Altaire. Gestão inteligente de conteúdo.
             </div>
         </div>
     );
