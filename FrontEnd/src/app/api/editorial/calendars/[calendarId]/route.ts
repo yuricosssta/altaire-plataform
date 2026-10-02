@@ -1,4 +1,4 @@
-import { notImplemented } from '../../../_notImplemented';
+import { notImplemented } from './../../../editorial/_notImplemented';
 
 export async function GET() {
   return notImplemented('./calendars/[calendarId]');

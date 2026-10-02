@@ -1,4 +1,4 @@
-import { notImplemented } from '../../../../../../_notImplemented';
+import { notImplemented } from '@/app/api/editorial/_notImplemented';
 
 export async function GET() {
   return notImplemented('./projects/[projectId]/scripts/slots/[format]');
