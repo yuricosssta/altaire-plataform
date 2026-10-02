@@ -4,7 +4,6 @@
 import { useState } from "react";
 import { Mail, ArrowLeft, Loader2, CheckCircle } from "lucide-react";
 import Link from "next/link";
-import http from "@/lib/http";
 
 export default function ForgotPasswordPage() {
   const [email, setEmail] = useState("");
@@ -15,10 +14,15 @@ export default function ForgotPasswordPage() {
     e.preventDefault();
     setIsLoading(true);
     try {
-      await http.post("/users/forgot-password", { email });
+      const res = await fetch('/api/auth/forgot-password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email }),
+      });
+      void res; // ignora resposta — evita vazamento de e-mails
       setIsSuccess(true);
-    } catch (error) {
-      setIsSuccess(true); // evita vazamento de e-mails
+    } catch {
+      setIsSuccess(true);
     } finally {
       setIsLoading(false);
     }

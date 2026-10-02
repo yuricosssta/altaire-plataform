@@ -44,7 +44,7 @@ export function CreateOrganizationModal({ isOpen, onClose, forceOnboarding = fal
 
     try {
       setIsSubmitting(true);
-      await apiCreateOrganization(token, name, acronym);
+      await apiCreateOrganization(name, acronym);
       dispatch(fetchMyOrganizations());
       setName("");
       setAcronym("");

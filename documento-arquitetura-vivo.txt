@@ -1,3 +1,52 @@
+## SPRINT 09 - 02/10/2026 ##
+Resumo Técnico de Fechamento
+
+Decisões de Arquitetura
+
+Migração de Auth/Org/Storage para BFF (Proxy Puro):
+- Auth pages (signup, forgot-password, reset-password) migradas de chamada direta ao backend NestJS para BFF routes em `/api/auth/*` via server-side proxy. BFF routes criadas: `signup/route.ts`, `forgot-password/route.ts`, `reset-password/route.ts` — validam payload, chamam backend, retornam resposta padronizada.
+- `authSlice.ts`: `renewToken` trocou `http.post('/auth/refresh')` (direto ao backend com JWT no header) por `axios.post('/api/auth/refresh', {}, { withCredentials: true })` (BFF route lê `auth_token` cookie httpOnly). Removeu dependência de `http` em `authSlice.ts`.
+- Páginas client-side (signup, forgot-password, reset-password) agora usam `fetch('/api/auth/*')` em vez de `http` ou `axios` apontando para `NEXT_PUBLIC_API_BASE_URL` direto.
+- Organization BFF routes criadas: `GET /api/organizations/my-orgs`, `POST /api/organizations`, members CRUD (`GET/POST /orgs/:id/members`, `PATCH /orgs/:id/members/:id/role`, `DELETE /orgs/:id/members/:id`). `_proxy.ts` compartilhado com interceptação automática de `Authorization` via cookie/header.
+- `organizationService.ts` migrado para `localClient` (axios com `baseURL: '/api'` e interceptor Redux) — removeu `axios.get(${API_URL}/...)` direto. `apiFetchMyOrganizations` e `apiCreateOrganization` simplificados (não recebem mais token manualmente).
+- Storage BFF routes criadas: `POST /api/storage/presigned-url`, `POST /api/storage/confirm-upload`, `GET /api/storage/assets`, `DELETE /api/storage/assets/:id`. Backend usa `assets` e não `files` — ajustado no plano.
+- `storageService.ts` migrado para `localClient`. `scriptsService.ts` limpo: removido import de `@/lib/mocks/scripts.mock` (diretório inexistente) e catch fallbacks com mock — erros propagam naturalmente para UI.
+- Mock stubs criados (`scripts.mock.ts`, `themes.mock.ts`) com apenas constantes de UI (FORMAT_LABELS, etc.) e funções vazias — mantém compilação sem reintroduzir dados mock.
+- Endpoints editoriais secundários permanecem como 501 Not Implemented (31 arquivos stub). Lint: 0 erros.
+
+Implementação do BFF (Backend For Frontend) com Proxy Puro e Re-encrypt JWT:
+- Substituição do padrão de fallback a mock por proxy puro (Option B). BFF editorial agora repassa requisições ao backend NestJS sem fallback; erros retornam formato rico `{ success: false, error: { code, message, details } }` com códigos padronizados: VALIDATION_ERROR, NOT_FOUND, UNAUTHORIZED, FORBIDDEN, INTERNAL_ERROR, EXTERNAL_ERROR, NOT_IMPLEMENTED.
+- JWT Re-encrypt: BFF decodifica token da API externa de auth, extrai claims (sub, email, name) e gera novo JWT assinado com JWT_SECRET próprio (HS256 via `jose`). Backend só conhece o segredo do BFF. Cookie httpOnly `auth_token` setado no login.
+- `src/lib/auth/token.service.ts`: Utilitário server-side com `createAuthToken()`, `verifyInternalToken()`, `decodeExternalToken()`, `getAuthTokenFromRequest()`.
+- `src/lib/auth/authProxy.ts`: `proxyAuthLogin()`, `proxyAuthSignup()`, `proxyAuthRefresh()` — chamam API externa, re-criptografam token.
+- BFF auth routes criadas: `POST /api/auth/login`, `POST /api/auth/signup`, `POST /api/auth/refresh`, `GET /api/auth/profile`. `authSlice.ts` atualizado para consumir BFF em vez de chamar backend direto.
+- Variáveis de ambiente: `AUTH_API_URL` (privada) para API externa, `BACKEND_API_URL` (privada) para backend NestJS, `JWT_SECRET` para re-encrypt. `getBffOrgHeaders` retorna `{ orgId: 'altaire', orgRole: 'member' }` fixo.
+
+Remoção de Módulos Legados (BackEnd):
+- Módulos removidos: `planning/`, `projects/`, `resources/` (32 arquivos).
+- Auth: removidos `auth.controller.ts`, `auth.service.ts`, `auth-users.service.ts`; mantido apenas `auth.guard.ts` + `auth.module.ts` simplificado (só JwtModule).
+- `app.module.ts` limpo: imports apenas `UsersModule`, `AuthModule`, `OrganizationModule`, `StorageModule`, `SharedModule` + novo `EditorialModule`.
+
+Criação do Módulo Editorial (BackEnd NestJS):
+- `src/editorial/` com padrão Service → Repository → Mongoose (mesmo de `users/`).
+- Schema `EditorialProject`: name, niche, subniche, currentObjective, editorialLineStatus, calendarStatus, createdBy, orgId, isActive (soft delete).
+- Controller: `GET/POST /editorial/projects` (listar/criar), `GET/PUT/DELETE /editorial/projects/:id`. Protegido por AuthGuard.
+- Validação Zod com `ZodValidationPipe`. Repository abstrato + implementação Mongoose.
+
+BFF Editorial Refatorado:
+- `_proxy.ts` reescrito: sem fallback, erro rico, usa `getBackendApiUrl()` + `getAuthTokenFromRequest()`. Mocks removidos (`editorial.mock.ts`, `calendar.mock.ts`, `themes.mock.ts`, `scripts.mock.ts`).
+- Rotas de projetos (list, create, get, update, delete) conectadas ao backend.
+- 30+ rotas não-implementadas (calendars, themes, scripts, versions) retornam `501 Not Implemented` com código `NOT_IMPLEMENTED`.
+
+Cleanup FrontEnd:
+- Componentes removidos: `posts/` (4), `planning/` (3), `resources/` (13), `summary/` (1), `AdmPost`, `AudioTranscriber`, `TextSummarizer`, `TranscriptionModal`, `DashboardMetrics`, `ExportPdfModal`, `CreateProjectModal`, `EmitParecerModal`, `ProjectsList`, `ManageTeamDrawer`, `TabPreferencesModal`, `TimelineEventCard`.
+- Páginas removidas: `dashboard/posts/`, `dashboard/planning/`, `dashboard/projects/`, `dashboard/resources/`, `dashboard/marketing/reels/`.
+- Services removidos: `planningService`, `postService`, `resourceService`, `summaryService`, `projectService`, `transcriptionService`.
+- Redux slices removidos: `postsSlice`, `resourcesSlice`, `planningSlice`. `store.ts` atualizado.
+- Types removidos: `post.ts`, `project.ts`. Validações: `post.zod.ts`, `summary.zod.ts`.
+- `axiosInstance.ts` removido. Sidebar simplificada (só editorial + people + storage + settings).
+- Branding Cazuá → Altaire: 17 arquivos atualizados (Footer, ComercialLogin, UpgradeModal, CreateOrganizationModal, PersonalTasksPanel, DataManagement, sitemap, robots, master-admin, settings, mail.service).
+
 ## SPRINT 07 - 18/09/2026 ##
 Resumo Técnico de Fechamento
 

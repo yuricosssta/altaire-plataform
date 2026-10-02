@@ -1,57 +1,75 @@
-//src/lib/services/storageService.ts
-import http from "@/lib/http";
 import axios from "axios";
 import imageCompression from 'browser-image-compression';
+
+const localClient = axios.create({ baseURL: '/api' });
+
+localClient.interceptors.request.use(
+  async (config) => {
+    const { store } = await import('@/lib/redux/store');
+    const state = store.getState();
+    const token = state.auth?.token;
+    const currentOrg = state.organizations?.currentOrganization;
+
+    if (token) {
+      config.headers['Authorization'] = `Bearer ${token}`;
+    }
+
+    if (currentOrg && currentOrg.organizationId) {
+      const orgId =
+        typeof currentOrg.organizationId === 'string'
+          ? currentOrg.organizationId
+          : currentOrg.organizationId._id || currentOrg.organizationId.id;
+
+      config.headers['x-org-id'] = orgId;
+      config.headers['x-org-role'] = currentOrg.role;
+    }
+    return config;
+  },
+  (error) => Promise.reject(error),
+);
 
 export async function uploadFileToR2(file: File): Promise<string> {
   try {
     let fileToUpload = file;
 
-    // MOTOR DE COMPRESSÃO E CORREÇÃO DE ROTAÇÃO (Apenas para imagens)
     if (file.type.startsWith('image/')) {
       const options = {
-        maxSizeMB: 1, // Trava o tamanho máximo da imagem em 1 Megabyte
-        maxWidthOrHeight: 1920, // Redimensiona fotos gigantes (ex: 4K do iPhone) para Full HD
-        useWebWorker: true, // Usa processamento paralelo para não travar a tela
-        // A biblioteca já corrige a rotação do celular automaticamente!
+        maxSizeMB: 1,
+        maxWidthOrHeight: 1920,
+        useWebWorker: true,
       };
-      
+
       console.log(`Comprimindo imagem... Tamanho original: ${(file.size / 1024 / 1024).toFixed(2)} MB`);
       fileToUpload = await imageCompression(file, options);
       console.log(`Imagem comprimida! Novo tamanho: ${(fileToUpload.size / 1024 / 1024).toFixed(2)} MB`);
     }
 
-    // Pede a URL assinada (Agora enviando o tamanho do arquivo já reduzido)
-    const authResponse = await http.post('/storage/presigned-url', {
+    const authResponse = await localClient.post('/storage/presigned-url', {
       fileName: fileToUpload.name,
       fileType: fileToUpload.type,
-      sizeBytes: fileToUpload.size 
+      sizeBytes: fileToUpload.size,
     });
 
-    const { uploadUrl, fileUrl } = authResponse.data;
+    const { uploadUrl, fileUrl } = authResponse.data.data;
 
-    // Upload Direto para a Cloudflare (Axios limpo sem JWT)
     await axios.put(uploadUrl, fileToUpload, {
       headers: {
         'Content-Type': fileToUpload.type,
-      }
+      },
     });
 
-    // Avisa a portaria que o arquivo subiu para contabilizar os Megabytes reais
-    await http.post('/storage/confirm-upload', {
+    await localClient.post('/storage/confirm-upload', {
       fileUrl: fileUrl,
       fileName: fileToUpload.name,
       mimeType: fileToUpload.type,
-      sizeBytes: fileToUpload.size
+      sizeBytes: fileToUpload.size,
     });
 
-    // Retorna a URL pública limpa para o componente usar
     return fileUrl;
 
   } catch (error: any) {
     console.error("Erro no serviço central de upload:", error);
-    
-    // Repassa o erro legível do backend (Ex: "LIMITE DE ARMAZENAMENTO EXCEDIDO")
+
     if (error.response && error.response.data && error.response.data.message) {
       throw new Error(error.response.data.message);
     }
