@@ -1,27 +1,21 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { proxyEditorialRequest } from '@/app/api/editorial/_proxy';
-import { mockGenerationResult } from '@/lib/mocks/scripts.mock';
+import { notImplemented } from '../../../../../../_notImplemented';
 
-export async function POST(request: NextRequest, { params }: { params: Promise<{ projectId: string; scriptId: string }> }) {
-  const { projectId, scriptId } = await params;
-  const body = await request.json().catch(() => null);
+export async function GET() {
+  return notImplemented('./projects/[projectId]/scripts/[scriptId]/generate');
+}
 
-  // Tenta enviar ao backend
-  const result = await proxyEditorialRequest(request, `/projects/${projectId}/scripts/${scriptId}/generate`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(body),
-  });
-  if (result.ok) return NextResponse.json(result.data);
+export async function POST() {
+  return notImplemented('./projects/[projectId]/scripts/[scriptId]/generate');
+}
 
-  // Fallback mock com delay
-  const briefing = body?.briefing;
-  const format = briefing?.bloco1?.format || 'video_curto';
-  const mode = briefing?.bloco2?.scriptMode || 'conexao';
-  const tema = briefing?.bloco1?.theme || 'crescimento digital';
+export async function PUT() {
+  return notImplemented('./projects/[projectId]/scripts/[scriptId]/generate');
+}
 
-  // Simula progressão: 3 fases com delay de 1.5s cada
-  await new Promise((resolve) => setTimeout(resolve, 4000));
+export async function DELETE() {
+  return notImplemented('./projects/[projectId]/scripts/[scriptId]/generate');
+}
 
-  return NextResponse.json(mockGenerationResult(format, mode, tema));
+export async function PATCH() {
+  return notImplemented('./projects/[projectId]/scripts/[scriptId]/generate');
 }

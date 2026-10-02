@@ -1,24 +1,21 @@
-// src/app/api/editorial/versions/[versionId]/mapa/route.ts
-import { NextRequest, NextResponse } from 'next/server';
-import { proxyEditorialRequest } from '@/app/api/editorial/_proxy';
-import { mockMapa, mockVersionById } from '@/lib/mocks/editorial.mock';
-import { EditorialMapaSchema } from '@/lib/dto/editorial.schema';
+import { notImplemented } from '../../../../_notImplemented';
 
-interface RouteContext {
-  params: Promise<{ versionId: string }>;
+export async function GET() {
+  return notImplemented('./versions/[versionId]/mapa');
 }
 
-export async function GET(request: NextRequest, { params }: RouteContext) {
-  const { versionId } = await params;
+export async function POST() {
+  return notImplemented('./versions/[versionId]/mapa');
+}
 
-  const result = await proxyEditorialRequest(request, `/versions/${versionId}/mapa`);
+export async function PUT() {
+  return notImplemented('./versions/[versionId]/mapa');
+}
 
-  if (result.ok) {
-    return NextResponse.json(result.data);
-  }
+export async function DELETE() {
+  return notImplemented('./versions/[versionId]/mapa');
+}
 
-  const version = mockVersionById(versionId);
-  const fallback = version ? { ...mockMapa, versionId, versionNumber: version.versionNumber, name: version.name } : mockMapa;
-  const parsed = EditorialMapaSchema.safeParse(fallback);
-  return NextResponse.json(parsed.success ? parsed.data : fallback);
+export async function PATCH() {
+  return notImplemented('./versions/[versionId]/mapa');
 }

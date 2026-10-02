@@ -1,14 +1,21 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { proxyEditorialRequest } from '@/app/api/editorial/_proxy';
-import { mockCalendarSlots } from '@/lib/mocks/scripts.mock';
-import type { ScriptFormat } from '@/lib/dto/editorial.schema';
+import { notImplemented } from '../../../../../../_notImplemented';
 
-export async function GET(request: NextRequest, { params }: { params: Promise<{ projectId: string; format: string }> }) {
-  const { projectId, format } = await params;
-  const result = await proxyEditorialRequest(request, `/projects/${projectId}/scripts/slots/${format}`);
-  if (result.ok) return NextResponse.json(result.data);
+export async function GET() {
+  return notImplemented('./projects/[projectId]/scripts/slots/[format]');
+}
 
-  const slots = mockCalendarSlots[format as ScriptFormat];
-  if (!slots) return NextResponse.json([], { status: 200 });
-  return NextResponse.json(slots);
+export async function POST() {
+  return notImplemented('./projects/[projectId]/scripts/slots/[format]');
+}
+
+export async function PUT() {
+  return notImplemented('./projects/[projectId]/scripts/slots/[format]');
+}
+
+export async function DELETE() {
+  return notImplemented('./projects/[projectId]/scripts/slots/[format]');
+}
+
+export async function PATCH() {
+  return notImplemented('./projects/[projectId]/scripts/slots/[format]');
 }

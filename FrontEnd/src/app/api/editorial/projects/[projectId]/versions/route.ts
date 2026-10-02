@@ -1,28 +1,21 @@
-// src/app/api/editorial/projects/[projectId]/versions/route.ts
-import { NextRequest, NextResponse } from 'next/server';
-import { proxyEditorialRequest, normalizeList } from '@/app/api/editorial/_proxy';
-import { mockVersionsForProject } from '@/lib/mocks/editorial.mock';
-import { EditorialVersionSchema } from '@/lib/dto/editorial.schema';
+import { notImplemented } from '../../../../_notImplemented';
 
-interface RouteContext {
-  params: Promise<{ projectId: string }>;
+export async function GET() {
+  return notImplemented('./projects/[projectId]/versions');
 }
 
-export async function GET(request: NextRequest, { params }: RouteContext) {
-  const { projectId } = await params;
+export async function POST() {
+  return notImplemented('./projects/[projectId]/versions');
+}
 
-  const result = await proxyEditorialRequest(request, `/projects/${projectId}/versions`);
+export async function PUT() {
+  return notImplemented('./projects/[projectId]/versions');
+}
 
-  if (result.ok) {
-    const versions = normalizeList(result.data as any[]).map((version: any) => ({
-      ...version,
-      createdAt: version.createdAt ? new Date(version.createdAt) : undefined,
-      updatedAt: version.updatedAt ? new Date(version.updatedAt) : undefined,
-    }));
-    return NextResponse.json(versions);
-  }
+export async function DELETE() {
+  return notImplemented('./projects/[projectId]/versions');
+}
 
-  const fallback = mockVersionsForProject(projectId);
-  const parsed = EditorialVersionSchema.array().safeParse(fallback);
-  return NextResponse.json(parsed.success ? parsed.data : fallback);
+export async function PATCH() {
+  return notImplemented('./projects/[projectId]/versions');
 }

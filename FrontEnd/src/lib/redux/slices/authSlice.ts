@@ -53,10 +53,12 @@ const safeDecode = (token: string): UserPayload | null => {
 };
 
 export const loginUser = createAsyncThunk<AuthResponse, { email: string; password: string }>(
-  'auth/loginUser', //nome da ação
+  'auth/loginUser',
   async (credentials) => {
-    const response = await axios.post(`${process.env.NEXT_PUBLIC_API_BASE_URL}/auth/login`, credentials);
-    return response.data;
+    const response = await axios.post(`/api/auth/login`, credentials, {
+      headers: { 'Content-Type': 'application/json' },
+    });
+    return response.data.data;
   }
 );
 

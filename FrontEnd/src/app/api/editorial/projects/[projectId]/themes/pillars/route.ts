@@ -1,21 +1,21 @@
-// src/app/api/editorial/projects/[projectId]/themes/pillars/route.ts
-import { NextRequest, NextResponse } from 'next/server';
-import { proxyEditorialRequest } from '@/app/api/editorial/_proxy';
-import { getRomaPillars } from '@/lib/mocks/themes.mock';
+import { notImplemented } from '../../../../../_notImplemented';
 
-interface RouteContext {
-  params: Promise<{ projectId: string }>;
+export async function GET() {
+  return notImplemented('./projects/[projectId]/themes/pillars');
 }
 
-export async function GET(request: NextRequest, { params }: RouteContext) {
-  const { projectId } = await params;
+export async function POST() {
+  return notImplemented('./projects/[projectId]/themes/pillars');
+}
 
-  const result = await proxyEditorialRequest(request, `/projects/${projectId}/themes/pillars`);
+export async function PUT() {
+  return notImplemented('./projects/[projectId]/themes/pillars');
+}
 
-  if (result.ok) {
-    return NextResponse.json(result.data);
-  }
+export async function DELETE() {
+  return notImplemented('./projects/[projectId]/themes/pillars');
+}
 
-  const fallback = getRomaPillars(projectId);
-  return NextResponse.json({ pillars: fallback });
+export async function PATCH() {
+  return notImplemented('./projects/[projectId]/themes/pillars');
 }

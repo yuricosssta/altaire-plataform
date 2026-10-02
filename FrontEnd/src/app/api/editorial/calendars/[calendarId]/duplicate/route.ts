@@ -1,41 +1,21 @@
-// src/app/api/editorial/calendars/[calendarId]/duplicate/route.ts
-import { NextRequest, NextResponse } from 'next/server';
-import { proxyEditorialRequest } from '@/app/api/editorial/_proxy';
-import { mockCalendarById, mockDuplicateCalendar } from '@/lib/mocks/calendar.mock';
-import { CalendarDuplicateSchema, EditorialCalendarSchema } from '@/lib/dto/editorial.schema';
+import { notImplemented } from '../../../../_notImplemented';
 
-interface RouteContext {
-  params: Promise<{ calendarId: string }>;
+export async function GET() {
+  return notImplemented('./calendars/[calendarId]/duplicate');
 }
 
-export async function POST(request: NextRequest, { params }: RouteContext) {
-  const { calendarId } = await params;
+export async function POST() {
+  return notImplemented('./calendars/[calendarId]/duplicate');
+}
 
-  const body = await request.json().catch(() => ({}));
-  const parsed = CalendarDuplicateSchema.safeParse(body);
-  if (!parsed.success) {
-    return NextResponse.json(
-      { error: 'Período de duplicação inválido.', details: parsed.error.flatten() },
-      { status: 400 },
-    );
-  }
+export async function PUT() {
+  return notImplemented('./calendars/[calendarId]/duplicate');
+}
 
-  const result = await proxyEditorialRequest(request, `/calendars/${calendarId}/duplicate`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(parsed.data),
-  });
+export async function DELETE() {
+  return notImplemented('./calendars/[calendarId]/duplicate');
+}
 
-  if (result.ok) {
-    return NextResponse.json(result.data, { status: 201 });
-  }
-
-  const source = mockCalendarById(calendarId);
-  if (!source) {
-    return NextResponse.json({ error: 'Calendário não encontrado.' }, { status: 404 });
-  }
-
-  const fallback = mockDuplicateCalendar(source, parsed.data);
-  const validated = EditorialCalendarSchema.safeParse(fallback);
-  return NextResponse.json(validated.success ? validated.data : fallback, { status: 201 });
+export async function PATCH() {
+  return notImplemented('./calendars/[calendarId]/duplicate');
 }

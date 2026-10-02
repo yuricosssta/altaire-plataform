@@ -1,26 +1,21 @@
-// src/app/api/editorial/projects/route.ts
 import { NextRequest, NextResponse } from 'next/server';
-import { proxyEditorialRequest, normalizeList } from '@/app/api/editorial/_proxy';
-import { mockCreateProject, mockProjects } from '@/lib/mocks/editorial.mock';
+import { proxyEditorialRequest } from '@/app/api/editorial/_proxy';
 import { ProjectCardSchema, ProjectCreateSchema } from '@/lib/dto/editorial.schema';
+import { error, ERROR_CODES } from '@/lib/api/response';
 
 export async function GET(request: NextRequest) {
   const result = await proxyEditorialRequest(request, '/projects');
 
-  if (result.ok) {
-    const projects = normalizeList(result.data as any[]).map((project: any) => ({
-      ...project,
-      updatedAt: project.updatedAt ? new Date(project.updatedAt) : undefined,
+  if ('ok' in result) {
+    const projects = (result.data as any[]).map((p: any) => ({
+      ...p,
+      id: p.id || p._id,
+      updatedAt: p.updatedAt ? new Date(p.updatedAt) : undefined,
     }));
     return NextResponse.json(projects);
   }
 
-  const fallback = mockProjects.map((project) => ({
-    ...project,
-    id: project.id,
-  }));
-  const parsed = ProjectCardSchema.array().safeParse(fallback);
-  return NextResponse.json(parsed.success ? parsed.data : fallback);
+  return NextResponse.json(result, { status: 502 });
 }
 
 export async function POST(request: NextRequest) {
@@ -28,22 +23,19 @@ export async function POST(request: NextRequest) {
   const parsed = ProjectCreateSchema.safeParse(body);
   if (!parsed.success) {
     return NextResponse.json(
-      { error: 'Payload do projeto inválido.', details: parsed.error.flatten() },
+      error(ERROR_CODES.VALIDATION_ERROR, 'Payload do projeto inválido.', parsed.error.flatten()),
       { status: 400 },
     );
   }
 
   const result = await proxyEditorialRequest(request, '/projects', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(parsed.data),
+    body: parsed.data,
   });
 
-  if (result.ok) {
+  if ('ok' in result) {
     return NextResponse.json(result.data, { status: 201 });
   }
 
-  const fallback = mockCreateProject(parsed.data);
-  const validated = ProjectCardSchema.safeParse(fallback);
-  return NextResponse.json(validated.success ? validated.data : fallback, { status: 201 });
+  return NextResponse.json(result, { status: 502 });
 }

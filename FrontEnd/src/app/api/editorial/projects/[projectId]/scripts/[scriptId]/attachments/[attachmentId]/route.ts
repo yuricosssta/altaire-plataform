@@ -1,6 +1,21 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { notImplemented } from '../../../../../../../_notImplemented';
 
-export async function DELETE(request: NextRequest, { params }: { params: Promise<{ projectId: string; scriptId: string; attachmentId: string }> }) {
-  const { projectId, scriptId, attachmentId } = await params;
-  return NextResponse.json({ success: true });
+export async function GET() {
+  return notImplemented('./projects/[projectId]/scripts/[scriptId]/attachments/[attachmentId]');
+}
+
+export async function POST() {
+  return notImplemented('./projects/[projectId]/scripts/[scriptId]/attachments/[attachmentId]');
+}
+
+export async function PUT() {
+  return notImplemented('./projects/[projectId]/scripts/[scriptId]/attachments/[attachmentId]');
+}
+
+export async function DELETE() {
+  return notImplemented('./projects/[projectId]/scripts/[scriptId]/attachments/[attachmentId]');
+}
+
+export async function PATCH() {
+  return notImplemented('./projects/[projectId]/scripts/[scriptId]/attachments/[attachmentId]');
 }

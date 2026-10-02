@@ -9,6 +9,7 @@ import { UsersModule } from './users/user.module';
 import { OrganizationModule } from './organization/organization.module';
 import { StorageModule } from './storage/storage.module';
 import { SharedModule } from './shared/shared.module';
+import { EditorialModule } from './editorial/editorial.module';
 
 @Module({
   imports: [
@@ -23,6 +24,7 @@ import { SharedModule } from './shared/shared.module';
     }),
     UsersModule,
     AuthModule,
+    EditorialModule,
     OrganizationModule,
     StorageModule,
     SharedModule,

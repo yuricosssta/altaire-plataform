@@ -28,12 +28,6 @@ export function Sidebar() {
     { name: "Recursos Humanos", href: "/dashboard/people", icon: <Users className="w-4 h-4" /> },
   ];
 
-  const monetizationLinks = [
-    { name: "Receita", href: "/dashboard/revenue", icon: <BarChart3 className="w-4 h-4" /> },
-    { name: "Pedidos", href: "/dashboard/orders", icon: <ShoppingCart className="w-4 h-4" /> },
-    { name: "Descontos", href: "/dashboard/discounts", icon: <Tag className="w-4 h-4" /> },
-  ];
-
   const settingsLinks = [
     { name: "Armazenamento", href: "/dashboard/storage", icon: <Archive className="w-4 h-4" /> },
     { name: "Configurações", href: "/dashboard/settings", icon: <Settings className="w-4 h-4" /> },
