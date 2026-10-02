@@ -4,8 +4,9 @@ import { success, error, ERROR_CODES } from '@/lib/api/response';
 
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } },
+  { params }: { params: Promise<{ id: string }> },
 ) {
+  const { id } = await params;
   try {
     const backendUrl = getBackendApiUrl();
     const authHeader = await getBffAuthHeader(request);
@@ -14,7 +15,7 @@ export async function DELETE(
     const headers: Record<string, string> = { ...orgHeaders };
     if (authHeader) headers['Authorization'] = authHeader;
 
-    const response = await fetch(`${backendUrl}/storage/assets/${params.id}`, {
+    const response = await fetch(`${backendUrl}/storage/assets/${id}`, {
       method: 'DELETE',
       headers,
     });

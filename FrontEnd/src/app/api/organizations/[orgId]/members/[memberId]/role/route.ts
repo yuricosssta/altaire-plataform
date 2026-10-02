@@ -1,16 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { proxyOrgRequest } from '@/app/api/organizations/_proxy';
 import { error, ERROR_CODES } from '@/lib/api/response';
- 
+
 export async function PATCH(
   request: NextRequest,
-  { params }: { params: { orgId: string; memberId: string } },
+  { params }: { params: Promise<{ orgId: string; memberId: string }> }
 ) {
+  const { orgId, memberId } = await params;
   const body = await request.json().catch(() => ({}));
 
   const result = await proxyOrgRequest(
     request,
-    `/${params.orgId}/members/${params.memberId}/role`,
+    `/${orgId}/members/${memberId}/role`,
     { method: 'PATCH', body },
   );
 

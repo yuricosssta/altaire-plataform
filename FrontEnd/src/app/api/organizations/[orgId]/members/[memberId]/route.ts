@@ -3,11 +3,12 @@ import { proxyOrgRequest } from '@/app/api/organizations/_proxy';
 
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { orgId: string; memberId: string } },
+  { params }: { params: Promise<{ orgId: string; memberId: string }> },
 ) {
+  const { orgId, memberId } = await params;
   const result = await proxyOrgRequest(
     request,
-    `/${params.orgId}/members/${params.memberId}`,
+    `/${orgId}/members/${memberId}`,
     { method: 'DELETE' },
   );
 

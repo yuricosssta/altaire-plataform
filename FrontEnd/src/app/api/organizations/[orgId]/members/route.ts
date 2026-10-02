@@ -4,9 +4,10 @@ import { error, ERROR_CODES } from '@/lib/api/response';
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { orgId: string } },
+  { params }: { params: Promise<{ orgId: string }> },
 ) {
-  const result = await proxyOrgRequest(request, `/${params.orgId}/members`);
+  const { orgId } = await params;
+  const result = await proxyOrgRequest(request, `/${orgId}/members`);
 
   if ('ok' in result) {
     return NextResponse.json(result.data);
@@ -17,11 +18,12 @@ export async function GET(
 
 export async function POST(
   request: NextRequest,
-  { params }: { params: { orgId: string } },
+  { params }: { params: Promise<{ orgId: string }> },
 ) {
+  const { orgId } = await params;
   const body = await request.json().catch(() => ({}));
 
-  const result = await proxyOrgRequest(request, `/${params.orgId}/members`, {
+  const result = await proxyOrgRequest(request, `/${orgId}/members`, {
     method: 'POST',
     body,
   });
