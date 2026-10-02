@@ -1,3 +1,5 @@
+import { BrandStory } from "../dto/editorial.schema";
+
 export const FORMAT_LABELS: Record<string, string> = {
   video_curto: 'Vídeo Curto',
   video_medio: 'Vídeo Médio',
@@ -45,7 +47,7 @@ export const FORMAT_ROUTE: Record<string, string> = {
 export const mockScripts: Record<string, any[]> = {};
 export const mockCalendarSlots: Record<string, any[]> = {};
 export const mockThemesForScript: Record<string, any[]> = {};
-export const mockBrandStory: any = null;
+export const mockBrandStory: BrandStory | null = null;
 export const mockVersionsForScript = (_scriptId: string): any[] => [];
 export const mockAttachmentsForScript = (_scriptId: string): any[] => [];
 export const mockGenerationResult = (..._args: any[]): any => ({});
