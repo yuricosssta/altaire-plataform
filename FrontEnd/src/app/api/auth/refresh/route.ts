@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { proxyAuthRefresh, getAuthTokenFromRequest } from '@/lib/auth/authProxy';
+import { proxyAuthRefresh } from '@/lib/auth/authProxy';
 import { getAuthTokenFromRequest as getToken } from '@/lib/auth/token.service';
 import { success, error, ERROR_CODES } from '@/lib/api/response';
 

@@ -39,9 +39,9 @@ export async function proxyAuthLogin(credentials: {
   }
 
   const userPayload: TokenPayload = {
-    sub: externalPayload.sub || externalPayload.id || '',
+    sub: externalPayload.sub || (externalPayload.id as string) || '',
     email: externalPayload.email || credentials.email,
-    name: externalPayload.name || data.user?.name || externalPayload.email?.split('@')[0] || '',
+    name: externalPayload.name || (data.user?.name as string) || externalPayload.email?.split('@')[0] || '',
     org: 'altaire',
     role: 'member',
   };
@@ -77,11 +77,14 @@ export async function proxyAuthSignup(data: {
   }
 
   const externalPayload = decodeExternalToken(externalToken);
+  if (!externalPayload) {
+    throw new Error('Token externo inválido');
+  }
 
   const userPayload: TokenPayload = {
-    sub: externalPayload?.sub || externalPayload?.id || '',
+    sub: externalPayload.sub || (externalPayload.id as string) || '',
     email: data.email,
-    name: data.name || externalPayload?.name || data.email.split('@')[0],
+    name: data.name || externalPayload.name || data.email.split('@')[0],
     org: 'altaire',
     role: 'member',
   };

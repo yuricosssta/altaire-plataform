@@ -1,16 +1,16 @@
 import { Injectable } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
-import { EditorialProjectRepository } from '../repositories/editorial-project.repository';
+import { EditorialProjectRepository } from '../../repositories/editorial-project.repository';
 import {
   IEditorialProject,
   ICreateEditorialProject,
   IUpdateEditorialProject,
-} from '../schemas/models/editorial-project.interface';
+} from '../../schemas/models/editorial-project.interface';
 import {
   EditorialProject,
   EditorialProjectDocument,
-} from '../schemas/editorial-project.schema';
+} from '../../schemas/editorial-project.schema';
 
 @Injectable()
 export class EditorialProjectMongooseRepository implements EditorialProjectRepository {

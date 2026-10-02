@@ -18,6 +18,7 @@ import {
   CreateProject,
   UpdateProject,
 } from '../validations/editorial-project.zod';
+import { ICreateEditorialProject } from '../schemas/models/editorial-project.interface';
 
 @UseGuards(AuthGuard)
 @Controller('editorial/projects')
@@ -42,7 +43,7 @@ export class EditorialProjectController {
     return this.projectService.create({
       ...data,
       createdBy: userId,
-    });
+    } as ICreateEditorialProject);
   }
 
   @Put(':id')

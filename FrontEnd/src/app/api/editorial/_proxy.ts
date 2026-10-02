@@ -1,6 +1,6 @@
 import { getBackendApiUrl } from '@/lib/api/serverUtils';
 import { getAuthTokenFromRequest } from '@/lib/auth/token.service';
-import { success, error, ERROR_CODES, ErrorResponse } from '@/lib/api/response';
+import { success, error, ERROR_CODES, ErrorCode, ErrorResponse } from '@/lib/api/response';
 
 interface ProxyOptions {
   method?: string;
@@ -60,7 +60,7 @@ export async function proxyEditorialRequest(
   }
 }
 
-function mapStatusToErrorCode(status: number): string {
+function mapStatusToErrorCode(status: number): ErrorCode {
   switch (status) {
     case 400: return ERROR_CODES.VALIDATION_ERROR;
     case 401: return ERROR_CODES.UNAUTHORIZED;
