@@ -1,3 +1,28 @@
+## SPRINT 10 - 05/10/2026 ##
+Resumo Técnico de Fechamento
+
+Implementação do Ciclo 1 — Versions, Onboarding & Mapa (BackEnd):
+- Novas coleções: `EditorialVersion` e `EditorialMapa` com Service/Repository pattern (mesmo do EditorialProject).
+- `POST /editorial/projects/:projectId/onboarding`: recebe onboarding com 5 blocos (niche, offer, audience, branding, capacity), atualiza project.niche/subniche, cria versão v1 + mapa estratégico, emite evento `editorial.onboarding.completed`.
+- `GET /editorial/projects/:projectId/versions`: lista versões de um projeto (sorted by versionNumber desc).
+- `GET /editorial/versions/:versionId/mapa`: retorna o mapa estratégico de uma versão.
+- `POST /editorial/versions/:versionId/duplicate`: duplica versão (versionNumber++) + mapa, emite `editorial.version.duplicated`.
+- `PATCH /editorial/versions/:versionId`: atualiza name/status, emite `editorial.version.archived` se status=archived.
+- `DELETE /editorial/versions/:versionId`: soft delete + remove mapa.
+
+Otimização de Espaço no MongoDB:
+- Abreviação de campos via `@Prop({ name: 'alias' })` nas schemas novas: `versionNumber→vn`, `projectId→pid`, `name→n`, `status→st`, `createdBy→cb`, `isActive→ia`, `versionId→vid`, `positioningPhrase→pp`, `mensagemCentral→mc`, `pilares→pl`, `tomDeVoz→tv`, `retina→rt`.
+- Economia estimada de ~37 bytes por documento de version + ~25 bytes por documento de mapa vs nomes literais.
+- Índices compostos adicionados: `{ orgId, isActive, updatedAt }` no `EditorialProject` (otimiza listagem); `{ pid, ia, vn }` e `{ pid, vn }` no `EditorialVersion`; `{ vid }` no `EditorialMapa`.
+
+Infraestrutura de Eventos (EventEmitter2):
+- `EventEmitterModule.forRoot()` registrado em `app.module.ts` (antes inexistente).
+- Constantes centralizadas em `shared/events/editorial.events.ts`: VERSION_CREATED, VERSION_DUPLICATED, VERSION_ARCHIVED, ONBOARDING_COMPLETED.
+- Payload padronizado `EditorialEventPayload { event, projectId, versionId, versionNumber, triggeredBy, timestamp, metadata? }`.
+- Eventos emitidos pelo `EditorialVersionService` nas ações de criação, duplicação e arquivamento.
+- Design compatível com migração futura para RabbitMQ/Kafka (troca apenas a camada de transporte).
+- Listeners podem ser criados em qualquer módulo via `@OnEvent(EDITORIAL_EVENTS.ONBOARDING_COMPLETED)` sem acoplamento.
+
 ## SPRINT 09 - 02/10/2026 ##
 Resumo Técnico de Fechamento
 

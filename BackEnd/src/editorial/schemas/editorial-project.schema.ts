@@ -35,3 +35,5 @@ export class EditorialProject {
 
 export const EditorialProjectSchema =
   SchemaFactory.createForClass(EditorialProject);
+
+EditorialProjectSchema.index({ orgId: 1, isActive: 1, updatedAt: -1 });

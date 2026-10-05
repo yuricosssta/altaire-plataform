@@ -4,6 +4,7 @@ import { AppService } from './app.service';
 import { MongooseModule } from '@nestjs/mongoose';
 import { JwtModule } from '@nestjs/jwt';
 import { ConfigModule } from '@nestjs/config';
+import { EventEmitterModule } from '@nestjs/event-emitter';
 import { AuthModule } from './auth/auth.module';
 import { UsersModule } from './users/user.module';
 import { OrganizationModule } from './organization/organization.module';
@@ -16,6 +17,7 @@ import { EditorialModule } from './editorial/editorial.module';
     ConfigModule.forRoot({
       isGlobal: true,
     }),
+    EventEmitterModule.forRoot(),
     MongooseModule.forRoot(process.env.MONGO_URI),
     JwtModule.register({
       global: true,
