@@ -23,6 +23,7 @@ import {
   onboardingSchema,
   OnboardingInput,
 } from '../validations/onboarding.zod';
+import { ICreateEditorialProject } from '../schemas/models/editorial-project.interface';
 
 @UseGuards(AuthGuard)
 @Controller('editorial/projects')
@@ -31,6 +32,7 @@ export class EditorialProjectController {
     private readonly projectService: EditorialProjectService,
     private readonly versionService: EditorialVersionService,
   ) {}
+  constructor(private readonly projectService: EditorialProjectService) {}
 
   @Get()
   async findAll() {
@@ -51,6 +53,7 @@ export class EditorialProjectController {
       ...data,
       createdBy: userId,
     } as any);
+    } as ICreateEditorialProject);
   }
 
   @Put(':id')

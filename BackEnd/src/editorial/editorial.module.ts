@@ -22,6 +22,10 @@ import { EditorialMapaMongooseRepository } from './repositories/mongoose/editori
 import { EditorialMapaRepository } from './repositories/editorial-mapa.repository';
 import { EditorialProjectController } from './controllers/editorial-project.controller';
 import { EditorialVersionController } from './controllers/editorial-version.controller';
+import { EditorialProjectService } from './services/editorial-project.service';
+import { EditorialProjectMongooseRepository } from './repositories/mongoose/editorial-project.mongoose.repository';
+import { EditorialProjectRepository } from './repositories/editorial-project.repository';
+import { EditorialProjectController } from './controllers/editorial-project.controller';
 
 @Module({
   imports: [
@@ -35,6 +39,11 @@ import { EditorialVersionController } from './controllers/editorial-version.cont
   providers: [
     EditorialProjectService,
     EditorialVersionService,
+    ]),
+  ],
+  controllers: [EditorialProjectController],
+  providers: [
+    EditorialProjectService,
     {
       provide: EditorialProjectRepository,
       useClass: EditorialProjectMongooseRepository,
