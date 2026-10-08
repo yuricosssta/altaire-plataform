@@ -7,7 +7,10 @@ import {
   IEditorialVersion,
   IUpdateEditorialVersion,
 } from '../schemas/models/editorial-version.interface';
-import { IEditorialMapa } from '../schemas/models/editorial-mapa.interface';
+import {
+  IEditorialMapa,
+  IUpdateEditorialMapa,
+} from '../schemas/models/editorial-mapa.interface';
 import { EDITORIAL_EVENTS } from '../../shared/events/editorial.events';
 import { OnboardingInput } from '../validations/onboarding.zod';
 
@@ -32,6 +35,19 @@ export class EditorialVersionService {
 
   async findMapa(versionId: string): Promise<IEditorialMapa> {
     const mapa = await this.mapaRepository.findByVersionId(versionId);
+    if (!mapa)
+      throw new NotFoundException('Mapa não encontrado para esta versão.');
+    return mapa;
+  }
+
+  async updateMapa(
+    versionId: string,
+    data: IUpdateEditorialMapa,
+  ): Promise<IEditorialMapa> {
+    const version = await this.versionRepository.findById(versionId);
+    if (!version) throw new NotFoundException('Versão não encontrada.');
+
+    const mapa = await this.mapaRepository.update(versionId, data);
     if (!mapa)
       throw new NotFoundException('Mapa não encontrado para esta versão.');
     return mapa;

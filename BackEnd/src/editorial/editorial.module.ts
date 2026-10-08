@@ -14,6 +14,7 @@ import {
 } from './schemas/editorial-mapa.schema';
 import { EditorialProjectService } from './services/editorial-project.service';
 import { EditorialVersionService } from './services/editorial-version.service';
+import { EditorialEventListener } from './services/editorial-event.listener';
 import { EditorialProjectMongooseRepository } from './repositories/mongoose/editorial-project.mongoose.repository';
 import { EditorialProjectRepository } from './repositories/editorial-project.repository';
 import { EditorialVersionMongooseRepository } from './repositories/mongoose/editorial-version.mongoose.repository';
@@ -22,10 +23,6 @@ import { EditorialMapaMongooseRepository } from './repositories/mongoose/editori
 import { EditorialMapaRepository } from './repositories/editorial-mapa.repository';
 import { EditorialProjectController } from './controllers/editorial-project.controller';
 import { EditorialVersionController } from './controllers/editorial-version.controller';
-import { EditorialProjectService } from './services/editorial-project.service';
-import { EditorialProjectMongooseRepository } from './repositories/mongoose/editorial-project.mongoose.repository';
-import { EditorialProjectRepository } from './repositories/editorial-project.repository';
-import { EditorialProjectController } from './controllers/editorial-project.controller';
 
 @Module({
   imports: [
@@ -39,11 +36,7 @@ import { EditorialProjectController } from './controllers/editorial-project.cont
   providers: [
     EditorialProjectService,
     EditorialVersionService,
-    ]),
-  ],
-  controllers: [EditorialProjectController],
-  providers: [
-    EditorialProjectService,
+    EditorialEventListener,
     {
       provide: EditorialProjectRepository,
       useClass: EditorialProjectMongooseRepository,

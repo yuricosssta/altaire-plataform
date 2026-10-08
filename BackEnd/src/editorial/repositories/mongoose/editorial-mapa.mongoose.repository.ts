@@ -5,6 +5,7 @@ import { EditorialMapaRepository } from '../editorial-mapa.repository';
 import {
   IEditorialMapa,
   ICreateEditorialMapa,
+  IUpdateEditorialMapa,
 } from '../../schemas/models/editorial-mapa.interface';
 import {
   EditorialMapa,
@@ -41,6 +42,29 @@ export class EditorialMapaMongooseRepository implements EditorialMapaRepository 
     const doc = new this.mapaModel(mapped);
     const saved = await doc.save();
     return saved.toObject() as unknown as IEditorialMapa;
+  }
+
+  async update(
+    versionId: string,
+    data: IUpdateEditorialMapa,
+  ): Promise<IEditorialMapa | null> {
+    const set: Record<string, unknown> = {};
+    if (data.name !== undefined) set['n'] = data.name;
+    if (data.positioningPhrase !== undefined) set['pp'] = data.positioningPhrase;
+    if (data.mensagemCentral !== undefined) set['mc'] = data.mensagemCentral;
+    if (data.pilares !== undefined) set['pl'] = data.pilares;
+    if (data.tomDeVoz !== undefined) set['tv'] = data.tomDeVoz;
+    if (data.retina !== undefined) set['rt'] = data.retina;
+
+    const updated = await this.mapaModel
+      .findOneAndUpdate(
+        { vid: new (Types.ObjectId as any)(versionId) },
+        { $set: set },
+        { new: true },
+      )
+      .lean()
+      .exec();
+    return updated as unknown as IEditorialMapa | null;
   }
 
   async deleteByVersionId(versionId: string): Promise<void> {
