@@ -32,7 +32,6 @@ export class EditorialProjectController {
     private readonly projectService: EditorialProjectService,
     private readonly versionService: EditorialVersionService,
   ) {}
-  constructor(private readonly projectService: EditorialProjectService) {}
 
   @Get()
   async findAll() {
@@ -52,7 +51,6 @@ export class EditorialProjectController {
     return this.projectService.create({
       ...data,
       createdBy: userId,
-    } as any);
     } as ICreateEditorialProject);
   }
 

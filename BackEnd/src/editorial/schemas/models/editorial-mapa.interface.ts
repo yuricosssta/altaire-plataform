@@ -38,3 +38,12 @@ export interface ICreateEditorialMapa {
   tomDeVoz?: ITomDeVoz;
   retina?: IRentina[];
 }
+
+export interface IUpdateEditorialMapa {
+  name?: string;
+  positioningPhrase?: string;
+  mensagemCentral?: string;
+  pilares?: IPilar[];
+  tomDeVoz?: ITomDeVoz;
+  retina?: IRentina[];
+}

@@ -16,6 +16,10 @@ import {
   updateVersionSchema,
   UpdateVersion,
 } from '../validations/editorial-version.zod';
+import {
+  updateMapaSchema,
+  UpdateMapaInput,
+} from '../validations/editorial-mapa.zod';
 
 @UseGuards(AuthGuard)
 @Controller('editorial/versions')
@@ -41,6 +45,14 @@ export class EditorialVersionController {
     @Body(new ZodValidationPipe(updateVersionSchema)) data: UpdateVersion,
   ) {
     return this.versionService.update(versionId, data);
+  }
+
+  @Patch(':versionId/mapa')
+  async updateMapa(
+    @Param('versionId') versionId: string,
+    @Body(new ZodValidationPipe(updateMapaSchema)) data: UpdateMapaInput,
+  ) {
+    return this.versionService.updateMapa(versionId, data as any);
   }
 
   @Delete(':versionId')

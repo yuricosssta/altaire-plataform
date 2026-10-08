@@ -1,3 +1,30 @@
+## SPRINT 11 - 08/10/2026 ##
+Resumo Técnico de Fechamento
+
+Correção de Bugs no Módulo Editorial (BackEnd):
+- `controllers/editorial-project.controller.ts`: Removido construtor duplicado (segundo construtor sobreescrevia o primeiro, impedindo injeção de `EditorialVersionService`). Corrigido syntax error no método `create` — artefato de merge com `as any` e `as ICreateEditorialProject` colados.
+- `editorial.module.ts`: Limpeza de artefato de merge — imports duplicados removidos, bloco `controllers`/`providers` duplicado com `])` extra substituído por declaração única limpa.
+
+Novo Endpoint de Atualização do Mapa Estratégico:
+- `PATCH /editorial/versions/:versionId/mapa`: atualiza campos do mapa (positioningPhrase, mensagemCentral, pilares, tomDeVoz, retina). Controller → Service (com validação de existência da versão) → Repository (update com shorthand fields: `n`, `pp`, `mc`, `pl`, `tv`, `rt`).
+- `IUpdateEditorialMapa` adicionado em `schemas/models/editorial-mapa.interface.ts`.
+- `EditorialMapaRepository.update()` adicionado (abstrato + implementação Mongoose).
+- `validations/editorial-mapa.zod.ts`: schema Zod para update com sub-schemas `pilarSchema`, `tomDeVozSchema`, `retinaSchema`.
+
+Infraestrutura de Eventos — Listeners Implementados:
+- `services/editorial-event.listener.ts`: Primeiro listener real com `@OnEvent()` no codebase. Escuta os 4 eventos editoriais (ONBOARDING_COMPLETED, VERSION_CREATED, VERSION_DUPLICATED, VERSION_ARCHIVED) e loga via `Logger` do NestJS.
+- Registrado como provider no `EditorialModule`.
+
+Testes Unitários do Módulo Editorial:
+- 4 arquivos de teste criados seguindo o padrão `@nestjs/testing` + Jest com mocks:
+  - `services/editorial-project.service.spec.ts`: 7 testes cobrindo findAll, findById (2), create, update (2), delete (2).
+  - `services/editorial-version.service.spec.ts`: 9 testes cobrindo findByProjectId, findById, findMapa, updateMapa (2), update (com emissão de evento de archive), delete (com cascade), createFromOnboarding (fluxo completo com eventos), duplicate.
+  - `controllers/editorial-project.controller.spec.ts`: 3 testes com mocks de AuthGuard.
+  - `controllers/editorial-version.controller.spec.ts`: 3 testes com mocks de AuthGuard.
+- Resultado: 24/24 testes passando. Zero erros de TypeScript no módulo editorial.
+
+Nota: `orgId` permanece hardcoded como `'altaire'` — a personalização é por usuário via API de autenticação, não por organização.
+
 ## SPRINT 10 - 05/10/2026 ##
 Resumo Técnico de Fechamento
 
