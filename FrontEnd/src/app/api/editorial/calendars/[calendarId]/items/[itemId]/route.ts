@@ -1,21 +1,36 @@
-import { notImplemented } from '@/app/api/editorial/_notImplemented';
+import { NextRequest, NextResponse } from 'next/server';
+import { proxyEditorialRequest } from '@/app/api/editorial/_proxy';
+import { CalendarItemUpdateSchema } from '@/lib/dto/editorial.schema';
+import { error, ERROR_CODES } from '@/lib/api/response';
 
-export async function GET() {
-  return notImplemented('./calendars/[calendarId]/items/[itemId]');
-}
+export async function PATCH(
+  request: NextRequest,
+  { params }: { params: Promise<{ calendarId: string; itemId: string }> },
+) {
+  const { calendarId, itemId } = await params;
+  const body = await request.json().catch(() => null);
 
-export async function POST() {
-  return notImplemented('./calendars/[calendarId]/items/[itemId]');
-}
+  const parsed = CalendarItemUpdateSchema.safeParse(body);
+  if (!parsed.success) {
+    return NextResponse.json(
+      error(ERROR_CODES.VALIDATION_ERROR, 'Dados do item inválidos.', parsed.error.flatten()),
+      { status: 400 },
+    );
+  }
 
-export async function PUT() {
-  return notImplemented('./calendars/[calendarId]/items/[itemId]');
-}
+  const result = await proxyEditorialRequest(
+    request,
+    `/calendars/${calendarId}/items/${itemId}`,
+    { method: 'PATCH', body: parsed.data },
+  );
 
-export async function DELETE() {
-  return notImplemented('./calendars/[calendarId]/items/[itemId]');
-}
+  if ('ok' in result) {
+    const data = result.data as any;
+    return NextResponse.json({
+      ...data,
+      date: data.date ? new Date(data.date) : undefined,
+    });
+  }
 
-export async function PATCH() {
-  return notImplemented('./calendars/[calendarId]/items/[itemId]');
+  return NextResponse.json(result, { status: 502 });
 }

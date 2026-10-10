@@ -1,6 +1,9 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { OnEvent } from '@nestjs/event-emitter';
-import { EDITORIAL_EVENTS, EditorialEventPayload } from '../../shared/events/editorial.events';
+import {
+  EDITORIAL_EVENTS,
+  EditorialEventPayload,
+} from '../../shared/events/editorial.events';
 
 @Injectable()
 export class EditorialEventListener {
@@ -31,6 +34,30 @@ export class EditorialEventListener {
   handleVersionArchived(payload: EditorialEventPayload): void {
     this.logger.log(
       `Versão arquivada — v${payload.versionNumber} (${payload.versionId}) no projeto ${payload.projectId}`,
+    );
+  }
+
+  @OnEvent(EDITORIAL_EVENTS.CALENDAR_CREATED)
+  handleCalendarCreated(payload: EditorialEventPayload): void {
+    const calendarId = payload.metadata?.calendarId || '(desconhecido)';
+    this.logger.log(
+      `Calendário criado — ${calendarId} no projeto ${payload.projectId}, versão ${payload.versionId}`,
+    );
+  }
+
+  @OnEvent(EDITORIAL_EVENTS.CALENDAR_ARCHIVED)
+  handleCalendarArchived(payload: EditorialEventPayload): void {
+    const calendarId = payload.metadata?.calendarId || '(desconhecido)';
+    this.logger.log(
+      `Calendário arquivado — ${calendarId} no projeto ${payload.projectId}`,
+    );
+  }
+
+  @OnEvent(EDITORIAL_EVENTS.CALENDAR_DUPLICATED)
+  handleCalendarDuplicated(payload: EditorialEventPayload): void {
+    const calendarId = payload.metadata?.calendarId || '(desconhecido)';
+    this.logger.log(
+      `Calendário duplicado — novo ${calendarId} (original: ${payload.metadata?.originalId}) no projeto ${payload.projectId}`,
     );
   }
 }

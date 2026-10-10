@@ -50,7 +50,8 @@ export class EditorialMapaMongooseRepository implements EditorialMapaRepository 
   ): Promise<IEditorialMapa | null> {
     const set: Record<string, unknown> = {};
     if (data.name !== undefined) set['n'] = data.name;
-    if (data.positioningPhrase !== undefined) set['pp'] = data.positioningPhrase;
+    if (data.positioningPhrase !== undefined)
+      set['pp'] = data.positioningPhrase;
     if (data.mensagemCentral !== undefined) set['mc'] = data.mensagemCentral;
     if (data.pilares !== undefined) set['pl'] = data.pilares;
     if (data.tomDeVoz !== undefined) set['tv'] = data.tomDeVoz;

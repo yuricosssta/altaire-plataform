@@ -1,3 +1,40 @@
+## SPRINT 12 - 10/10/2026 ##
+Resumo Técnico de Fechamento
+
+Implementação do Ciclo 2 — Calendários (BackEnd + BFF):
+- Nova coleção `EditorialCalendar` com schema Mongoose usando short field names (`pid`, `evid`, `n`, `per`, `cap`, `obj`, `st`, `dys`, `rv`, `ia`) e subdocumentos aninhados (CalendarDay → CalendarItem → StorySequence).
+- Abreviações de subcampos: `tp` (type), `lb` (label), `sd`/`ed` (startDate/endDate), `rw`/`lw`/`cw`/`sw`/`lv`/`ss` (capacity), `d` (date), `f` (format), `rt` (retinaType), `plf` (platforms), `o` (objective), `stm` (suggestedTime), `th` (theme), `sts` (status), `pn` (provisionalName), `so` (strategicObjective), `pl` (pillar), `pdo` (painDesireObjection), `ob` (observations), `eu` (exampleUrl), `it` (items), `sq` (storySequences).
+- Índices compostos: `{ pid, ia, st }` e `{ pid, obj }`.
+- Service/Repository pattern (mesmo de EditorialVersion) com `EditorialCalendarRepository` abstrato + `EditorialCalendarMongooseRepository`.
+- Geração automática de `days[]` no `EditorialCalendarService.criar()`: calcula endDate pelo periodType, distribui itens por formato baseado na capacity, alterna retinaTypes em round-robin, atribui suggestedTimes por formato.
+- Controller com 8 endpoints REST em `editorial-calendar.controller.ts`: `GET/POST /editorial/projects/:projectId/calendars`, `GET/PATCH/DELETE /editorial/calendars/:calendarId`, `POST /calendars/:calendarId/duplicate`, `PATCH /calendars/:calendarId/items/:itemId`, `GET /calendars/:calendarId/review`.
+- `GET /calendars/:calendarId/review`: gera `ReviewSuggestion[]` analisando distribuição RETINA vs esperada, alerta sobre capacidade subutilizada.
+- Zod validations em `validations/editorial-calendar.zod.ts`: `calendarSetupSchema`, `calendarPatchSchema`, `calendarDuplicateSchema`, `calendarItemUpdateSchema`.
+- Eventos adicionados: `CALENDAR_CREATED`, `CALENDAR_UPDATED`, `CALENDAR_ARCHIVED`, `CALENDAR_DUPLICATED`. Listeners implementados no `EditorialEventListener`.
+
+Conexão do BFF FrontEnd (Ciclo 1):
+- 5 BFF routes de versions/onboarding/mapa/duplicate migradas de `notImplemented()` para `proxyEditorialRequest()` com validação Zod:
+  - `POST /api/editorial/projects/[projectId]/onboarding`
+  - `GET /api/editorial/projects/[projectId]/versions`
+  - `GET/PATCH/DELETE /api/editorial/versions/[versionId]`
+  - `GET/PATCH /api/editorial/versions/[versionId]/mapa`
+  - `POST /api/editorial/versions/[versionId]/duplicate`
+
+Conexão do BFF FrontEnd (Ciclo 2):
+- 6 BFF routes de calendário migradas de `notImplemented()` para `proxyEditorialRequest()` com validação Zod:
+  - `GET/POST /api/editorial/projects/[projectId]/calendars`
+  - `GET/PATCH/DELETE /api/editorial/calendars/[calendarId]`
+  - `POST /api/editorial/calendars/[calendarId]/duplicate`
+  - `PATCH /api/editorial/calendars/[calendarId]/items/[itemId]`
+  - `GET /api/editorial/calendars/[calendarId]/review`
+
+Ajuste na ESLint Rule:
+- `schemas/models/*` (interfaces) liberado para services e controllers — o padrão `*/schemas/*` bloqueava também interfaces puras, que services/controllers precisam importar para tipagem.
+
+Adicionado endpoint faltante `GET /editorial/versions/:versionId` no `EditorialVersionController`.
+
+Resultado: 24/24 testes editoriais passando. Zero erros de ESLint no módulo editorial. FrontEnd typecheck 0 erros.
+
 ## SPRINT 11 - 08/10/2026 ##
 Resumo Técnico de Fechamento
 

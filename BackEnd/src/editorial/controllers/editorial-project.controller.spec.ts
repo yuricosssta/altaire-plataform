@@ -12,14 +12,25 @@ describe('EditorialProjectController', () => {
     const module: TestingModule = await Test.createTestingModule({
       controllers: [EditorialProjectController],
       providers: [
-        { provide: EditorialProjectService, useValue: { findAll: jest.fn(), findById: jest.fn() } },
-        { provide: EditorialVersionService, useValue: { createFromOnboarding: jest.fn(), findByProjectId: jest.fn() } },
+        {
+          provide: EditorialProjectService,
+          useValue: { findAll: jest.fn(), findById: jest.fn() },
+        },
+        {
+          provide: EditorialVersionService,
+          useValue: {
+            createFromOnboarding: jest.fn(),
+            findByProjectId: jest.fn(),
+          },
+        },
         { provide: JwtService, useValue: { verifyAsync: jest.fn() } },
         { provide: ConfigService, useValue: { get: jest.fn() } },
       ],
     }).compile();
 
-    controller = module.get<EditorialProjectController>(EditorialProjectController);
+    controller = module.get<EditorialProjectController>(
+      EditorialProjectController,
+    );
   });
 
   it('should be defined', () => {
