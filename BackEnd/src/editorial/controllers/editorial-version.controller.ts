@@ -26,6 +26,11 @@ import {
 export class EditorialVersionController {
   constructor(private readonly versionService: EditorialVersionService) {}
 
+  @Get(':versionId')
+  async findById(@Param('versionId') versionId: string) {
+    return this.versionService.findById(versionId);
+  }
+
   @Get(':versionId/mapa')
   async getMapa(@Param('versionId') versionId: string) {
     return this.versionService.findMapa(versionId);

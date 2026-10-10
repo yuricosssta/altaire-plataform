@@ -31,7 +31,7 @@ module.exports = {
             patterns: [
               { group: ['mongoose'], message: 'Service não deve importar mongoose (use o repository)' },
               { group: ['@nestjs/mongoose'], message: 'Service não deve importar @nestjs/mongoose (use o repository)' },
-              { group: ['**/schemas/**'], message: 'Service não deve importar schemas diretamente' },
+              { group: ['**/schemas/**', '!**/schemas/models/**'], message: 'Service não deve importar schemas diretamente' },
             ],
           },
         ],
@@ -47,7 +47,7 @@ module.exports = {
               { group: ['mongoose'], message: 'Controller não deve importar mongoose' },
               { group: ['@nestjs/mongoose'], message: 'Controller não deve importar @nestjs/mongoose' },
               { group: ['**/repositories/**'], message: 'Controller deve usar Service, não Repository' },
-              { group: ['**/schemas/**'], message: 'Controller não deve importar schemas' },
+              { group: ['**/schemas/**', '!**/schemas/models/**'], message: 'Controller não deve importar schemas' },
             ],
           },
         ],

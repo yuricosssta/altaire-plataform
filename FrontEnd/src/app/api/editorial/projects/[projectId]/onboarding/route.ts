@@ -1,21 +1,46 @@
-import { notImplemented } from '@/app/api/editorial/_notImplemented';
+import { NextRequest, NextResponse } from 'next/server';
+import { proxyEditorialRequest } from '@/app/api/editorial/_proxy';
+import { EditorialOnboardingSchema } from '@/lib/dto/editorial.schema';
+import { error, ERROR_CODES } from '@/lib/api/response';
 
-export async function GET() {
-  return notImplemented('./projects/[projectId]/onboarding');
-}
+export async function POST(
+  request: NextRequest,
+  { params }: { params: Promise<{ projectId: string }> },
+) {
+  const { projectId } = await params;
 
-export async function POST() {
-  return notImplemented('./projects/[projectId]/onboarding');
-}
+  const body = await request.json().catch(() => null);
+  if (!body) {
+    return NextResponse.json(
+      error(ERROR_CODES.VALIDATION_ERROR, 'Corpo da requisição é obrigatório.'),
+      { status: 400 },
+    );
+  }
 
-export async function PUT() {
-  return notImplemented('./projects/[projectId]/onboarding');
-}
+  const parsed = EditorialOnboardingSchema.safeParse(body);
+  if (!parsed.success) {
+    return NextResponse.json(
+      error(ERROR_CODES.VALIDATION_ERROR, 'Dados de onboarding inválidos.', parsed.error.flatten()),
+      { status: 400 },
+    );
+  }
 
-export async function DELETE() {
-  return notImplemented('./projects/[projectId]/onboarding');
-}
+  const result = await proxyEditorialRequest(request, `/projects/${projectId}/onboarding`, {
+    method: 'POST',
+    body: parsed.data,
+  });
 
-export async function PATCH() {
-  return notImplemented('./projects/[projectId]/onboarding');
+  if ('ok' in result) {
+    const data = result.data as any;
+    return NextResponse.json({
+      version: data.version ? {
+        ...data.version,
+        createdAt: data.version.createdAt ? new Date(data.version.createdAt) : undefined,
+        updatedAt: data.version.updatedAt ? new Date(data.version.updatedAt) : undefined,
+      } : undefined,
+      mapa: data.mapa,
+    }, { status: 201 });
+  }
+
+  return NextResponse.json(result, { status: 502 });
 }

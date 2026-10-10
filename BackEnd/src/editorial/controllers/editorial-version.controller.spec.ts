@@ -13,14 +13,22 @@ describe('EditorialVersionController', () => {
       providers: [
         {
           provide: EditorialVersionService,
-          useValue: { findMapa: jest.fn(), duplicate: jest.fn(), update: jest.fn(), delete: jest.fn(), updateMapa: jest.fn() },
+          useValue: {
+            findMapa: jest.fn(),
+            duplicate: jest.fn(),
+            update: jest.fn(),
+            delete: jest.fn(),
+            updateMapa: jest.fn(),
+          },
         },
         { provide: JwtService, useValue: { verifyAsync: jest.fn() } },
         { provide: ConfigService, useValue: { get: jest.fn() } },
       ],
     }).compile();
 
-    controller = module.get<EditorialVersionController>(EditorialVersionController);
+    controller = module.get<EditorialVersionController>(
+      EditorialVersionController,
+    );
   });
 
   it('should be defined', () => {
