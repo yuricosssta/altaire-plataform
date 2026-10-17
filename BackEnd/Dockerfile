@@ -1,6 +1,8 @@
 # Dockerfile para o BackEnd NestJS produção
 # Estágio 1: Builder
 FROM node:22-alpine AS builder
+# Toolchain para compilar módulos nativos sem prebuild (ex.: @mongodb-js/zstd em musl)
+RUN apk add --no-cache python3 make g++
 WORKDIR /app
 
 # Habilita o pnpm usando o Corepack nativo do Node 22

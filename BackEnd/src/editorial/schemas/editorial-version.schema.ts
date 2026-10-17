@@ -9,28 +9,27 @@ export class EditorialVersion {
     required: true,
     type: Types.ObjectId,
     ref: 'EditorialProject',
-    name: 'pid',
   })
   projectId: Types.ObjectId;
 
-  @Prop({ required: true, name: 'vn' })
+  @Prop({ required: true })
   versionNumber: number;
 
-  @Prop({ required: true, name: 'n' })
+  @Prop({ required: true })
   name: string;
 
-  @Prop({ required: true, default: 'active', name: 'st' })
+  @Prop({ required: true, default: 'active' })
   status: string;
 
-  @Prop({ required: true, type: Types.ObjectId, ref: 'User', name: 'cb' })
+  @Prop({ required: true, type: Types.ObjectId, ref: 'User' })
   createdBy: Types.ObjectId;
 
-  @Prop({ default: true, name: 'ia' })
+  @Prop({ default: true })
   isActive: boolean;
 }
 
 export const EditorialVersionSchema =
   SchemaFactory.createForClass(EditorialVersion);
 
-EditorialVersionSchema.index({ pid: 1, ia: 1, vn: -1 });
-EditorialVersionSchema.index({ pid: 1, vn: -1 });
+EditorialVersionSchema.index({ projectId: 1, isActive: 1, versionNumber: -1 });
+EditorialVersionSchema.index({ projectId: 1, versionNumber: -1 });
