@@ -1,0 +1,339 @@
+/* FrontEnd/src/styles/tokens.css */
+/* Legion Altaire — Public Design System Tokens (Etapa 2B, 2C, 2D & Etapa 3)
+   Fonte canônica de variáveis CSS para a experiência pública (Dark-First).
+   Regras:
+   - Não usar valores hexadecimais soltos nos componentes quando existir token correspondente.
+   - O sistema público é dark-first (Onyx, Grafite, Off-white e Dourado Champagne).
+   - O dourado é semântico (decisão, foco, progresso, inteligência ativa e CTA principal).
+*/
+
+:root,
+[data-la-surface="dark"] {
+  color-scheme: dark;
+
+  /* -------------------------------------------------------------------------- */
+  /* 1. Paleta Base Oficial — Legion Altaire (Dark-First)                       */
+  /* -------------------------------------------------------------------------- */
+
+  --la-canvas: #05060a;
+  --la-canvas-deep: #030407;
+
+  --la-surface-1: #0b0e15;
+  --la-surface-2: #111521;
+  --la-surface-3: #171b29;
+  --la-surface-hover: #1c2130;
+  --la-surface-glass: rgba(11, 14, 21, 0.78);
+  --la-header-scrolled-bg: rgba(5, 6, 10, 0.82);
+
+  --la-text-primary: #f5f2eb;
+  --la-text-secondary: #bbb8b0;
+  --la-text-muted: #929089;
+  --la-text-inverse: #08090c;
+
+  --la-gold-primary: #cfa965;
+  --la-gold-light: #e0c58a;
+  --la-gold-deep: #a77b3d;
+  --la-gold-faint: rgba(207, 169, 101, 0.1);
+  --la-gold-glow: rgba(207, 169, 101, 0.18);
+
+  --la-border-subtle: rgba(245, 242, 235, 0.1);
+  --la-border-visible: rgba(245, 242, 235, 0.18);
+  --la-border-gold: rgba(207, 169, 101, 0.38);
+  --la-divider: rgba(245, 242, 235, 0.08);
+
+  /* -------------------------------------------------------------------------- */
+  /* 2. Cores Semânticas de Estado (Separadas do Ouro Institucional)            */
+  /* -------------------------------------------------------------------------- */
+
+  --la-status-success: #4cd4a0;
+  --la-status-success-soft: rgba(76, 212, 160, 0.12);
+
+  --la-status-warning: #d99b38;
+  --la-status-warning-soft: rgba(217, 155, 56, 0.12);
+
+  --la-status-error: #e05a5a;
+  --la-status-error-soft: rgba(224, 90, 90, 0.12);
+
+  --la-status-info: #5b8def;
+  --la-status-info-soft: rgba(91, 141, 239, 0.12);
+
+  --la-status-disabled-bg: rgba(245, 242, 235, 0.06);
+  --la-status-disabled-text: rgba(146, 144, 137, 0.55);
+
+  /* -------------------------------------------------------------------------- */
+  /* 3. Quebra Narrativa Opcional (Superfície Off-White Controlada)             */
+  /* -------------------------------------------------------------------------- */
+
+  --la-offwhite-bg: #f5f2eb;
+  --la-offwhite-surface: #ebe6dc;
+  --la-offwhite-text: #08090c;
+  --la-offwhite-text-secondary: #3d3b37;
+  --la-offwhite-border: rgba(8, 9, 12, 0.12);
+
+  /* -------------------------------------------------------------------------- */
+  /* 4. Tipografia e Escala Fluida Oficial (Etapa 2B)                           */
+  /* -------------------------------------------------------------------------- */
+
+  --la-font-sans: "General Sans", var(--font-geist-sans, "Geist Sans"), var(--font-inter, "Inter"), ui-sans-serif, system-ui, sans-serif;
+  --la-font-display: var(--la-font-sans);
+  --la-font-mono: "JetBrains Mono", "Geist Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+
+  --la-text-display-hero: clamp(2.75rem, 5.6vw, 5rem);
+  --la-text-display-section: clamp(2rem, 4vw, 3.5rem);
+  --la-text-heading-lg: clamp(1.5rem, 2.4vw, 2.25rem);
+  --la-text-heading-md: clamp(1.25rem, 1.6vw, 1.5rem);
+  --la-text-body-lg: clamp(1.0625rem, 1.2vw, 1.25rem);
+  --la-text-body-md: 1rem;
+  --la-text-body-sm: 0.875rem;
+  --la-text-label: 0.75rem;
+
+  --la-leading-hero: 1.06;
+  --la-leading-section: 1.12;
+  --la-leading-heading: 1.22;
+  --la-leading-body: 1.62;
+  --la-leading-ui: 1.4;
+
+  --la-tracking-hero: -0.03em;
+  --la-tracking-heading: -0.02em;
+  --la-tracking-body: -0.005em;
+  --la-tracking-eyebrow: 0.08em;
+
+  --la-weight-regular: 400;
+  --la-weight-ui: 500;
+  --la-weight-heading: 600;
+  --la-weight-hero: 600;
+
+  /* -------------------------------------------------------------------------- */
+  /* 5. Escala de Espaçamento (Unidade-base: 4px)                               */
+  /* -------------------------------------------------------------------------- */
+
+  --la-space-0: 0rem;
+  --la-space-1: 0.25rem;  /* 4px */
+  --la-space-2: 0.5rem;   /* 8px */
+  --la-space-3: 0.75rem;  /* 12px */
+  --la-space-4: 1rem;     /* 16px */
+  --la-space-5: 1.25rem;  /* 20px */
+  --la-space-6: 1.5rem;   /* 24px */
+  --la-space-8: 2rem;     /* 32px */
+  --la-space-10: 2.5rem;  /* 40px */
+  --la-space-12: 3rem;    /* 48px */
+  --la-space-16: 4rem;    /* 64px */
+  --la-space-20: 5rem;    /* 80px */
+  --la-space-24: 6rem;    /* 96px */
+  --la-space-30: 7.5rem;  /* 120px */
+  --la-space-36: 9rem;    /* 144px */
+  --la-space-45: 11.25rem;/* 180px */
+
+  /* Ritmo de seções (alternância deliberada) */
+  --la-section-py-compact: clamp(3.5rem, 6vw, 6rem);     /* 56px -> 96px */
+  --la-section-py-default: clamp(4.25rem, 7.5vw, 7.5rem);/* 68px -> 120px */
+  --la-section-py-spacious: clamp(5rem, 9vw, 9rem);      /* 80px -> 144px */
+  --la-section-py-hero: clamp(7.5rem, 11vw, 11.25rem);   /* 120px -> 180px */
+  --la-section-py-footer: clamp(4rem, 6vw, 6rem);        /* 64px -> 96px */
+
+  --la-gutter-mobile: 1.25rem; /* 20px */
+  --la-gutter-tablet: 2rem;    /* 32px */
+  --la-gutter-desktop: 2.5rem; /* 40px */
+
+  /* -------------------------------------------------------------------------- */
+  /* 6. Containers, Grid e Dimensões do Header                                  */
+  /* -------------------------------------------------------------------------- */
+
+  --la-container-prose: 45rem;    /* 720px */
+  --la-container-default: 60rem;  /* 960px */
+  --la-container-wide: 75rem;     /* 1200px */
+  --la-container-max: 80rem;      /* 1280px */
+  --la-container-full: 100%;
+
+  --la-header-height-initial: 4.75rem; /* 76px */
+  --la-header-height-scrolled: 4.375rem; /* 70px (intervalo 68-72px) */
+  --la-header-height-mobile: 4.125rem; /* 66px (intervalo 64-68px) */
+  --la-anchor-offset: 5.5rem;          /* 88px */
+  --la-touch-target-min: 2.75rem;      /* 44px */
+
+  /* -------------------------------------------------------------------------- */
+  /* 7. Arredondamentos Oficiais (Etapa 2B)                                     */
+  /* -------------------------------------------------------------------------- */
+
+  --la-radius-xs: 0.375rem; /* 6px — chips internos e detalhes */
+  --la-radius-sm: 0.5rem;   /* 8px — controles pequenos */
+  --la-radius-md: 0.75rem;  /* 12px — botões e inputs */
+  --la-radius-lg: 1rem;     /* 16px — cards e dropdown */
+  --la-radius-xl: 1.5rem;   /* 24px — mockups e grandes painéis */
+  --la-radius-full: 9999px; /* pill — badges e indicadores */
+
+  /* -------------------------------------------------------------------------- */
+  /* 8. Bordas, Sombras, Luz e Elevação (Níveis 1, 2, 3 e Dourado)              */
+  /* -------------------------------------------------------------------------- */
+
+  --la-border-width: 1px;
+  --la-focus-ring-width: 2px;
+
+  /* Nível 1: Cards básicos (superfície + borda sutil, quase sem sombra) */
+  --la-elevation-1:
+    inset 0 1px 0 rgba(245, 242, 235, 0.04);
+
+  /* Nível 2: Dropdowns e elementos flutuantes */
+  --la-elevation-2:
+    inset 0 1px 0 rgba(245, 242, 235, 0.08),
+    0 4px 12px rgba(0, 0, 0, 0.36),
+    0 18px 40px rgba(0, 0, 0, 0.48);
+
+  /* Nível 3: Mockups e Showcase (profundidade 2.5D + reflexo superior parcial) */
+  --la-elevation-3:
+    inset 0 1px 0 rgba(224, 197, 138, 0.18),
+    0 8px 20px rgba(0, 0, 0, 0.42),
+    0 28px 72px rgba(0, 0, 0, 0.62);
+
+  /* Nível Dourado: Foco estratégico e ativação */
+  --la-elevation-gold:
+    0 0 0 1px rgba(207, 169, 101, 0.38),
+    0 0 24px rgba(207, 169, 101, 0.14);
+
+  --la-focus-ring:
+    0 0 0 2px var(--la-canvas),
+    0 0 0 4px var(--la-gold-primary);
+
+  --la-blur-header: 16px;
+  --la-blur-surface: 14px;
+
+  /* -------------------------------------------------------------------------- */
+  /* 9. Atmosferas e Gradientes Controlados (Etapa 2B — Seção 3.3)              */
+  /* -------------------------------------------------------------------------- */
+
+  --la-gradient-hero-atmosphere:
+    radial-gradient(
+      circle at 72% 34%,
+      rgba(207, 169, 101, 0.11) 0%,
+      rgba(207, 169, 101, 0.03) 34%,
+      transparent 65%
+    ),
+    linear-gradient(
+      180deg,
+      #05060a 0%,
+      #070910 52%,
+      #05060a 100%
+    );
+
+  --la-gradient-final-cta:
+    radial-gradient(
+      circle at 50% 0%,
+      rgba(207, 169, 101, 0.12) 0%,
+      rgba(207, 169, 101, 0.03) 42%,
+      transparent 72%
+    ),
+    linear-gradient(
+      180deg,
+      #0b0e15 0%,
+      #05060a 100%
+    );
+
+  --la-gradient-border-gold-top:
+    linear-gradient(
+      90deg,
+      transparent 0%,
+      rgba(224, 197, 138, 0.42) 50%,
+      transparent 100%
+    );
+
+  /* -------------------------------------------------------------------------- */
+  /* 10. Z-Index                                                                */
+  /* -------------------------------------------------------------------------- */
+
+  --la-z-base: 0;
+  --la-z-content: 1;
+  --la-z-sticky: 10;
+  --la-z-header: 40;
+  --la-z-dropdown: 50;
+  --la-z-overlay: 60;
+  --la-z-drawer: 70;
+  --la-z-modal: 80;
+  --la-z-toast: 90;
+
+  /* -------------------------------------------------------------------------- */
+  /* 11. Sistema de Motion (Etapa 2B — Seção 16)                                */
+  /* -------------------------------------------------------------------------- */
+
+  --la-duration-instant: 110ms;
+  --la-duration-fast: 180ms;
+  --la-duration-normal: 280ms;
+  --la-duration-reveal: 600ms;
+  --la-duration-scene: 820ms;
+  --la-duration-cinematic: 1200ms;
+
+  --la-ease-interface: cubic-bezier(0.16, 1, 0.3, 1);
+  --la-ease-reveal: cubic-bezier(0.22, 1, 0.36, 1);
+  --la-ease-exit: cubic-bezier(0.4, 0, 1, 1);
+
+  /* -------------------------------------------------------------------------- */
+  /* 12. Aliases Semânticos Compatíveis (Apontando para o Sistema Dark-First)   */
+  /* -------------------------------------------------------------------------- */
+
+  --font-display: var(--la-font-display);
+  --font-body: var(--la-font-sans);
+  --font-mono: var(--la-font-mono);
+
+  --color-bg: var(--la-canvas);
+  --color-bg-deep: var(--la-canvas-deep);
+  --color-surface: var(--la-surface-1);
+  --color-surface-2: var(--la-surface-2);
+  --color-surface-3: var(--la-surface-3);
+  --color-surface-hover: var(--la-surface-hover);
+  --color-surface-inverse: var(--la-offwhite-bg);
+
+  --color-text: var(--la-text-primary);
+  --color-text-soft: var(--la-text-secondary);
+  --color-text-muted: var(--la-text-muted);
+  --color-text-inverse: var(--la-text-inverse);
+
+  --color-border: var(--la-border-subtle);
+  --color-border-strong: var(--la-border-visible);
+  --color-border-gold: var(--la-border-gold);
+  --color-divider: var(--la-divider);
+
+  --color-primary: var(--la-gold-primary);
+  --color-primary-hover: var(--la-gold-light);
+  --color-primary-active: var(--la-gold-deep);
+  --color-primary-contrast: var(--la-text-inverse);
+  --color-primary-soft: var(--la-gold-faint);
+
+  --color-accent: var(--la-gold-primary);
+  --color-accent-hover: var(--la-gold-light);
+  --color-accent-active: var(--la-gold-deep);
+  --color-accent-contrast: var(--la-text-inverse);
+  --color-accent-soft: var(--la-gold-faint);
+
+  --page-bg: var(--la-canvas);
+  --panel-bg: var(--la-surface-1);
+  --panel-bg-alt: var(--la-surface-2);
+  --panel-bg-strong: var(--la-surface-3);
+
+  --text-primary: var(--la-text-primary);
+  --text-secondary: var(--la-text-secondary);
+  --text-tertiary: var(--la-text-muted);
+
+  --button-height-sm: 2.75rem; /* 44px — altura compacta */
+  --button-height-md: 3rem;    /* 48px — altura padrão */
+  --input-height-md: 3rem;     /* 48px */
+}
+
+/* Suporte localizado para eventual seção curta em off-white (quebra de ritmo) */
+[data-la-surface="offwhite"] {
+  --color-bg: var(--la-offwhite-bg);
+  --color-surface: var(--la-offwhite-surface);
+  --color-text: var(--la-offwhite-text);
+  --color-text-soft: var(--la-offwhite-text-secondary);
+  --color-border: var(--la-offwhite-border);
+}
+
+/* Acessibilidade obrigatória: Movimento reduzido */
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --la-duration-instant: 0ms;
+    --la-duration-fast: 0ms;
+    --la-duration-normal: 0ms;
+    --la-duration-reveal: 0ms;
+    --la-duration-scene: 0ms;
+    --la-duration-cinematic: 0ms;
+  }
+}

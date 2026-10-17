@@ -1,9 +1,10 @@
 /* FrontEnd/src/app/globals.css */
 @import "tailwindcss";
 @import "ol/ol.css";
+@import "../styles/tokens.css";
 
-@theme {
-  /* --- Mapeamento das Variáveis de Sistema (Shadcn UI) --- */
+@theme inline {
+  /* --- Mapeamento das Variáveis de Sistema Existentes (Shadcn UI / SaaS) --- */
   --color-background: var(--background);
   --color-foreground: var(--foreground);
 
@@ -32,116 +33,212 @@
   --color-input: var(--input);
   --color-ring: var(--ring);
 
-  /* --- Border Radius Estrito --- */
+  /* --- Border Radius Estrito (SaaS legado) --- */
   --radius-lg: var(--radius);
   --radius-md: var(--radius);
   --radius-sm: var(--radius);
 
   /* --- Font Family --- */
-  --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+  --font-sans: var(--la-font-sans), var(--font-inter), ui-sans-serif, system-ui, sans-serif;
   --font-heading: var(--font-callum), serif;
   --font-subheading: var(--font-playfair), serif;
+  --font-la-sans: var(--la-font-sans);
+  --font-la-mono: var(--la-font-mono);
 
-  /* --- ANIMAÇÕES --- */
+  /* --- Tokens Oficiais da Experiência Pública Legion Altaire (--la-*) --- */
+  --color-la-canvas: var(--la-canvas);
+  --color-la-canvas-deep: var(--la-canvas-deep);
+  --color-la-surface-1: var(--la-surface-1);
+  --color-la-surface-2: var(--la-surface-2);
+  --color-la-surface-3: var(--la-surface-3);
+  --color-la-surface-hover: var(--la-surface-hover);
+  --color-la-surface-glass: var(--la-surface-glass);
+
+  --color-la-text-primary: var(--la-text-primary);
+  --color-la-text-secondary: var(--la-text-secondary);
+  --color-la-text-muted: var(--la-text-muted);
+  --color-la-text-inverse: var(--la-text-inverse);
+
+  --color-la-gold: var(--la-gold-primary);
+  --color-la-gold-primary: var(--la-gold-primary);
+  --color-la-gold-light: var(--la-gold-light);
+  --color-la-gold-deep: var(--la-gold-deep);
+  --color-la-gold-faint: var(--la-gold-faint);
+
+  --color-la-border-subtle: var(--la-border-subtle);
+  --color-la-border-visible: var(--la-border-visible);
+  --color-la-border-gold: var(--la-border-gold);
+  --color-la-divider: var(--la-divider);
+
+  --color-la-success: var(--la-status-success);
+  --color-la-warning: var(--la-status-warning);
+  --color-la-error: var(--la-status-error);
+  --color-la-info: var(--la-status-info);
+
+  /* --- Arredondamentos Públicos Legion Altaire --- */
+  --radius-la-xs: var(--la-radius-xs);
+  --radius-la-sm: var(--la-radius-sm);
+  --radius-la-md: var(--la-radius-md);
+  --radius-la-lg: var(--la-radius-lg);
+  --radius-la-xl: var(--la-radius-xl);
+  --radius-la-full: var(--la-radius-full);
+
+  /* --- Breakpoint Canônico da Navegação Completa (1.184px) --- */
+  --breakpoint-nav: 74rem;
+
+  /* --- Animações --- */
   --animate-accordion-down: accordion-down 0.2s ease-out;
   --animate-accordion-up: accordion-up 0.2s ease-out;
 }
 
 /* --- Keyframes --- */
 @keyframes accordion-down {
-  from { height: 0; }
-  to { height: var(--radix-accordion-content-height); }
+  from {
+    height: 0;
+  }
+  to {
+    height: var(--radix-accordion-content-height);
+  }
 }
 
 @keyframes accordion-up {
-  from { height: var(--radix-accordion-content-height); }
-  to { height: 0; }
+  from {
+    height: var(--radix-accordion-content-height);
+  }
+  to {
+    height: 0;
+  }
 }
 
-/* --- Variáveis CSS Base --- */
+/* --- Variáveis CSS Base (Preservadas para Login e Dashboard) --- */
 @layer base {
   :root {
-    /* Modo Claro (Inversão tática focada nos 30% brancos) */
+    /* Modo Claro (Inversão tática focada nos 30% brancos no SaaS) */
     --background: hsl(0 0% 100%);
     --foreground: hsl(0 0% 4%);
-    
+
     --card: hsl(0 0% 98%);
     --card-foreground: hsl(0 0% 4%);
-    
+
     --popover: hsl(0 0% 100%);
     --popover-foreground: hsl(0 0% 4%);
-    
+
     /* Dourado #D4AF37 */
     --primary: hsl(43 74% 49%);
     --primary-foreground: hsl(0 0% 100%);
-    
+
     /* Preto base #0A0A0A */
     --secondary: hsl(0 0% 4%);
     --secondary-foreground: hsl(0 0% 98%);
-    
+
     --muted: hsl(0 0% 92%);
     --muted-foreground: hsl(0 0% 40%);
-    
+
     --accent: hsl(0 0% 92%);
     --accent-foreground: hsl(0 0% 4%);
-    
+
     --destructive: hsl(0 84.2% 60.2%);
     --destructive-foreground: hsl(0 0% 98%);
-    
+
     --border: hsl(0 0% 85%);
     --input: hsl(0 0% 85%);
     --ring: hsl(43 74% 49%);
-    
+
     /* Geometria estrita */
     --radius: 4px;
   }
 
   .dark {
     /* Modo Escuro Premium (60% Preto, 30% Contrastes, 10% Dourado) */
-    /* Fundo Dominante: #0A0A0A */
     --background: hsl(0 0% 4%);
     --foreground: hsl(0 0% 98%);
-    
-    /* Superfícies Secundárias: #1A1A1A */
+
     --card: hsl(0 0% 10%);
     --card-foreground: hsl(0 0% 98%);
-    
+
     --popover: hsl(0 0% 10%);
     --popover-foreground: hsl(0 0% 98%);
-    
-    /* Destaques e Conversão: #D4AF37 */
+
     --primary: hsl(43 74% 49%);
     --primary-foreground: hsl(0 0% 4%);
-    
-    /* Espaçamentos e fundos de máxima legibilidade (Branco puro/Gelo) */
+
     --secondary: hsl(0 0% 100%);
     --secondary-foreground: hsl(0 0% 4%);
-    
+
     --muted: hsl(0 0% 15%);
     --muted-foreground: hsl(0 0% 65%);
-    
+
     --accent: hsl(0 0% 15%);
     --accent-foreground: hsl(0 0% 98%);
-    
+
     --destructive: hsl(0 62.8% 30.6%);
     --destructive-foreground: hsl(0 0% 98%);
-    
+
     --border: hsl(0 0% 20%);
     --input: hsl(0 0% 20%);
     --ring: hsl(43 74% 49%);
   }
 
   * {
-    @apply border-border;
+    border-color: var(--border);
+  }
+
+  html {
+    scroll-behavior: smooth;
+    scroll-padding-top: var(--la-anchor-offset, 5.5rem);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    html {
+      scroll-behavior: auto;
+    }
   }
 
   body {
-    @apply bg-background text-foreground;
+    background-color: var(--background);
+    color: var(--foreground);
+    font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
   }
 }
 
 .bottom-0 {
-  @apply inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50 bg-secondary text-secondary-foreground hover:bg-secondary/80 h-10 px-4 py-2 w-full sm:w-auto self-start gap-2;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius);
+  font-size: 0.875rem;
+  line-height: 1.25rem;
+  font-weight: 500;
+  transition-property: color, background-color, border-color;
+  transition-duration: 150ms;
+  background-color: var(--secondary);
+  color: var(--secondary-foreground);
+  height: 2.5rem;
+  padding: 0.5rem 1rem;
+  width: 100%;
+  align-self: flex-start;
+  gap: 0.5rem;
+}
+
+@media (min-width: 640px) {
+  .bottom-0 {
+    width: auto;
+  }
+}
+
+.bottom-0:hover {
+  background-color: color-mix(in srgb, var(--secondary) 80%, transparent);
+}
+
+.bottom-0:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--ring);
+}
+
+.bottom-0:disabled {
+  opacity: 0.5;
 }
 
 /* --- Loader --- */
@@ -157,7 +254,7 @@
 }
 
 .loader::after {
-  content: '';
+  content: "";
   width: 40%;
   height: 3px;
   position: absolute;
@@ -165,7 +262,7 @@
   left: 0;
   box-sizing: border-box;
   animation: animloader 1s linear infinite;
-  @apply bg-primary;
+  background-color: var(--primary);
 }
 
 @media (min-width: 800px) {
@@ -176,11 +273,17 @@
 }
 
 @keyframes animloader {
-  0% { left: 0; transform: translateX(-100%); }
-  100% { left: 100%; transform: translateX(0%); }
+  0% {
+    left: 0;
+    transform: translateX(-100%);
+  }
+  100% {
+    left: 100%;
+    transform: translateX(0%);
+  }
 }
 
-/* --- Typography Styles --- */
+/* --- Typography Styles (Editorial / Markdown SaaS) --- */
 @layer components {
   .typography {
     color: var(--foreground);
@@ -193,7 +296,12 @@
       color: color-mix(in srgb, var(--foreground) 90%, transparent);
     }
 
-    h1, h2, h3, h4, h5, h6 {
+    h1,
+    h2,
+    h3,
+    h4,
+    h5,
+    h6 {
       color: var(--foreground);
       line-height: 1.3;
     }
@@ -225,15 +333,21 @@
       margin-bottom: 1em;
     }
 
-    ul, ol {
+    ul,
+    ol {
       font-family: var(--font-sans);
       margin-top: 1.25em;
       margin-bottom: 1.25em;
       padding-left: 1.75em;
     }
 
-    ul { list-style-type: disc; }
-    ol { list-style-type: decimal; }
+    ul {
+      list-style-type: disc;
+    }
+
+    ol {
+      list-style-type: decimal;
+    }
 
     li {
       margin-top: 0.5em;
@@ -262,7 +376,6 @@
       font-family: var(--font-subheading);
       margin-top: 1.5em;
       margin-bottom: 1.5em;
-      padding-left: 1em;
       border-left: 3px solid var(--primary);
       font-style: italic;
       color: var(--muted-foreground);
@@ -271,7 +384,9 @@
       border-radius: 0 4px 4px 0;
     }
 
-    blockquote p { margin: 0; }
+    blockquote p {
+      margin: 0;
+    }
 
     hr {
       border-top: 1px solid var(--border);
