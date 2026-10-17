@@ -18,7 +18,9 @@ import { EditorialModule } from './editorial/editorial.module';
       isGlobal: true,
     }),
     EventEmitterModule.forRoot(),
-    MongooseModule.forRoot(process.env.MONGO_URI),
+    MongooseModule.forRoot(process.env.MONGO_URI, {
+      compressors: ['zstd'],
+    }),
     JwtModule.register({
       global: true,
       secret: process.env.JWT_SECRET,

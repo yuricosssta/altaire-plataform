@@ -21,7 +21,7 @@ export class EditorialMapaMongooseRepository implements EditorialMapaRepository 
 
   async findByVersionId(versionId: string): Promise<IEditorialMapa | null> {
     const mapa = await this.mapaModel
-      .findOne({ vid: new (Types.ObjectId as any)(versionId) })
+      .findOne({ versionId: new (Types.ObjectId as any)(versionId) })
       .lean()
       .exec();
     return mapa as unknown as IEditorialMapa | null;
@@ -29,15 +29,16 @@ export class EditorialMapaMongooseRepository implements EditorialMapaRepository 
 
   async create(data: ICreateEditorialMapa): Promise<IEditorialMapa> {
     const mapped: Record<string, unknown> = {
-      vid: new (Types.ObjectId as any)(data.versionId),
-      vn: data.versionNumber,
-      n: data.name,
-      mc: data.mensagemCentral,
-      pl: data.pilares ?? [],
-      tv: data.tomDeVoz ?? { traits: [], rules: [] },
-      rt: data.retina ?? [],
+      versionId: new (Types.ObjectId as any)(data.versionId),
+      versionNumber: data.versionNumber,
+      name: data.name,
+      mensagemCentral: data.mensagemCentral,
+      pilares: data.pilares ?? [],
+      tomDeVoz: data.tomDeVoz ?? { traits: [], rules: [] },
+      retina: data.retina ?? [],
     };
-    if (data.positioningPhrase) mapped['pp'] = data.positioningPhrase;
+    if (data.positioningPhrase)
+      mapped['positioningPhrase'] = data.positioningPhrase;
 
     const doc = new this.mapaModel(mapped);
     const saved = await doc.save();
@@ -49,17 +50,18 @@ export class EditorialMapaMongooseRepository implements EditorialMapaRepository 
     data: IUpdateEditorialMapa,
   ): Promise<IEditorialMapa | null> {
     const set: Record<string, unknown> = {};
-    if (data.name !== undefined) set['n'] = data.name;
+    if (data.name !== undefined) set['name'] = data.name;
     if (data.positioningPhrase !== undefined)
-      set['pp'] = data.positioningPhrase;
-    if (data.mensagemCentral !== undefined) set['mc'] = data.mensagemCentral;
-    if (data.pilares !== undefined) set['pl'] = data.pilares;
-    if (data.tomDeVoz !== undefined) set['tv'] = data.tomDeVoz;
-    if (data.retina !== undefined) set['rt'] = data.retina;
+      set['positioningPhrase'] = data.positioningPhrase;
+    if (data.mensagemCentral !== undefined)
+      set['mensagemCentral'] = data.mensagemCentral;
+    if (data.pilares !== undefined) set['pilares'] = data.pilares;
+    if (data.tomDeVoz !== undefined) set['tomDeVoz'] = data.tomDeVoz;
+    if (data.retina !== undefined) set['retina'] = data.retina;
 
     const updated = await this.mapaModel
       .findOneAndUpdate(
-        { vid: new (Types.ObjectId as any)(versionId) },
+        { versionId: new (Types.ObjectId as any)(versionId) },
         { $set: set },
         { new: true },
       )
@@ -70,7 +72,7 @@ export class EditorialMapaMongooseRepository implements EditorialMapaRepository 
 
   async deleteByVersionId(versionId: string): Promise<void> {
     await this.mapaModel
-      .deleteOne({ vid: new (Types.ObjectId as any)(versionId) })
+      .deleteOne({ versionId: new (Types.ObjectId as any)(versionId) })
       .exec();
   }
 }

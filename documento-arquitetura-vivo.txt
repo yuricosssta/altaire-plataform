@@ -1,3 +1,23 @@
+## REVISÃO - 17/10/2026 ##
+Reversão dos Short Field Names + Ativação de Zstd (Módulo Editorial):
+
+Decisão de Arquitetura — fim da otimização de abreviação de campos (Sprints 10-12):
+- Short field names (`pid`, `vn`, `st`, `ia`, `vid`, `pp`, `mc`, `tv`, `rt`, `per`, `cap`, `dys`, `rv` etc.) removidos das 3 schemas: `EditorialVersion`, `EditorialMapa`, `EditorialCalendar` (incl. subdocs). Índices reescritos com nomes completos (`{ projectId, isActive, versionNumber: -1 }`, `{ versionId: 1 }`, `{ projectId, isActive, status }`, `{ projectId, objective: 1 }`).
+- Motivação: a economia de bytes era real, mas o custo de manutenção superava o benefício. Os aliases já haviam produzido bugs reais: `.lean()` retorna chaves cruas (bypass de alias) enquanto `toObject()` retorna nomes completos — mesmo collection, dois formatos; `EditorialCalendarService.duplicate()`/`getReview()` liam `original.period`/`calendar.days` (undefined em docs lean); `updateItem()` iterava `(doc as any).dys` em doc hidratado (que expõe `days`) — PATCH de item sempre retornava 404; fallback hack `(original as any).pid` no `EditorialVersionService.duplicate()` (removido).
+- Repositories reescritos em nomes completos: `editorial-version.mongoose.repository.ts`, `editorial-mapa.mongoose.repository.ts`, `editorial-calendar.mongoose.repository.ts` (queries, `$set` paths, mutações em memória e `markModified('days')`).
+- Contrato da API unificado em nomes completos, alinhado aos DTOs Zod do FrontEnd (que já esperavam `versionNumber`, `mensagemCentral`, `pilares`). BFF/FrontEnd sem alterações (proxy).
+
+Compressão nativa zstd (substitui a economia dos short names na camada de rede):
+- `@mongodb-js/zstd@^2.0.1` instalado como dependência direta do BackEnd (peer do driver mongodb 6.x; registrado em `pnpm.onlyBuiltDependencies` para o postinstall do binário nativo).
+- `MongooseModule.forRoot(MONGO_URI, { compressors: ['zstd'] })` em `app.module.ts`. O MongoDB de produção é Atlas — zstd habilitado por padrão no servidor; a negociação degrada com segurança se o servidor não suportar.
+- Dockerfile (builder): `apk add python3 make g++` como toolchain de fallback para compilação do módulo nativo em musl (alpine), caso não haja prebuild.
+- Nota: compressão de armazenamento (WiredTiger blockCompressor) não ativada — dados são metadados pequenos; network compression já resolve.
+
+Migração de dados:
+- `BackEnd/scripts/migrate-undo-short-names.mjs`: script one-off e idempotente que renomeia recursivamente as chaves das coleções `editorialversions`/`editorialmapas`/`editorialcalendars` (top-level + arrays aninhados) e remove os índices antigos com alias. Necessário apenas para bancos que tenham documentos criados com short names (dev). Rodar: `node --env-file=.env scripts/migrate-undo-short-names.mjs` a partir de um IP whitelistado no Atlas.
+
+Validação: 24/24 testes editoriais passando; typecheck sem erros novos (3 erros pré-existentes do Sprint 12 em calendar controller/service ficam de fora deste escopo); lint sem erros novos.
+
 ## SPRINT 12 - 10/10/2026 ##
 Resumo Técnico de Fechamento
 
