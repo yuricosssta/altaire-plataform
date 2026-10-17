@@ -1,89 +1,163 @@
-// src/components/landing/HeroSection.tsx
-import Link from "next/link";
-import Image from "next/image";
-import { ArrowRight, PlayCircle, Trophy, Users, CheckCircle } from "lucide-react";
+// FrontEnd/src/components/landing/HeroSection.tsx
+"use client";
 
-export function HeroSection() {
-  const HERO_BACKGROUND_IMAGE = "/images/hero-background.webp";
+import { motion, useReducedMotion } from "motion/react";
+import { ArrowRight } from "lucide-react";
+import { clsx } from "clsx";
+import { CTAGroup } from "@/components/landing/CTAGroup";
+import { ProductFlowMockup } from "@/components/landing/ProductFlowMockup";
+import { SectionEyebrow } from "@/components/landing/SectionEyebrow";
+import { SectionShell } from "@/components/landing/SectionShell";
+import {
+  landingContent,
+  type LandingContent,
+} from "@/lib/constants/landing-content";
+import {
+  HERO_STAGE_MOTION,
+  REDUCED_MOTION_VARIANTS,
+  selectMotionPreset,
+} from "@/lib/constants/motion";
+
+export type HeroSectionProps = {
+  readonly content?: LandingContent["hero"];
+  readonly className?: string;
+};
+
+/**
+ * Seção 02 — Hero Definitivo da Landing Pública (CONTENT-LANDING.md §02 & DESIGN-LEGION-PUBLIC.md).
+ *
+ * Padronização de Alinhamento Editorial (Mobile & Desktop):
+ * - Coluna Esquerda unificada em `max-w-[35rem]` para que H1 e Subheadline compartilhem a mesma caixa visual.
+ * - `H1` com `text-balance` e escala calibrada (`clamp(2.125rem, 3.25vw, 3.125rem)`).
+ * - `Subheadline` com `text-justify [text-align-last:left] hyphens-auto` em todas as larguras (mobile e desktop).
+ */
+export function HeroSection({
+  content = landingContent.hero,
+  className,
+}: HeroSectionProps) {
+  const shouldReduceMotion = useReducedMotion();
+  const headingId = content.id ? `${content.id}-title` : "inicio-title";
+
+  const copyContainerVariants = selectMotionPreset(
+    shouldReduceMotion,
+    HERO_STAGE_MOTION.copyContainer,
+    REDUCED_MOTION_VARIANTS.reveal
+  );
+
+  const copyItemVariants = selectMotionPreset(
+    shouldReduceMotion,
+    HERO_STAGE_MOTION.copyItem,
+    REDUCED_MOTION_VARIANTS.reveal
+  );
 
   return (
-    <section className="relative w-full min-h-screen flex flex-col justify-center overflow-hidden border-b border-border">
-      {/* Background Container */}
-      <div className="absolute inset-0 bg-background z-0">
-        
-        {/* Camada 1: Imagem renderizada via Next/Image */}
-        <div className="absolute top-0 right-0 w-full md:w-3/5 h-full opacity-90 z-0">
-          <Image
-            src={HERO_BACKGROUND_IMAGE}
-            alt="Altaire Negócios Digitais"
-            fill
-            priority
-            className="object-cover object-center"
+    <SectionShell
+      id={content.id}
+      ariaLabelledBy={headingId}
+      container="max"
+      spacing="hero"
+      surface="hero"
+      bottomBorder={true}
+      className={clsx("overflow-hidden", className)}
+    >
+      {/* Luz Radial Dourada Concentrada no Topo */}
+      <div
+        aria-hidden="true"
+        className="pointer-events-none absolute top-8 left-1/2 -z-0 h-[32rem] w-[60rem] -translate-x-1/2 rounded-la-full bg-[radial-gradient(circle_at_center,rgba(207,169,101,0.10)_0%,rgba(207,169,101,0.025)_46%,transparent_72%)] blur-3xl"
+      />
+
+      {/* Grid Principal Acima da Dobra: Copy à Esquerda + Palco 3D Vivo à Direita */}
+      <div className="relative z-10 grid grid-cols-1 items-center gap-10 pt-6 lg:grid-cols-12 lg:gap-10 lg:pt-8 xl:gap-12">
+        {/* 1. Coluna Esquerda (6 cols): Bloco Editorial Alinhado e Simétrico */}
+        <motion.div
+          initial="hidden"
+          animate="visible"
+          variants={copyContainerVariants}
+          className="flex w-full max-w-[35rem] flex-col items-start lg:col-span-6"
+        >
+          {/* Eyebrow Canônico: "PLATAFORMA DE IA PARA ESTRATÉGIA, CONTEÚDO, AUTORIDADE E VENDAS" */}
+          <motion.div variants={copyItemVariants}>
+            <SectionEyebrow label={content.eyebrow} variant="pill" />
+          </motion.div>
+
+          {/* Headline Canônica (H1) com `text-balance` para linhas simétricas */}
+          {content.headline ? (
+            <motion.h1
+              id={headingId}
+              variants={copyItemVariants}
+              className="mt-5 w-full text-balance font-la-sans text-[clamp(2.125rem,3.25vw,3.125rem)] font-semibold leading-[1.1] tracking-[-0.028em] text-la-text-primary"
+            >
+              {content.headline}
+            </motion.h1>
+          ) : null}
+
+          {/* Subheadline Canônica Justificada no Mobile e no Desktop */}
+          {content.subheadline ? (
+            <motion.p
+              variants={copyItemVariants}
+              className="mt-5 w-full text-justify [text-align-last:left] hyphens-auto font-la-sans text-[1.0625rem] leading-[1.68] text-la-text-secondary"
+            >
+              {content.subheadline}
+            </motion.p>
+          ) : null}
+
+          {/* Pílula da Sequência Visual Central (§02 Itens: "Estratégia → Planejamento → Conteúdo.") */}
+          <motion.div
+            variants={copyItemVariants}
+            aria-label={`Sequência visual central: ${content.visualSequenceText}`}
+            className="mt-6 inline-flex flex-wrap items-center gap-2 rounded-la-full border border-white/10 bg-white/[0.03] px-3.5 py-1.5 font-la-mono text-[0.75rem]"
+          >
+            {content.visualSequence.map((stepLabel, idx) => (
+              <span key={stepLabel} className="inline-flex items-center gap-2">
+                <span
+                  className={clsx(
+                    idx === content.visualSequence.length - 1
+                      ? "font-semibold text-la-gold-light"
+                      : "text-la-text-primary"
+                  )}
+                >
+                  {stepLabel}
+                </span>
+                {idx < content.visualSequence.length - 1 ? (
+                  <ArrowRight
+                    aria-hidden="true"
+                    className="h-3 w-3 text-la-gold"
+                  />
+                ) : null}
+              </span>
+            ))}
+          </motion.div>
+
+          {/* CTAs Canônicos + Microcopy Oficial */}
+          <motion.div
+            variants={copyItemVariants}
+            className="mt-7 w-full"
+          >
+            <CTAGroup
+              primaryAction={content.primaryAction}
+              secondaryAction={content.secondaryAction}
+              microcopy={content.microcopy}
+              conditionalTrialInfo={content.conditionalTrialInfo}
+              align="left"
+              size="md"
+              showPrimaryArrow={true}
+            />
+          </motion.div>
+        </motion.div>
+
+        {/* 2. Coluna Direita (6 cols): Palco 3D/2.5D Vivo ao Lado do Título */}
+        <div className="w-full lg:col-span-6">
+          <ProductFlowMockup
+            frameTitle={content.mockupPreview.frameTitle}
+            projectLabel={content.mockupPreview.projectLabel}
+            statusLabel={content.mockupPreview.statusLabel}
+            visualSequence={content.visualSequence}
+            flowSteps={content.mockupPreview.flowSteps}
           />
         </div>
-
-        {/* Camada 2: Gradiente sobreposto para garantir legibilidade (Regra 60-30-10) */}
-        <div className="absolute inset-0 bg-gradient-to-r from-background via-background/95 to-background/10 z-10" />
       </div>
-
-      <div className="container relative z-20 mx-auto px-6 pt-32 pb-16 flex flex-col items-start w-full lg:w-3/4 xl:w-2/3">
-        <span className="text-primary text-sm font-bold tracking-widest uppercase mb-4 flex items-center gap-2">
-          <span className="w-8 h-[2px] bg-primary"></span>
-          Método Validado
-        </span>
-        
-        <h1 className="font-heading text-5xl md:text-7xl font-bold leading-tight mb-6 text-foreground">
-          Estrutura Escalonável para <br />
-          <span className="text-transparent bg-clip-text bg-gradient-to-r from-primary to-yellow-600">
-            Negócios Digitais
-          </span>
-        </h1>
-        
-        <p className="font-sans text-lg md:text-xl text-muted-foreground mb-10 max-w-2xl leading-relaxed">
-          Sistema educacional focado em conversão. Elimine a sobrecarga de informações com processos estruturados e automação direta.
-        </p>
-
-        <div className="flex flex-col sm:flex-row gap-4 mb-16">
-          <Link 
-            href="/produtos" 
-            className="inline-flex h-12 items-center justify-center rounded-md bg-primary px-8 text-sm font-bold text-primary-foreground transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-          >
-            ACESSAR FORMAÇÃO
-            <ArrowRight className="ml-2 h-4 w-4" />
-          </Link>
-          <button 
-            className="inline-flex h-12 items-center justify-center rounded-md border border-border bg-transparent px-8 text-sm font-bold text-foreground transition-colors hover:bg-secondary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-          >
-            <PlayCircle className="mr-2 h-4 w-4 text-primary" />
-            VER DEMONSTRAÇÃO
-          </button>
-        </div>
-
-        {/* Métricas de Validação */}
-        <div className="flex items-center gap-8 md:gap-16 border-t border-border/50 pt-8 mt-auto">
-          <div className="flex flex-col">
-            <span className="flex items-center text-xs font-bold text-muted-foreground uppercase tracking-wider mb-2">
-              <Trophy className="w-4 h-4 mr-2 text-primary" />
-              Módulos
-            </span>
-            <span className="text-3xl font-heading font-bold text-foreground">50+</span>
-          </div>
-          <div className="flex flex-col">
-            <span className="flex items-center text-xs font-bold text-muted-foreground uppercase tracking-wider mb-2">
-              <Users className="w-4 h-4 mr-2 text-primary" />
-              Alunos Ativos
-            </span>
-            <span className="text-3xl font-heading font-bold text-foreground">10K+</span>
-          </div>
-          <div className="flex flex-col">
-            <span className="flex items-center text-xs font-bold text-muted-foreground uppercase tracking-wider mb-2">
-              <CheckCircle className="w-4 h-4 mr-2 text-primary" />
-              Estratégias Válidas
-            </span>
-            <span className="text-3xl font-heading font-bold text-foreground">100%</span>
-          </div>
-        </div>
-      </div>
-    </section>
+    </SectionShell>
   );
 }
+
+export default HeroSection;
