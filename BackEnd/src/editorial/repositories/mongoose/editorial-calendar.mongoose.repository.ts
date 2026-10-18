@@ -24,8 +24,8 @@ export class EditorialCalendarMongooseRepository implements EditorialCalendarRep
   async findAllByProject(projectId: string): Promise<IEditorialCalendar[]> {
     const calendars = await this.calendarModel
       .find({
-        pid: new (Types.ObjectId as any)(projectId),
-        ia: { $ne: false },
+        projectId: new (Types.ObjectId as any)(projectId),
+        isActive: { $ne: false },
       })
       .sort({ updatedAt: -1 })
       .lean()
@@ -37,7 +37,7 @@ export class EditorialCalendarMongooseRepository implements EditorialCalendarRep
     const calendar = await this.calendarModel
       .findOne({
         _id: new (Types.ObjectId as any)(id),
-        ia: { $ne: false },
+        isActive: { $ne: false },
       })
       .lean()
       .exec();
@@ -46,26 +46,26 @@ export class EditorialCalendarMongooseRepository implements EditorialCalendarRep
 
   async create(data: ICreateEditorialCalendar): Promise<IEditorialCalendar> {
     const mapped: Record<string, unknown> = {
-      pid: new (Types.ObjectId as any)(data.projectId),
-      evid: new (Types.ObjectId as any)(data.editorialVersionId),
-      n: data.name,
-      per: {
-        tp: data.period.type,
-        lb: data.period.label,
-        sd: data.period.startDate,
-        ed: data.period.endDate,
+      projectId: new (Types.ObjectId as any)(data.projectId),
+      editorialVersionId: new (Types.ObjectId as any)(data.editorialVersionId),
+      name: data.name,
+      period: {
+        type: data.period.type,
+        label: data.period.label,
+        startDate: data.period.startDate,
+        endDate: data.period.endDate,
       },
-      plf: data.platforms,
-      cap: {
-        rw: data.capacity.reelsPerWeek,
-        lw: data.capacity.longVideosPerWeek,
-        cw: data.capacity.carouselsPerWeek,
-        sw: data.capacity.staticPostsPerWeek,
-        lv: data.capacity.livesPerWeek,
-        ss: data.capacity.storySequencesPerDay,
+      platforms: data.platforms,
+      capacity: {
+        reelsPerWeek: data.capacity.reelsPerWeek,
+        longVideosPerWeek: data.capacity.longVideosPerWeek,
+        carouselsPerWeek: data.capacity.carouselsPerWeek,
+        staticPostsPerWeek: data.capacity.staticPostsPerWeek,
+        livesPerWeek: data.capacity.livesPerWeek,
+        storySequencesPerDay: data.capacity.storySequencesPerDay,
       },
-      obj: data.objective,
-      dys: data.days ?? [],
+      objective: data.objective,
+      days: data.days ?? [],
     };
 
     const doc = new this.calendarModel(mapped);
@@ -78,25 +78,30 @@ export class EditorialCalendarMongooseRepository implements EditorialCalendarRep
     data: IUpdateEditorialCalendar,
   ): Promise<IEditorialCalendar | null> {
     const set: Record<string, unknown> = {};
-    if (data.name !== undefined) set['n'] = data.name;
-    if (data.status !== undefined) set['st'] = data.status;
+    if (data.name !== undefined) set['name'] = data.name;
+    if (data.status !== undefined) set['status'] = data.status;
     if (data.editorialVersionId !== undefined)
-      set['evid'] = new (Types.ObjectId as any)(data.editorialVersionId);
-    if (data.objective !== undefined) set['obj'] = data.objective;
+      set['editorialVersionId'] = new (Types.ObjectId as any)(
+        data.editorialVersionId,
+      );
+    if (data.objective !== undefined) set['objective'] = data.objective;
     if (data.capacity !== undefined) {
-      set['cap.rw'] = data.capacity.reelsPerWeek;
-      set['cap.lw'] = data.capacity.longVideosPerWeek;
-      set['cap.cw'] = data.capacity.carouselsPerWeek;
-      set['cap.sw'] = data.capacity.staticPostsPerWeek;
-      set['cap.lv'] = data.capacity.livesPerWeek;
-      set['cap.ss'] = data.capacity.storySequencesPerDay;
+      set['capacity.reelsPerWeek'] = data.capacity.reelsPerWeek;
+      set['capacity.longVideosPerWeek'] = data.capacity.longVideosPerWeek;
+      set['capacity.carouselsPerWeek'] = data.capacity.carouselsPerWeek;
+      set['capacity.staticPostsPerWeek'] = data.capacity.staticPostsPerWeek;
+      set['capacity.livesPerWeek'] = data.capacity.livesPerWeek;
+      set['capacity.storySequencesPerDay'] = data.capacity.storySequencesPerDay;
     }
     if (data.reviewSuggestions !== undefined)
-      set['rv'] = data.reviewSuggestions;
+      set['reviewSuggestions'] = data.reviewSuggestions;
 
     const updated = await this.calendarModel
       .findOneAndUpdate(
-        { _id: new (Types.ObjectId as any)(id), ia: { $ne: false } },
+        {
+          _id: new (Types.ObjectId as any)(id),
+          isActive: { $ne: false },
+        },
         { $set: set },
         { new: true },
       )
@@ -109,7 +114,7 @@ export class EditorialCalendarMongooseRepository implements EditorialCalendarRep
     const deleted = await this.calendarModel
       .findOneAndUpdate(
         { _id: new (Types.ObjectId as any)(id) },
-        { $set: { ia: false } },
+        { $set: { isActive: false } },
         { new: true },
       )
       .lean()
@@ -132,27 +137,30 @@ export class EditorialCalendarMongooseRepository implements EditorialCalendarRep
       : new (Types.ObjectId as any)(itemId);
 
     let found = false;
-    for (const day of (doc as any).dys || []) {
-      for (let i = 0; i < (day.it || []).length; i++) {
-        const item = day.it[i] as Record<string, unknown>;
+    for (const day of doc.days || []) {
+      for (let i = 0; i < (day.items || []).length; i++) {
+        const item = day.items[i] as unknown as Record<string, unknown>;
         const itemDocId = (item._id || item.id)?.toString();
         if (itemDocId === itemObjectId.toString()) {
           if (data.provisionalName !== undefined)
-            item.pn = data.provisionalName;
-          if (data.theme !== undefined) item.th = data.theme;
+            item.provisionalName = data.provisionalName;
+          if (data.theme !== undefined) item.theme = data.theme;
           if (data.painDesireObjection !== undefined)
-            item.pdo = data.painDesireObjection;
-          if (data.suggestedTime !== undefined) item.stm = data.suggestedTime;
-          if (data.observations !== undefined) item.ob = data.observations;
-          if (data.referenceUrl !== undefined) item.ru = data.referenceUrl;
-          if (data.exampleUrl !== undefined) item.eu = data.exampleUrl;
-          if (data.pillar !== undefined) item.pl = data.pillar;
+            item.painDesireObjection = data.painDesireObjection;
+          if (data.suggestedTime !== undefined)
+            item.suggestedTime = data.suggestedTime;
+          if (data.observations !== undefined)
+            item.observations = data.observations;
+          if (data.referenceUrl !== undefined)
+            item.referenceUrl = data.referenceUrl;
+          if (data.exampleUrl !== undefined) item.exampleUrl = data.exampleUrl;
+          if (data.pillar !== undefined) item.pillar = data.pillar;
           if (data.strategicObjective !== undefined)
-            item.so = data.strategicObjective;
-          if (data.status !== undefined) item.sts = data.status;
-          if (data.retinaType !== undefined) item.rt = data.retinaType;
-          if (data.platforms !== undefined) item.plf = data.platforms;
-          if (data.objective !== undefined) item.o = data.objective;
+            item.strategicObjective = data.strategicObjective;
+          if (data.status !== undefined) item.status = data.status;
+          if (data.retinaType !== undefined) item.retinaType = data.retinaType;
+          if (data.platforms !== undefined) item.platforms = data.platforms;
+          if (data.objective !== undefined) item.objective = data.objective;
           found = true;
           break;
         }
@@ -162,7 +170,7 @@ export class EditorialCalendarMongooseRepository implements EditorialCalendarRep
 
     if (!found) return null;
 
-    doc.markModified('dys' as any);
+    doc.markModified('days' as any);
     const saved = await doc.save();
     return saved.toObject() as unknown as IEditorialCalendar;
   }
@@ -172,16 +180,16 @@ export class EditorialCalendarMongooseRepository implements EditorialCalendarRep
     suggestions: IReviewSuggestion[],
   ): Promise<IEditorialCalendar | null> {
     const mapped = suggestions.map((s) => ({
-      tp: s.type,
-      t: s.title,
-      d: s.description,
-      im: s.impact,
+      type: s.type,
+      title: s.title,
+      description: s.description,
+      impact: s.impact,
     }));
 
     const updated = await this.calendarModel
       .findOneAndUpdate(
         { _id: new (Types.ObjectId as any)(calendarId) },
-        { $set: { rv: mapped } },
+        { $set: { reviewSuggestions: mapped } },
         { new: true },
       )
       .lean()

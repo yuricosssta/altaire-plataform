@@ -33,36 +33,34 @@ export class EditorialMapa {
     required: true,
     type: Types.ObjectId,
     ref: 'EditorialVersion',
-    name: 'vid',
   })
   versionId: Types.ObjectId;
 
-  @Prop({ required: true, name: 'vn' })
+  @Prop({ required: true })
   versionNumber: number;
 
-  @Prop({ required: true, name: 'n' })
+  @Prop({ required: true })
   name: string;
 
-  @Prop({ name: 'pp' })
+  @Prop()
   positioningPhrase?: string;
 
-  @Prop({ required: true, name: 'mc' })
+  @Prop({ required: true })
   mensagemCentral: string;
 
-  @Prop({ type: [PilarSubDoc], default: [], name: 'pl' })
+  @Prop({ type: [PilarSubDoc], default: [] })
   pilares: Types.Array<PilarSubDoc>;
 
   @Prop({
     type: TomDeVozSubDoc,
     default: { traits: [], rules: [] },
-    name: 'tv',
   })
   tomDeVoz: TomDeVozSubDoc;
 
-  @Prop({ type: [RetinaSubDoc], default: [], name: 'rt' })
+  @Prop({ type: [RetinaSubDoc], default: [] })
   retina: Types.Array<RetinaSubDoc>;
 }
 
 export const EditorialMapaSchema = SchemaFactory.createForClass(EditorialMapa);
 
-EditorialMapaSchema.index({ vid: 1 });
+EditorialMapaSchema.index({ versionId: 1 });

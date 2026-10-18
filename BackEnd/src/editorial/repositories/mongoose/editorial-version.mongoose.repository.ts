@@ -22,10 +22,10 @@ export class EditorialVersionMongooseRepository implements EditorialVersionRepos
   async findAllByProject(projectId: string): Promise<IEditorialVersion[]> {
     const versions = await this.versionModel
       .find({
-        pid: new (Types.ObjectId as any)(projectId),
-        ia: { $ne: false },
+        projectId: new (Types.ObjectId as any)(projectId),
+        isActive: { $ne: false },
       })
-      .sort({ vn: -1 })
+      .sort({ versionNumber: -1 })
       .lean()
       .exec();
     return versions as unknown as IEditorialVersion[];
@@ -35,7 +35,7 @@ export class EditorialVersionMongooseRepository implements EditorialVersionRepos
     const version = await this.versionModel
       .findOne({
         _id: new (Types.ObjectId as any)(id),
-        ia: { $ne: false },
+        isActive: { $ne: false },
       })
       .lean()
       .exec();
@@ -44,21 +44,23 @@ export class EditorialVersionMongooseRepository implements EditorialVersionRepos
 
   async findMaxVersionNumber(projectId: string): Promise<number> {
     const max = await this.versionModel
-      .findOne({ pid: new (Types.ObjectId as any)(projectId) })
-      .sort({ vn: -1 })
-      .select('vn')
+      .findOne({ projectId: new (Types.ObjectId as any)(projectId) })
+      .sort({ versionNumber: -1 })
+      .select('versionNumber')
       .lean()
       .exec();
-    return (max as unknown as { vn: number } | null)?.vn ?? 0;
+    return (
+      (max as unknown as { versionNumber: number } | null)?.versionNumber ?? 0
+    );
   }
 
   async create(data: ICreateEditorialVersion): Promise<IEditorialVersion> {
     const mapped = {
-      pid: new (Types.ObjectId as any)(data.projectId),
-      vn: data.versionNumber,
-      n: data.name,
-      st: 'active',
-      cb: new (Types.ObjectId as any)(data.createdBy),
+      projectId: new (Types.ObjectId as any)(data.projectId),
+      versionNumber: data.versionNumber,
+      name: data.name,
+      status: 'active',
+      createdBy: new (Types.ObjectId as any)(data.createdBy),
     };
     const doc = new this.versionModel(mapped);
     const saved = await doc.save();
@@ -70,12 +72,12 @@ export class EditorialVersionMongooseRepository implements EditorialVersionRepos
     data: IUpdateEditorialVersion,
   ): Promise<IEditorialVersion | null> {
     const set: Record<string, unknown> = {};
-    if (data.name !== undefined) set['n'] = data.name;
-    if (data.status !== undefined) set['st'] = data.status;
+    if (data.name !== undefined) set['name'] = data.name;
+    if (data.status !== undefined) set['status'] = data.status;
 
     const updated = await this.versionModel
       .findOneAndUpdate(
-        { _id: new (Types.ObjectId as any)(id), ia: { $ne: false } },
+        { _id: new (Types.ObjectId as any)(id), isActive: { $ne: false } },
         { $set: set },
         { new: true },
       )
@@ -88,7 +90,7 @@ export class EditorialVersionMongooseRepository implements EditorialVersionRepos
     const deleted = await this.versionModel
       .findOneAndUpdate(
         { _id: new (Types.ObjectId as any)(id) },
-        { $set: { ia: false } },
+        { $set: { isActive: false } },
         { new: true },
       )
       .lean()

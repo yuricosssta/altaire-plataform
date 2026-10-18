@@ -4,134 +4,134 @@ import { Document, Types } from 'mongoose';
 export type EditorialCalendarDocument = EditorialCalendar & Document;
 
 class CalendarPeriodSubDoc {
-  @Prop({ required: true, name: 'tp' })
+  @Prop({ required: true })
   type: string;
 
-  @Prop({ required: true, name: 'lb' })
+  @Prop({ required: true })
   label: string;
 
-  @Prop({ required: true, name: 'sd' })
+  @Prop({ required: true })
   startDate: Date;
 
-  @Prop({ required: true, name: 'ed' })
+  @Prop({ required: true })
   endDate: Date;
 }
 
 class ProductionCapacitySubDoc {
-  @Prop({ required: true, default: 0, name: 'rw' })
+  @Prop({ required: true, default: 0 })
   reelsPerWeek: number;
 
-  @Prop({ required: true, default: 0, name: 'lw' })
+  @Prop({ required: true, default: 0 })
   longVideosPerWeek: number;
 
-  @Prop({ required: true, default: 0, name: 'cw' })
+  @Prop({ required: true, default: 0 })
   carouselsPerWeek: number;
 
-  @Prop({ required: true, default: 0, name: 'sw' })
+  @Prop({ required: true, default: 0 })
   staticPostsPerWeek: number;
 
-  @Prop({ required: true, default: 0, name: 'lv' })
+  @Prop({ required: true, default: 0 })
   livesPerWeek: number;
 
-  @Prop({ required: true, default: 0, name: 'ss' })
+  @Prop({ required: true, default: 0 })
   storySequencesPerDay: number;
 }
 
 class CalendarItemSubDoc {
-  @Prop({ required: true, name: 'd' })
+  @Prop({ required: true })
   date: Date;
 
-  @Prop({ required: true, name: 'f' })
+  @Prop({ required: true })
   format: string;
 
-  @Prop({ required: true, name: 'rt' })
+  @Prop({ required: true })
   retinaType: string;
 
-  @Prop({ required: true, type: [String], name: 'plf' })
+  @Prop({ required: true, type: [String] })
   platforms: string[];
 
-  @Prop({ required: true, name: 'o' })
+  @Prop({ required: true })
   objective: string;
 
-  @Prop({ required: true, name: 'stm' })
+  @Prop({ required: true })
   suggestedTime: string;
 
-  @Prop({ name: 'th' })
+  @Prop()
   theme?: string;
 
-  @Prop({ name: 'ru' })
+  @Prop()
   referenceUrl?: string;
 
-  @Prop({ required: true, name: 'sts' })
+  @Prop({ required: true })
   status: string;
 
-  @Prop({ name: 'pn' })
+  @Prop()
   provisionalName?: string;
 
-  @Prop({ name: 'so' })
+  @Prop()
   strategicObjective?: string;
 
-  @Prop({ name: 'pl' })
+  @Prop()
   pillar?: string;
 
-  @Prop({ name: 'pdo' })
+  @Prop()
   painDesireObjection?: string;
 
-  @Prop({ name: 'ob' })
+  @Prop()
   observations?: string;
 
-  @Prop({ name: 'eu' })
+  @Prop()
   exampleUrl?: string;
 }
 
 class StorySequenceSubDoc {
-  @Prop({ required: true, name: 'd' })
+  @Prop({ required: true })
   date: Date;
 
-  @Prop({ required: true, name: 'si' })
+  @Prop({ required: true })
   sequenceIndex: number;
 
-  @Prop({ required: true, name: 'sc' })
+  @Prop({ required: true })
   storiesCount: number;
 
-  @Prop({ required: true, name: 'fo' })
+  @Prop({ required: true })
   focus: string;
 
-  @Prop({ required: true, name: 'rt' })
+  @Prop({ required: true })
   retinaType: string;
 
-  @Prop({ required: true, name: 'stm' })
+  @Prop({ required: true })
   suggestedTime: string;
 
-  @Prop({ required: true, name: 'sts' })
+  @Prop({ required: true })
   status: string;
 
-  @Prop({ name: 'th' })
+  @Prop()
   theme?: string;
 }
 
 class CalendarDaySubDoc {
-  @Prop({ required: true, name: 'd' })
+  @Prop({ required: true })
   date: Date;
 
-  @Prop({ type: [CalendarItemSubDoc], default: [], name: 'it' })
+  @Prop({ type: [CalendarItemSubDoc], default: [] })
   items: CalendarItemSubDoc[];
 
-  @Prop({ type: [StorySequenceSubDoc], default: [], name: 'sq' })
+  @Prop({ type: [StorySequenceSubDoc], default: [] })
   storySequences: StorySequenceSubDoc[];
 }
 
 class ReviewSuggestionSubDoc {
-  @Prop({ required: true, name: 'tp' })
+  @Prop({ required: true })
   type: string;
 
-  @Prop({ required: true, name: 't' })
+  @Prop({ required: true })
   title: string;
 
-  @Prop({ required: true, name: 'd' })
+  @Prop({ required: true })
   description: string;
 
-  @Prop({ required: true, name: 'im' })
+  @Prop({ required: true })
   impact: string;
 }
 
@@ -141,7 +141,6 @@ export class EditorialCalendar {
     required: true,
     type: Types.ObjectId,
     ref: 'EditorialProject',
-    name: 'pid',
   })
   projectId: Types.ObjectId;
 
@@ -149,40 +148,39 @@ export class EditorialCalendar {
     required: true,
     type: Types.ObjectId,
     ref: 'EditorialVersion',
-    name: 'evid',
   })
   editorialVersionId: Types.ObjectId;
 
-  @Prop({ required: true, name: 'n' })
+  @Prop({ required: true })
   name: string;
 
-  @Prop({ required: true, type: CalendarPeriodSubDoc, name: 'per' })
+  @Prop({ required: true, type: CalendarPeriodSubDoc })
   period: CalendarPeriodSubDoc;
 
-  @Prop({ required: true, type: [String], name: 'plf' })
+  @Prop({ required: true, type: [String] })
   platforms: string[];
 
-  @Prop({ required: true, type: ProductionCapacitySubDoc, name: 'cap' })
+  @Prop({ required: true, type: ProductionCapacitySubDoc })
   capacity: ProductionCapacitySubDoc;
 
-  @Prop({ required: true, name: 'obj' })
+  @Prop({ required: true })
   objective: string;
 
-  @Prop({ required: true, default: 'active', name: 'st' })
+  @Prop({ required: true, default: 'active' })
   status: string;
 
-  @Prop({ type: [CalendarDaySubDoc], default: [], name: 'dys' })
+  @Prop({ type: [CalendarDaySubDoc], default: [] })
   days: CalendarDaySubDoc[];
 
-  @Prop({ type: [ReviewSuggestionSubDoc], default: [], name: 'rv' })
+  @Prop({ type: [ReviewSuggestionSubDoc], default: [] })
   reviewSuggestions: ReviewSuggestionSubDoc[];
 
-  @Prop({ default: true, name: 'ia' })
+  @Prop({ default: true })
   isActive: boolean;
 }
 
 export const EditorialCalendarSchema =
   SchemaFactory.createForClass(EditorialCalendar);
 
-EditorialCalendarSchema.index({ pid: 1, ia: 1, st: 1 });
-EditorialCalendarSchema.index({ pid: 1, obj: 1 });
+EditorialCalendarSchema.index({ projectId: 1, isActive: 1, status: 1 });
+EditorialCalendarSchema.index({ projectId: 1, objective: 1 });

@@ -135,9 +135,7 @@ export class EditorialVersionService {
 
     const originalMapa = await this.mapaRepository.findByVersionId(versionId);
 
-    const projectId = (original as any).pid
-      ? (original as any).pid.toString()
-      : original.projectId;
+    const projectId = original.projectId.toString();
 
     const maxVersion =
       await this.versionRepository.findMaxVersionNumber(projectId);
