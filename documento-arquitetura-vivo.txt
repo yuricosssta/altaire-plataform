@@ -1,3 +1,34 @@
+## SPRINT 13 - 20/10/2026 ##
+Resumo Técnico de Fechamento
+
+Implementação do Ciclo 3 — Temas, Roteiros e BrandStory (BackEnd + BFF):
+- Módulo 3A (Temas):
+  - Coleções `EditorialTheme` e `EditorialCalendarThemeVersion` com nomes completos (alinhados à revisão de 17/10).
+  - Schema de calendário atualizado com `themeId` opcional em `CalendarItemSubDoc` e métodos atômicos de atribuição e contagem no repositório.
+  - Abstração do motor gerador de temas via Port `ThemeGenerator` + implementação determinística `StubThemeGenerator` (pilares × RETINA × consciência em round-robin a partir do Mapa Estratégico).
+  - 14 endpoints REST em `EditorialThemeController` (CRUD, geração de lote com `batchId`, `generate-more`, `bulk-status`, `calendar-suggestions`, `assign`, `balance`, `rebalance`, `simulate`, histórico de `versions`).
+  - Emissão do evento `editorial.theme.generated`.
+
+- Módulo 3B (Roteiros):
+  - Coleções `EditorialScript` e `EditorialScriptVersion` com subdocumentos tipados para blocos, legendas, títulos sugeridos, prompts de thumbnail, materiais complementares e anexos.
+  - Abstração via Port `ScriptGenerator` + implementação determinística `StubScriptGenerator` cobrindo os 6 formatos de conteúdo (`reel`, `long_video`, `carousel`, `static_post`, `live`, `stories_sequence`) e modos (`conexao`, `seguranca`).
+  - 14 endpoints REST em `EditorialScriptController` (CRUD, geração via briefing, duplicação, exportação em Markdown string, versões versionadas, anexos com upload desacoplado via storage, regeneração de bloco individual, listagem de slots e temas compatíveis por formato).
+  - Emissão dos eventos `editorial.script.created` e `editorial.script.generated`.
+
+- Módulo 3C (BrandStory):
+  - Coleção `EditorialBrandStory` indexada unicamente por `{ userId, organizationId }`.
+  - CRUD e upsert implementados via `EditorialBrandStoryService` e expostos em `GET/PUT /editorial/projects/:projectId/scripts/brand-story`.
+
+- Unificação de Vocabulário de Formatos e Integração FrontEnd BFF:
+  - Unificação do contrato no front: `ScriptFormatSchema = ContentFormatSchema` (`reel`, `long_video`, `carousel`, `static_post`, `live`, `stories_sequence`), alinhando o front aos dados já persistidos nos calendários.
+  - Atualização dos mocks, slices Redux (`scriptsSlice`) e páginas de roteiros (`criar/page.tsx` e `ScriptsDashboard.tsx`).
+  - 23 rotas BFF migradas de stub `501 Not Implemented` para `proxyEditorialRequest()` com tipagem Zod e repasse seguro de autenticação.
+  - Ajuste de regra do ESLint (`no-restricted-imports`) no BackEnd para liberar paths `schemas/models/*` (interfaces de domínio).
+
+- Validação e Testes:
+  - 43/43 testes unitários passando (9 suítes com mocks completos dos novos services e generators).
+  - ESLint 0 erros no backend editorial e 0 erros no frontend.
+
 ## REVISÃO - 17/10/2026 ##
 Reversão dos Short Field Names + Ativação de Zstd (Módulo Editorial):
 

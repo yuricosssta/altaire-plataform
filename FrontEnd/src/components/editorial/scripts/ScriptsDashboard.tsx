@@ -12,14 +12,14 @@ import { scriptsService } from '@/lib/services/scriptsService';
 import { FORMAT_LABELS, FORMAT_DESCRIPTIONS, FORMAT_ICONS, FORMAT_ROUTE } from '@/lib/mocks/scripts.mock';
 import type { Script, ScriptFormat, ScriptStatus } from '@/lib/dto/editorial.schema';
 
-const ALL_FORMATS: ScriptFormat[] = ['video_curto', 'video_longo', 'live', 'carrossel', 'post_estatico', 'stories_sequence'];
+const ALL_FORMATS: ScriptFormat[] = ['reel', 'long_video', 'carousel', 'static_post', 'live', 'stories_sequence'];
 
 const FORMAT_ORDER: Record<ScriptFormat, number> = {
-  video_curto: 0,
-  video_longo: 1,
-  live: 2,
-  carrossel: 3,
-  post_estatico: 4,
+  reel: 0,
+  long_video: 1,
+  carousel: 2,
+  static_post: 3,
+  live: 4,
   stories_sequence: 5,
 };
 
@@ -92,7 +92,7 @@ export function ScriptsDashboard({ projectId }: { projectId: string }) {
     try {
       const all = await scriptsService.listScripts(projectId);
       const grouped: Record<ScriptFormat, Script[]> = {
-        video_curto: [], video_longo: [], live: [], carrossel: [], post_estatico: [], stories_sequence: [],
+        reel: [], long_video: [], carousel: [], static_post: [], live: [], stories_sequence: [],
       };
       for (const script of all) {
         if (grouped[script.format]) grouped[script.format].push(script);

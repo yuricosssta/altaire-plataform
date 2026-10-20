@@ -8,7 +8,7 @@ import { FORMAT_LABELS, FORMAT_DESCRIPTIONS, FORMAT_ICONS, FORMAT_ROUTE } from '
 import type { ScriptFormat, ScriptMode } from '@/lib/dto/editorial.schema';
 
 const ICON_MAP: Record<string, typeof ArrowLeft> = { Video: ArrowLeft, Film: ArrowLeft, Radio: ArrowLeft, Columns: ArrowLeft, Image: ArrowLeft, Square: ArrowLeft };
-const FORMATS: ScriptFormat[] = ['video_curto', 'video_longo', 'live', 'carrossel', 'post_estatico', 'stories_sequence'];
+const FORMATS: ScriptFormat[] = ['reel', 'long_video', 'carousel', 'static_post', 'live', 'stories_sequence'];
 
 const MODE_DESCRIPTIONS: Record<ScriptMode, string> = {
   seguranca: 'Roteiro escrito palavra por palavra — ideal para iniciantes ou temas técnicos.',
