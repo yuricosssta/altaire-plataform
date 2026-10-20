@@ -47,11 +47,11 @@ interface ScriptsState {
 
 const initialState: ScriptsState = {
   scriptsByFormat: {
-    video_curto: [],
-    video_longo: [],
+    reel: [],
+    long_video: [],
+    carousel: [],
+    static_post: [],
     live: [],
-    carrossel: [],
-    post_estatico: [],
     stories_sequence: [],
   },
   currentScript: null,
@@ -214,7 +214,7 @@ const scriptsSlice = createSlice({
           state.scriptsByFormat[format] = scripts;
         } else {
           const grouped: Record<ScriptFormat, Script[]> = {
-            video_curto: [], video_longo: [], live: [], carrossel: [], post_estatico: [], stories_sequence: [],
+            reel: [], long_video: [], carousel: [], static_post: [], live: [], stories_sequence: [],
           };
           for (const script of scripts) {
             if (grouped[script.format]) grouped[script.format].push(script);

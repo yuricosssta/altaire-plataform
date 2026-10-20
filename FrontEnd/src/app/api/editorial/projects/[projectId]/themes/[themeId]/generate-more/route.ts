@@ -1,21 +1,38 @@
-import { notImplemented } from '@/app/api/editorial/_notImplemented';
+import { NextRequest, NextResponse } from 'next/server';
+import { proxyEditorialRequest } from '@/app/api/editorial/_proxy';
+import { GenerateMoreSchema } from '@/lib/dto/themes.schema';
+import { error, ERROR_CODES } from '@/lib/api/response';
 
-export async function GET() {
-  return notImplemented('./projects/[projectId]/themes/[themeId]/generate-more');
-}
+export async function POST(
+  request: NextRequest,
+  { params }: { params: Promise<{ projectId: string; themeId: string }> },
+) {
+  const { projectId, themeId } = await params;
+  const body = await request.json().catch(() => ({}));
 
-export async function POST() {
-  return notImplemented('./projects/[projectId]/themes/[themeId]/generate-more');
-}
+  const parsed = GenerateMoreSchema.safeParse(body);
+  if (!parsed.success) {
+    return NextResponse.json(
+      error(
+        ERROR_CODES.VALIDATION_ERROR,
+        'Parâmetros inválidos.',
+        parsed.error.flatten(),
+      ),
+      { status: 400 },
+    );
+  }
 
-export async function PUT() {
-  return notImplemented('./projects/[projectId]/themes/[themeId]/generate-more');
-}
+  const result = await proxyEditorialRequest(
+    request,
+    `/projects/${projectId}/themes/${themeId}/generate-more`,
+    {
+      method: 'POST',
+      body: parsed.data,
+    },
+  );
 
-export async function DELETE() {
-  return notImplemented('./projects/[projectId]/themes/[themeId]/generate-more');
-}
-
-export async function PATCH() {
-  return notImplemented('./projects/[projectId]/themes/[themeId]/generate-more');
+  if ('ok' in result) {
+    return NextResponse.json(result.data);
+  }
+  return NextResponse.json(result, { status: 502 });
 }

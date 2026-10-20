@@ -196,4 +196,49 @@ export class EditorialCalendarMongooseRepository implements EditorialCalendarRep
       .exec();
     return updated as unknown as IEditorialCalendar | null;
   }
+
+  async assignItemTheme(
+    calendarId: string,
+    itemId: string,
+    themeId: string | null,
+    theme: string,
+  ): Promise<IEditorialCalendar | null> {
+    const itemObjectId = new (Types.ObjectId as any)(String(itemId));
+    const update = themeId
+      ? {
+          $set: {
+            'days.$[].items.$[it].themeId': new (Types.ObjectId as any)(
+              String(themeId),
+            ),
+            'days.$[].items.$[it].theme': theme,
+          },
+        }
+      : {
+          $set: { 'days.$[].items.$[it].theme': theme },
+          $unset: { 'days.$[].items.$[it].themeId': '' },
+        };
+
+    const updated = await this.calendarModel
+      .findOneAndUpdate(
+        {
+          _id: new (Types.ObjectId as any)(String(calendarId)),
+          isActive: { $ne: false },
+          'days.items._id': itemObjectId,
+        },
+        update,
+        { new: true, arrayFilters: [{ 'it._id': itemObjectId }] },
+      )
+      .lean()
+      .exec();
+    return updated as unknown as IEditorialCalendar | null;
+  }
+
+  async countItemsByThemeId(themeId: string): Promise<number> {
+    return this.calendarModel
+      .countDocuments({
+        isActive: { $ne: false },
+        'days.items.themeId': new (Types.ObjectId as any)(String(themeId)),
+      })
+      .exec();
+  }
 }

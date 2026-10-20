@@ -62,6 +62,7 @@ export interface ICalendarItem {
   objective: string;
   suggestedTime: string;
   theme?: string;
+  themeId?: string;
   referenceUrl?: string;
   status: CalendarItemStatus;
   provisionalName?: string;

@@ -131,14 +131,10 @@ export const scriptsService = {
     projectId: string,
     scriptId: string,
     data: Partial<ScriptAttachment>,
-    file?: File,
   ): Promise<ScriptAttachment> => {
-    const formData = new FormData();
-    if (file) formData.append('file', file);
-    formData.append('data', JSON.stringify(data));
     const response = await localClient.post(
       `${BASE}/${projectId}/scripts/${scriptId}/attachments`,
-      formData,
+      data,
     );
     return response.data;
   },
@@ -163,6 +159,11 @@ export const scriptsService = {
 
   getBrandStory: async (projectId: string): Promise<any> => {
     const response = await localClient.get(`${BASE}/${projectId}/scripts/brand-story`);
+    return response.data;
+  },
+
+  saveBrandStory: async (projectId: string, data: any): Promise<any> => {
+    const response = await localClient.put(`${BASE}/${projectId}/scripts/brand-story`, data);
     return response.data;
   },
 };

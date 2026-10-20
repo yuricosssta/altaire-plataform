@@ -24,4 +24,13 @@ export abstract class EditorialCalendarRepository {
     calendarId: string,
     suggestions: IReviewSuggestion[],
   ): Promise<IEditorialCalendar | null>;
+  /** Grava (ou limpa, com themeId null) a referência de tema de um item. */
+  abstract assignItemTheme(
+    calendarId: string,
+    itemId: string,
+    themeId: string | null,
+    theme: string,
+  ): Promise<IEditorialCalendar | null>;
+  /** Quantos itens de calendários ativos referenciam o tema. */
+  abstract countItemsByThemeId(themeId: string): Promise<number>;
 }
