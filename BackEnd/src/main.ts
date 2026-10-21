@@ -3,7 +3,7 @@ import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { HttpExceptionFilter } from './shared/filters/http-exception.filter';
-import { ValidationPipe } from '@nestjs/common'; // <--- Importante
+import { ValidationPipe } from '@nestjs/common';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
@@ -32,9 +32,9 @@ async function bootstrap() {
   const config = new DocumentBuilder()
     .setTitle('Altaire API')
     .setDescription(
-      'API do ecossistema Altaire — assistente de criação de conteúdo educacional',
+      'API do ecossistema Altaire — assistente de criação de conteúdo digital',
     )
-    .setVersion('1.0')
+    .setVersion('0.1.0')
     .build();
   const documentFactory = () => SwaggerModule.createDocument(app, config);
   SwaggerModule.setup('api', app, documentFactory);
