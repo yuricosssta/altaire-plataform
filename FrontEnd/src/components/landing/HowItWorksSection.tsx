@@ -7,7 +7,7 @@ import {
   useState,
   type MouseEvent as ReactMouseEvent,
 } from "react";
-import { AnimatePresence, motion, useReducedMotion } from "motion/react";
+import { motion, useInView, useReducedMotion } from "motion/react";
 import {
   ArrowRight,
   CheckCircle2,
@@ -30,7 +30,6 @@ import {
   type LandingContent,
 } from "@/lib/constants/landing-content";
 import {
-  MOCKUP_SCENE_VARIANTS,
   MOTION_VIEWPORT,
   REDUCED_MOTION_VARIANTS,
   SECTION_REVEAL_VARIANTS,
@@ -49,18 +48,8 @@ const ROUTINE_STAGE_CYCLE_MS = 5200;
 
 /**
  * Seção 09 — Como funciona (`id="como-funciona"`).
- *
- * Referências dominantes: LiveKit (trilha conectada de progressão) + Resend (física 3D no escuro).
- * Intensidade: 3/5 | Profundidade: Nível 2 (Elevado).
- *
- * Regras inegociáveis (CONTENT-LANDING.md §09, Etapa 2D §4.8 & ROUTES-PUBLIC.md §9):
- * - Eyebrow estritamente canônico: "COMO O LEGION ALTAIRE ENTRA NA SUA ROTINA".
- * - Foco nas ações práticas controladas pelo usuário em 3 etapas, sem repetir títulos.
- * - Exibe todos os itens canônicos de Interface (Etapa 01), Ação/Elementos revisáveis/Capacidade (Etapa 02)
- *   e Fluxo/Materiais possíveis (Etapa 03).
- * - Palco 3D/2.5D interativo com inclinação no mouse, blur dourado (`Spotlight`), autociclo de 5.2s
- *   com pausa no hover e seleção por clique com FLIP (`layoutId`).
- * - Textos justificados em todas as dimensões (`text-justify [text-align-last:left] hyphens-auto`).
+ * - Painel de inspeção inferior travado em célula única de Grid (`col-start-1 row-start-1`)
+ *   + `useInView` para garantir variação zero de altura (sem quicar a página).
  */
 export function HowItWorksSection({
   content = landingContent.howItWorks,
@@ -83,6 +72,7 @@ export function HowItWorksSection({
   });
 
   const stageContainerRef = useRef<HTMLDivElement>(null);
+  const isInView = useInView(stageContainerRef, { amount: 0.2 });
   const shouldReduceMotion = useReducedMotion();
 
   const headingId = content.id
@@ -91,9 +81,9 @@ export function HowItWorksSection({
 
   const steps = content.steps ?? [];
 
-  /* Autociclo de 5.2s pelas 3 etapas que pausa imediatamente quando o mouse interage */
+  /* Autociclo roda apenas quando a seção está visível no monitor e sem o mouse em cima */
   useEffect(() => {
-    if (shouldReduceMotion || isPaused || steps.length === 0) {
+    if (shouldReduceMotion || isPaused || !isInView || steps.length === 0) {
       return;
     }
 
@@ -104,7 +94,7 @@ export function HowItWorksSection({
     return () => {
       window.clearInterval(timer);
     };
-  }, [shouldReduceMotion, isPaused, steps.length]);
+  }, [shouldReduceMotion, isPaused, isInView, steps.length]);
 
   const handleMouseMove = (event: ReactMouseEvent<HTMLDivElement>) => {
     if (shouldReduceMotion || !stageContainerRef.current) {
@@ -160,12 +150,6 @@ export function HowItWorksSection({
     REDUCED_MOTION_VARIANTS.strategicLine
   );
 
-  const sceneVariants = selectMotionPreset(
-    shouldReduceMotion,
-    MOCKUP_SCENE_VARIANTS,
-    REDUCED_MOTION_VARIANTS.mockupScene
-  );
-
   const resolveStepIcon = (step: HowItWorksStep["step"]) => {
     switch (step) {
       case "01":
@@ -207,16 +191,18 @@ export function HowItWorksSection({
       spacing="spacious"
       surface="surface-1"
       bottomBorder={true}
-      className={clsx("relative overflow-hidden [color-scheme:dark]", className)}
+      className={clsx(
+        "relative overflow-hidden [color-scheme:dark] [overflow-anchor:none]",
+        className
+      )}
     >
-      {/* Luz Radial Dourada Sutil no Centro da Seção */}
       <div
         aria-hidden="true"
         className="pointer-events-none absolute top-1/2 left-1/2 -z-0 h-[28rem] w-[52rem] -translate-x-1/2 -translate-y-1/2 rounded-la-full bg-[radial-gradient(circle_at_center,rgba(207,169,101,0.08)_0%,rgba(207,169,101,0.02)_48%,transparent_74%)] blur-3xl"
       />
 
       <div className="relative z-10 flex flex-col gap-10 lg:gap-12">
-        {/* 1. Cabeçalho Editorial Canônico (§09 de 02. CONTENT-LANDING.md) */}
+        {/* 1. Cabeçalho Editorial Canônico */}
         <motion.div
           initial="hidden"
           whileInView="visible"
@@ -224,9 +210,7 @@ export function HowItWorksSection({
           variants={revealVariants}
           className="grid grid-cols-1 items-center gap-6 lg:grid-cols-12 lg:gap-10"
         >
-          {/* Coluna Esquerda (7 cols): Eyebrow + Headline + Subheadline Justificada */}
           <div className="flex flex-col items-start lg:col-span-7">
-            {/* Eyebrow Canônico: "COMO O LEGION ALTAIRE ENTRA NA SUA ROTINA" */}
             <SectionEyebrow label={content.eyebrow} variant="pill" />
 
             {content.headline ? (
@@ -245,7 +229,6 @@ export function HowItWorksSection({
             ) : null}
           </div>
 
-          {/* Coluna Direita (5 cols): Corpo Canônico Justificado + Nota de Governança Humana */}
           <div className="flex flex-col justify-between gap-4 border-l-2 border-la-gold/55 pl-4 sm:pl-5 lg:col-span-5 lg:border-l lg:border-white/15 lg:pl-8">
             {content.body && content.body.length > 0
               ? content.body.map((paragraph) => (
@@ -258,7 +241,6 @@ export function HowItWorksSection({
                 ))
               : null}
 
-            {/* Selo de Aprovação Humana Explícita */}
             <div className="flex items-center gap-3 rounded-la-lg border border-la-border-gold/50 bg-la-gold-faint px-4 py-3">
               <ShieldCheck
                 aria-hidden="true"
@@ -271,7 +253,7 @@ export function HowItWorksSection({
           </div>
         </motion.div>
 
-        {/* 2. Barra de Síntese Visual Canônica (§09: PROJETO EDITORIAL -> CONTEXTO -> DIREÇÃO APROVADA -> OPORTUNIDADE DE CONTEÚDO -> EXECUÇÃO) */}
+        {/* 2. Barra de Síntese Visual Canônica */}
         <motion.div
           initial="hidden"
           whileInView="visible"
@@ -324,13 +306,12 @@ export function HowItWorksSection({
           </div>
         </motion.div>
 
-        {/* 3. Trilha Conectada das 3 Etapas (Cards Uniformes, Clicáveis, Sem Repetição de Título) */}
+        {/* 3. Trilha Conectada das 3 Etapas */}
         <div
           className="relative"
           onMouseEnter={() => setIsPaused(true)}
           onMouseLeave={() => setIsPaused(false)}
         >
-          {/* Conector SVG Horizontal no Desktop (>= 1024px) */}
           <svg
             aria-hidden="true"
             viewBox="0 0 1000 10"
@@ -359,7 +340,6 @@ export function HowItWorksSection({
             />
           </svg>
 
-          {/* Conector Vertical no Mobile (< 1024px) */}
           <div
             aria-hidden="true"
             className="pointer-events-none absolute top-8 bottom-8 left-6 w-px bg-gradient-to-b from-la-gold via-la-gold/45 to-white/10 lg:hidden"
@@ -395,7 +375,6 @@ export function HowItWorksSection({
                         : "border-white/12 bg-la-canvas/90 text-la-text-secondary hover:border-white/25 hover:bg-la-surface-2/60"
                     )}
                   >
-                    {/* Moldura Deslizante FLIP (`layoutId`) */}
                     {isSelected ? (
                       <motion.div
                         layoutId="how-it-works-step-active-card"
@@ -411,8 +390,7 @@ export function HowItWorksSection({
                       />
                     ) : null}
 
-                    {/* Véu Dourado Translúcido de Progresso + Filete Inferior Embutido */}
-                    {isSelected && !shouldReduceMotion && !isPaused ? (
+                    {isSelected && !shouldReduceMotion && !isPaused && isInView ? (
                       <motion.div
                         key={`how-sweep-${activeIndex}`}
                         aria-hidden="true"
@@ -433,7 +411,6 @@ export function HowItWorksSection({
                     ) : null}
 
                     <div className="relative z-20">
-                      {/* Topo da Etapa: Número + Rótulo Oficial Único (`stepItem.stepLabel`) */}
                       <div className="flex items-center justify-between gap-3 border-b border-white/10 pb-3.5">
                         <div className="flex items-center gap-3">
                           <span
@@ -461,23 +438,19 @@ export function HowItWorksSection({
                         />
                       </div>
 
-                      {/* Título Canônico (`stepItem.title`) */}
                       <h3 className="mt-4 text-balance font-la-sans text-[1.25rem] font-semibold leading-[1.25] text-la-text-primary sm:text-[1.375rem]">
                         {stepItem.title}
                       </h3>
 
-                      {/* Subheadline Oficial da Etapa (`stepItem.stepSubheadline` — Sem Repetir o Título!) */}
                       <p className="mt-2 w-full text-justify [text-align-last:left] hyphens-auto font-la-sans text-[0.875rem] font-medium leading-[1.55] text-la-gold-light">
                         {stepItem.stepSubheadline}
                       </p>
 
-                      {/* Texto Descritivo Canônico Justificado (`stepItem.description`) */}
                       <p className="mt-2.5 w-full text-justify [text-align-last:left] hyphens-auto font-la-sans text-[0.875rem] leading-[1.65] text-la-text-secondary">
                         {stepItem.description}
                       </p>
                     </div>
 
-                    {/* Rodapé Uniforme do Card: Benefício Percebido + Microcopy da Etapa */}
                     <div className="relative z-20 mt-5 flex flex-col gap-2.5 border-t border-white/10 pt-4">
                       <div className="rounded-la-md border border-white/10 bg-black/45 p-3">
                         <div className="flex items-center gap-1.5">
@@ -510,7 +483,7 @@ export function HowItWorksSection({
           </motion.ol>
         </div>
 
-        {/* 4. Palco 3D/2.5D Interativo da Rotina (Inspeção Detalhada de Interface, Revisão e Execução) */}
+        {/* 4. Palco 3D/2.5D Interativo da Rotina (Com Altura Travada em Grid col-start-1 row-start-1) */}
         {activeStep ? (
           <motion.div
             ref={stageContainerRef}
@@ -522,9 +495,8 @@ export function HowItWorksSection({
             onMouseMove={handleMouseMove}
             onMouseLeave={handleMouseLeave}
             style={{ perspective: "1400px" }}
-            className="relative w-full select-none"
+            className="relative w-full select-none [overflow-anchor:none]"
           >
-            {/* Glow Radial Dourado atrás do Palco */}
             <div
               aria-hidden="true"
               className="pointer-events-none absolute -inset-3 rounded-[2rem] bg-[radial-gradient(circle_at_50%_30%,rgba(207,169,101,0.14)_0%,rgba(207,169,101,0.03)_45%,transparent_75%)] blur-2xl"
@@ -547,7 +519,6 @@ export function HowItWorksSection({
               style={{ transformStyle: "preserve-3d" }}
               className="relative overflow-hidden rounded-la-xl border border-white/12 bg-[#07090F]/95 shadow-[inset_0_1px_1px_rgba(255,255,255,0.12),0_28px_64px_rgba(0,0,0,0.85),0_0_80px_rgba(207,169,101,0.10)] backdrop-blur-xl"
             >
-              {/* Blur Dourado (Spotlight Radial) seguindo o ponteiro do mouse */}
               <div
                 aria-hidden="true"
                 style={{
@@ -557,13 +528,12 @@ export function HowItWorksSection({
                 className="pointer-events-none absolute inset-0 z-0 transition-opacity duration-300"
               />
 
-              {/* Hairline luminosa superior dourada */}
               <div
                 aria-hidden="true"
                 className="pointer-events-none absolute inset-x-10 top-0 z-10 h-px bg-[image:var(--la-gradient-border-gold-top)]"
               />
 
-              {/* TopBar do Palco com Abas Rápidas FLIP (`layoutId`) */}
+              {/* TopBar do Palco */}
               <div className="relative z-10 flex flex-wrap items-center justify-between gap-3 border-b border-white/10 bg-black/65 px-4 py-3 sm:px-6">
                 <div className="flex items-center gap-2.5">
                   <div aria-hidden="true" className="flex items-center gap-1.5">
@@ -580,7 +550,6 @@ export function HowItWorksSection({
                   </span>
                 </div>
 
-                {/* Seletor Rápido das 3 Etapas */}
                 <div
                   aria-label="Alternar visualização da etapa na interface"
                   className="flex flex-wrap items-center gap-1 rounded-la-md border border-white/10 bg-black/50 p-1"
@@ -621,205 +590,206 @@ export function HowItWorksSection({
                 </div>
               </div>
 
-              {/* Corpo do Palco 3D: Coluna Esquerda (Elementos Canônicos da Etapa) + Coluna Direita (Câmara Orbital 3D) */}
+              {/* Corpo do Palco 3D: Painéis Empilhados em Célula Única de Grid (Altura 100% Fixa) */}
               <div className="relative z-10 grid grid-cols-1 items-center gap-6 p-5 sm:p-6 lg:grid-cols-12 lg:gap-8">
-                {/* Esquerda do Palco (8 cols): Detalhamento Canônico da Etapa Selecionada */}
-                <div className="lg:col-span-8">
-                  <AnimatePresence mode="wait">
-                    <motion.div
-                      key={activeStep.step}
-                      initial="enter"
-                      animate="center"
-                      exit="exit"
-                      variants={sceneVariants}
-                      className="flex flex-col gap-4"
-                    >
-                      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-white/10 pb-3">
-                        <div>
-                          <span className="font-la-mono text-[0.625rem] font-semibold uppercase tracking-[0.08em] text-la-gold-light">
-                            {activeStep.stepLabel}
-                          </span>
-                          <h4 className="mt-0.5 font-la-sans text-[1.125rem] font-semibold text-la-text-primary">
-                            {activeStep.title}
-                          </h4>
-                        </div>
+                <div className="grid grid-cols-1 lg:col-span-8">
+                  {steps.map((stepPanel, panelIdx) => {
+                    const isPanelActive = activeIndex === panelIdx;
 
-                        <span className="rounded-la-full border border-la-border-gold/55 bg-la-gold-faint px-3 py-1 font-la-mono text-[0.625rem] font-medium text-la-gold-light">
-                          {activeStep.stepMicrocopy}
-                        </span>
-                      </div>
-
-                      {/* Conteúdo Específico da Etapa 01: Interface do Projeto Editorial (§09) */}
-                      {activeStep.step === "01" &&
-                      activeStep.interfaceElements ? (
-                        <div className="flex flex-col gap-3">
-                          <span className="font-la-mono text-[0.625rem] font-semibold uppercase tracking-[0.08em] text-la-text-muted">
-                            Interface · Dados configurados no Projeto Editorial
-                          </span>
-
-                          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-                            {activeStep.interfaceElements.map((item) => (
-                              <div
-                                key={item}
-                                className="flex items-center gap-2.5 rounded-la-md border border-white/10 bg-white/[0.03] px-3.5 py-2.5"
-                              >
-                                <CheckCircle2
-                                  aria-hidden="true"
-                                  className="h-3.5 w-3.5 shrink-0 text-la-gold"
-                                />
-                                <span className="font-la-sans text-[0.8125rem] font-medium text-la-text-primary">
-                                  {item}
-                                </span>
-                              </div>
-                            ))}
+                    return (
+                      <div
+                        key={stepPanel.step}
+                        aria-hidden={!isPanelActive}
+                        className={clsx(
+                          "col-start-1 row-start-1 flex flex-col gap-4 transition-opacity duration-250",
+                          isPanelActive
+                            ? "relative z-10 opacity-100"
+                            : "pointer-events-none z-0 opacity-0 select-none"
+                        )}
+                      >
+                        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-white/10 pb-3">
+                          <div>
+                            <span className="font-la-mono text-[0.625rem] font-semibold uppercase tracking-[0.08em] text-la-gold-light">
+                              {stepPanel.stepLabel}
+                            </span>
+                            <h4 className="mt-0.5 font-la-sans text-[1.125rem] font-semibold text-la-text-primary">
+                              {stepPanel.title}
+                            </h4>
                           </div>
+
+                          <span className="rounded-la-full border border-la-border-gold/55 bg-la-gold-faint px-3 py-1 font-la-mono text-[0.625rem] font-medium text-la-gold-light">
+                            {stepPanel.stepMicrocopy}
+                          </span>
                         </div>
-                      ) : null}
 
-                      {/* Conteúdo Específico da Etapa 02: Ação do Usuário + Elementos Revisáveis + Capacidade de Produção (§09) */}
-                      {activeStep.step === "02" ? (
-                        <div className="flex flex-col gap-3.5">
-                          {activeStep.userAction ? (
-                            <div className="flex flex-wrap items-center justify-between gap-2 rounded-la-md border border-la-border-gold/45 bg-la-gold-faint px-3.5 py-2.5">
-                              <span className="font-la-mono text-[0.625rem] font-semibold uppercase tracking-[0.08em] text-la-gold-light">
-                                Ação do usuário
-                              </span>
-                              <div className="flex flex-wrap items-center gap-1.5 font-la-mono text-[0.75rem] font-semibold text-la-text-primary">
-                                {parseFlowChain(activeStep.userAction).map(
-                                  (actionNode, actionIdx, arr) => (
-                                    <span
-                                      key={actionNode}
-                                      className="inline-flex items-center gap-1.5"
-                                    >
-                                      <span>{actionNode}</span>
-                                      {actionIdx < arr.length - 1 ? (
-                                        <ArrowRight
-                                          aria-hidden="true"
-                                          className="h-3 w-3 text-la-gold"
-                                        />
-                                      ) : null}
-                                    </span>
-                                  )
-                                )}
-                              </div>
+                        {stepPanel.step === "01" && stepPanel.interfaceElements ? (
+                          <div className="flex flex-col gap-3">
+                            <span className="font-la-mono text-[0.625rem] font-semibold uppercase tracking-[0.08em] text-la-text-muted">
+                              Interface · Dados configurados no Projeto Editorial
+                            </span>
+
+                            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                              {stepPanel.interfaceElements.map((item) => (
+                                <div
+                                  key={item}
+                                  className="flex items-center gap-2.5 rounded-la-md border border-white/10 bg-white/[0.03] px-3.5 py-2.5"
+                                >
+                                  <CheckCircle2
+                                    aria-hidden="true"
+                                    className="h-3.5 w-3.5 shrink-0 text-la-gold"
+                                  />
+                                  <span className="font-la-sans text-[0.8125rem] font-medium text-la-text-primary">
+                                    {item}
+                                  </span>
+                                </div>
+                              ))}
                             </div>
-                          ) : null}
+                          </div>
+                        ) : null}
 
-                          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                            {activeStep.reviewableElements ? (
-                              <div className="rounded-la-md border border-white/10 bg-white/[0.025] p-3.5">
-                                <span className="block font-la-mono text-[0.625rem] font-semibold uppercase tracking-[0.08em] text-la-gold-light">
-                                  Elementos revisáveis
+                        {stepPanel.step === "02" ? (
+                          <div className="flex flex-col gap-3.5">
+                            {stepPanel.userAction ? (
+                              <div className="flex flex-wrap items-center justify-between gap-2 rounded-la-md border border-la-border-gold/45 bg-la-gold-faint px-3.5 py-2.5">
+                                <span className="font-la-mono text-[0.625rem] font-semibold uppercase tracking-[0.08em] text-la-gold-light">
+                                  Ação do usuário
                                 </span>
-                                <ul className="mt-2 flex flex-wrap gap-1.5">
-                                  {activeStep.reviewableElements.map((el) => (
-                                    <li
-                                      key={el}
-                                      className="rounded-la-xs border border-white/10 bg-black/50 px-2 py-0.5 font-la-sans text-[0.75rem] text-la-text-primary"
-                                    >
-                                      {el}
-                                    </li>
-                                  ))}
-                                </ul>
-                              </div>
-                            ) : null}
-
-                            {activeStep.productionCapacityExamples ? (
-                              <div className="rounded-la-md border border-white/10 bg-white/[0.025] p-3.5">
-                                <span className="block font-la-mono text-[0.625rem] font-semibold uppercase tracking-[0.08em] text-la-gold-light">
-                                  Capacidade de produção
-                                </span>
-                                <ul className="mt-2 flex flex-wrap gap-1.5">
-                                  {activeStep.productionCapacityExamples.map(
-                                    (cap) => (
-                                      <li
-                                        key={cap}
-                                        className="rounded-la-xs border border-white/10 bg-black/50 px-2 py-0.5 font-la-sans text-[0.75rem] text-la-text-secondary"
+                                <div className="flex flex-wrap items-center gap-1.5 font-la-mono text-[0.75rem] font-semibold text-la-text-primary">
+                                  {parseFlowChain(stepPanel.userAction).map(
+                                    (actionNode, actionIdx, arr) => (
+                                      <span
+                                        key={actionNode}
+                                        className="inline-flex items-center gap-1.5"
                                       >
-                                        {cap}
-                                      </li>
+                                        <span>{actionNode}</span>
+                                        {actionIdx < arr.length - 1 ? (
+                                          <ArrowRight
+                                            aria-hidden="true"
+                                            className="h-3 w-3 text-la-gold"
+                                          />
+                                        ) : null}
+                                      </span>
                                     )
                                   )}
-                                </ul>
+                                </div>
+                              </div>
+                            ) : null}
+
+                            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                              {stepPanel.reviewableElements ? (
+                                <div className="rounded-la-md border border-white/10 bg-white/[0.025] p-3.5">
+                                  <span className="block font-la-mono text-[0.625rem] font-semibold uppercase tracking-[0.08em] text-la-gold-light">
+                                    Elementos revisáveis
+                                  </span>
+                                  <ul className="mt-2 flex flex-wrap gap-1.5">
+                                    {stepPanel.reviewableElements.map((el) => (
+                                      <li
+                                        key={el}
+                                        className="rounded-la-xs border border-white/10 bg-black/50 px-2 py-0.5 font-la-sans text-[0.75rem] text-la-text-primary"
+                                      >
+                                        {el}
+                                      </li>
+                                    ))}
+                                  </ul>
+                                </div>
+                              ) : null}
+
+                              {stepPanel.productionCapacityExamples ? (
+                                <div className="rounded-la-md border border-white/10 bg-white/[0.025] p-3.5">
+                                  <span className="block font-la-mono text-[0.625rem] font-semibold uppercase tracking-[0.08em] text-la-gold-light">
+                                    Capacidade de produção
+                                  </span>
+                                  <ul className="mt-2 flex flex-wrap gap-1.5">
+                                    {stepPanel.productionCapacityExamples.map(
+                                      (cap) => (
+                                        <li
+                                          key={cap}
+                                          className="rounded-la-xs border border-white/10 bg-black/50 px-2 py-0.5 font-la-sans text-[0.75rem] text-la-text-secondary"
+                                        >
+                                          {cap}
+                                        </li>
+                                      )
+                                    )}
+                                  </ul>
+                                </div>
+                              ) : null}
+                            </div>
+                          </div>
+                        ) : null}
+
+                        {stepPanel.step === "03" ? (
+                          <div className="flex flex-col gap-3.5">
+                            {stepPanel.executionFlow ? (
+                              <div className="rounded-la-md border border-la-border-gold/45 bg-la-gold-faint p-3.5">
+                                <span className="block font-la-mono text-[0.625rem] font-semibold uppercase tracking-[0.08em] text-la-gold-light">
+                                  Fluxo de execução controlado pelo usuário
+                                </span>
+                                <div className="mt-2 flex flex-wrap items-center gap-1.5 font-la-mono text-[0.6875rem] text-la-text-primary">
+                                  {parseFlowChain(stepPanel.executionFlow).map(
+                                    (flowNode, flowIdx, arr) => (
+                                      <span
+                                        key={flowNode}
+                                        className="inline-flex items-center gap-1.5"
+                                      >
+                                        <span className="rounded-la-xs border border-white/15 bg-black/50 px-2 py-0.5">
+                                          {flowNode}
+                                        </span>
+                                        {flowIdx < arr.length - 1 ? (
+                                          <ArrowRight
+                                            aria-hidden="true"
+                                            className="h-3 w-3 shrink-0 text-la-gold"
+                                          />
+                                        ) : null}
+                                      </span>
+                                    )
+                                  )}
+                                </div>
+                              </div>
+                            ) : null}
+
+                            {stepPanel.possibleMaterials ? (
+                              <div>
+                                <span className="block font-la-mono text-[0.625rem] font-semibold uppercase tracking-[0.08em] text-la-text-muted">
+                                  Materiais possíveis no pacote de conteúdo
+                                </span>
+                                <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-4">
+                                  {stepPanel.possibleMaterials.map((mat) => (
+                                    <div
+                                      key={mat}
+                                      className="flex items-center gap-2 rounded-la-md border border-white/10 bg-white/[0.03] px-3 py-2"
+                                    >
+                                      <CheckCircle2
+                                        aria-hidden="true"
+                                        className="h-3 w-3 shrink-0 text-la-gold"
+                                      />
+                                      <span className="font-la-sans text-[0.75rem] font-medium text-la-text-primary">
+                                        {mat}
+                                      </span>
+                                    </div>
+                                  ))}
+                                </div>
                               </div>
                             ) : null}
                           </div>
-                        </div>
-                      ) : null}
-
-                      {/* Conteúdo Específico da Etapa 03: Fluxo Prático + Materiais Possíveis (§09) */}
-                      {activeStep.step === "03" ? (
-                        <div className="flex flex-col gap-3.5">
-                          {activeStep.executionFlow ? (
-                            <div className="rounded-la-md border border-la-border-gold/45 bg-la-gold-faint p-3.5">
-                              <span className="block font-la-mono text-[0.625rem] font-semibold uppercase tracking-[0.08em] text-la-gold-light">
-                                Fluxo de execução controlado pelo usuário
-                              </span>
-                              <div className="mt-2 flex flex-wrap items-center gap-1.5 font-la-mono text-[0.6875rem] text-la-text-primary">
-                                {parseFlowChain(activeStep.executionFlow).map(
-                                  (flowNode, flowIdx, arr) => (
-                                    <span
-                                      key={flowNode}
-                                      className="inline-flex items-center gap-1.5"
-                                    >
-                                      <span className="rounded-la-xs border border-white/15 bg-black/50 px-2 py-0.5">
-                                        {flowNode}
-                                      </span>
-                                      {flowIdx < arr.length - 1 ? (
-                                        <ArrowRight
-                                          aria-hidden="true"
-                                          className="h-3 w-3 shrink-0 text-la-gold"
-                                        />
-                                      ) : null}
-                                    </span>
-                                  )
-                                )}
-                              </div>
-                            </div>
-                          ) : null}
-
-                          {activeStep.possibleMaterials ? (
-                            <div>
-                              <span className="block font-la-mono text-[0.625rem] font-semibold uppercase tracking-[0.08em] text-la-text-muted">
-                                Materiais possíveis no pacote de conteúdo
-                              </span>
-                              <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-4">
-                                {activeStep.possibleMaterials.map((mat) => (
-                                  <div
-                                    key={mat}
-                                    className="flex items-center gap-2 rounded-la-md border border-white/10 bg-white/[0.03] px-3 py-2"
-                                  >
-                                    <CheckCircle2
-                                      aria-hidden="true"
-                                      className="h-3 w-3 shrink-0 text-la-gold"
-                                    />
-                                    <span className="font-la-sans text-[0.75rem] font-medium text-la-text-primary">
-                                      {mat}
-                                    </span>
-                                  </div>
-                                ))}
-                              </div>
-                            </div>
-                          ) : null}
-                        </div>
-                      ) : null}
-                    </motion.div>
-                  </AnimatePresence>
+                        ) : null}
+                      </div>
+                    );
+                  })}
                 </div>
 
-                {/* Direita do Palco (4 cols): Câmara Orbital 3D Girando no Próprio Eixo */}
+                {/* Direita do Palco (4 cols): Câmara Orbital 3D */}
                 <div
                   aria-hidden="true"
                   className="relative flex h-[12.5rem] items-center justify-center rounded-la-lg border border-white/10 bg-[radial-gradient(circle_at_center,rgba(207,169,101,0.16)_0%,rgba(11,14,21,0.94)_62%,#040508_100%)] lg:col-span-4"
                   style={{ perspective: "900px" }}
                 >
-                  {/* Grade sutil de fundo */}
                   <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(to_right,rgba(255,255,255,0.025)_1px,transparent_1px),linear-gradient(to_bottom,rgba(255,255,255,0.025)_1px,transparent_1px)] bg-[size:20px_20px] [mask-image:radial-gradient(ellipse_at_center,black_45%,transparent_85%)]" />
 
-                  {/* Anel Orbital Contínuo */}
                   <motion.div
                     animate={
-                      shouldReduceMotion ? { rotateZ: 0 } : { rotateZ: 360 }
+                      shouldReduceMotion || !isInView
+                        ? { rotateZ: 0 }
+                        : { rotateZ: 360 }
                     }
                     transition={{
                       duration: 24,
@@ -829,10 +799,9 @@ export function HowItWorksSection({
                     className="pointer-events-none absolute h-36 w-36 rounded-la-full border border-dashed border-la-gold/35"
                   />
 
-                  {/* Segundo Anel Orbital 3D */}
                   <motion.div
                     animate={
-                      shouldReduceMotion
+                      shouldReduceMotion || !isInView
                         ? { rotateX: 60, rotateZ: 0 }
                         : { rotateX: 60, rotateZ: -360 }
                     }
@@ -844,10 +813,9 @@ export function HowItWorksSection({
                     className="pointer-events-none absolute h-40 w-40 rounded-la-full border border-white/15 shadow-[0_0_24px_rgba(207,169,101,0.14)]"
                   />
 
-                  {/* Prisma 3D das 3 Etapas da Rotina Oscilando no Próprio Eixo */}
                   <motion.div
                     animate={
-                      shouldReduceMotion
+                      shouldReduceMotion || !isInView
                         ? { rotateX: 24, rotateY: -28, rotateZ: 0 }
                         : {
                             rotateX: [22, 30, 22],
@@ -905,7 +873,7 @@ export function HowItWorksSection({
           </motion.div>
         ) : null}
 
-        {/* 5. Fechamento Canônico da Seção + CTA Principal (/cadastro — §09 de CONTENT-LANDING.md) */}
+        {/* 5. Fechamento Canônico da Seção + CTA Principal (/cadastro) */}
         <motion.div
           initial="hidden"
           whileInView="visible"

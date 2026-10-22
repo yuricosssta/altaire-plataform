@@ -77,6 +77,7 @@ export default function RootLayout({
       className={cn(inter.variable, playfair.variable, dmSerif.variable)}
     >
       <body
+        suppressHydrationWarning
         className={cn(
           "min-h-screen bg-background font-sans text-foreground antialiased"
         )}

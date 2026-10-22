@@ -56,9 +56,8 @@ export function HeroSection({
       ariaLabelledBy={headingId}
       container="max"
       spacing="hero"
-      surface="hero"
-      bottomBorder={true}
-      className={clsx("overflow-hidden", className)}
+      surface="canvas"
+      className={clsx("relative", className)}
     >
       {/* Luz Radial Dourada Concentrada no Topo */}
       <div

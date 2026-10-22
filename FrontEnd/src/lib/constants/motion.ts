@@ -247,8 +247,8 @@ export const MOTION_TRANSITIONS = {
 
 export const MOTION_VIEWPORT = {
   once: true,
-  amount: 0.22,
-  margin: "0px 0px -10% 0px",
+  amount: 0.04,
+  margin: "0px 0px -24px 0px",
 } as const;
 
 /* -------------------------------------------------------------------------- */
