@@ -27,13 +27,14 @@ export default function HomePage() {
   return (
     <div
       data-la-surface="dark"
-      className="flex min-h-screen flex-col bg-la-canvas font-la-sans text-la-text-primary selection:bg-la-gold/25 selection:text-la-gold-light"
+      // Adicionado `w-full max-w-[100vw] overflow-x-hidden` para blindar o eixo X e impedir que o botão hambúrguer vaze da tela.
+      className="flex min-h-screen w-full max-w-[100vw] flex-col overflow-x-hidden bg-la-canvas font-la-sans text-la-text-primary selection:bg-la-gold/25 selection:text-la-gold-light"
     >
       {/* 01. Header Público Canônico */}
       <LandingPageHeader mainContentId="main-content" />
 
       {/* Conteúdo Principal com as Seções 02 a 14 na Ordem Narrativa Canônica */}
-      <main id="main-content" className="relative flex-1">
+      <main id="main-content" className="relative flex-1 w-full max-w-[100vw] overflow-x-hidden">
         {/* 02. Hero Definitivo (#inicio) */}
         <HeroSection />
 

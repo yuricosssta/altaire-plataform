@@ -1,41 +1,85 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { proxyAuthLogin } from '@/lib/auth/authProxy';
-import { success, error, ERROR_CODES } from '@/lib/api/response';
+// FrontEnd/src/app/api/auth/login/route.ts
+import { NextResponse } from "next/server";
+import { cookies } from "next/headers";
+import { loginSchema } from "@/lib/validations/auth";
+import type { AuthResponse, UserSession } from "@/types/auth";
 
-export async function POST(request: NextRequest) {
-  const body = await request.json().catch(() => null);
-  if (!body?.email || !body?.password) {
-    return NextResponse.json(
-      error(ERROR_CODES.VALIDATION_ERROR, 'E-mail e senha são obrigatórios.'),
-      { status: 400 },
-    );
-  }
-
+export async function POST(request: Request) {
   try {
-    const result = await proxyAuthLogin({
-      email: body.email,
-      password: body.password,
-    });
+    const body = await request.json();
+    const result = loginSchema.safeParse(body);
 
-    const response = NextResponse.json(success({
-      access_token: result.token,
-      user: result.user,
-    }));
+    if (!result.success) {
+      return NextResponse.json(
+        { success: false, message: "Dados de login inválidos." },
+        { status: 400 }
+      );
+    }
 
-    response.cookies.set('auth_token', result.token, {
+    const { email, password, rememberMe } = result.data;
+
+    // TODO: Substituir por chamada real ao BackEnd NestJS via fetch()
+    // Simulação temporária de validação
+    if (email === "erro@legionaltaire.com.br") {
+      return NextResponse.json(
+        { success: false, message: "E-mail ou senha incorretos." },
+        { status: 401 }
+      );
+    }
+
+    // Mock de usuário sem projeto editorial
+    const hasProject = email !== "novo@legionaltaire.com.br";
+
+    const mockUser: UserSession = {
+      id: "usr_mock123",
+      email,
+      fullName: "Usuário Mockado",
+      role: "owner",
+      tier: "pro",
+      hasActiveProject: hasProject,
+      activeProjectContext: hasProject
+        ? {
+            id: "prj_abc789",
+            name: "Projeto Principal Altaire",
+            niche: "Tecnologia B2B",
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+          }
+        : null,
+      createdAt: new Date().toISOString(),
+    };
+
+    // Grava o cookie de sessão HTTP-Only seguro
+    const cookieStore = await cookies();
+    cookieStore.set({
+      name: "la_session_token",
+      value: "mock_jwt_token_12345",
       httpOnly: true,
-      sameSite: 'lax',
-      secure: process.env.NODE_ENV === 'production',
-      path: '/',
-      maxAge: 60 * 60 * 24 * 30,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "lax",
+      maxAge: rememberMe ? 60 * 60 * 24 * 30 : 60 * 60 * 24, // 30 dias ou 1 dia
+      path: "/",
     });
 
-    return response;
-  } catch (err: unknown) {
-    const message = err instanceof Error ? err.message : 'Erro ao autenticar';
+    // Lógica Canônica de Roteamento Pós-Login
+    // Sem projeto -> Vai para Base Estratégica (Onboarding)
+    // Com projeto -> Vai para o Dashboard ou Base Estratégica já carregada
+    const redirectUrl = mockUser.hasActiveProject
+      ? "/editorial/base"
+      : "/editorial/base?onboarding=true";
+
+    const responsePayload: AuthResponse = {
+      success: true,
+      user: mockUser,
+      redirectUrl,
+    };
+
+    return NextResponse.json(responsePayload, { status: 200 });
+  } catch (error) {
+    console.error("[LOGIN_ERROR]", error);
     return NextResponse.json(
-      error(ERROR_CODES.UNAUTHORIZED, message),
-      { status: 401 },
+      { success: false, message: "Falha interna no servidor de autenticação." },
+      { status: 500 }
     );
   }
 }

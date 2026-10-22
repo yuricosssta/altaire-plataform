@@ -7,11 +7,10 @@ import {
   useState,
   type MouseEvent as ReactMouseEvent,
 } from "react";
-import { AnimatePresence, motion, useReducedMotion } from "motion/react";
+import { motion, useInView, useReducedMotion } from "motion/react";
 import {
   ArrowDown,
   ArrowRight,
-  Calendar,
   CheckCircle2,
   Compass,
   FileText,
@@ -30,12 +29,8 @@ import {
   type LandingContent,
 } from "@/lib/constants/landing-content";
 import {
-  MOCKUP_SCENE_VARIANTS,
-  MOTION_VIEWPORT,
   REDUCED_MOTION_VARIANTS,
   SECTION_REVEAL_VARIANTS,
-  STAGGER_CONTAINER_VARIANTS,
-  STAGGER_ITEM_VARIANTS,
   STRATEGIC_LINE_VARIANTS,
   selectMotionPreset,
 } from "@/lib/constants/motion";
@@ -46,6 +41,12 @@ export type FunctionsSectionProps = {
 };
 
 const FUNCTION_STAGE_CYCLE_MS = 5200;
+
+const FAST_VIEWPORT = {
+  once: true,
+  amount: 0.04,
+  margin: "0px 0px -24px 0px",
+} as const;
 
 const BASE_FEEDER_INPUTS = [
   "Oferta & Promessa",
@@ -322,12 +323,8 @@ const FUNCTION_03_INSPECTIONS: readonly FunctionStageInspection[] = [
 ] as const;
 
 /**
- * Palco 3D/2.5D Interativo para cada uma das 3 Funções (`FunctionInteractiveStage`).
- * - Inclinação 3D suave ao mover o mouse (`rotateX`, `rotateY`).
- * - Blur radial dourado (`Spotlight`) seguindo o cursor.
- * - Autociclo de 5.2s que pausa imediatamente quando o mouse entra no palco (`isPaused`).
- * - Abas clicáveis com transição deslizante FLIP (`layoutId`) e véu dourado translúcido.
- * - Câmara 3D com geometria distinta para Função 01, Função 02 e Função 03.
+ * Palco 3D/2.5D Interativo com Altura Travada em Grid (`col-start-1 row-start-1`)
+ * e Pausa Automática Fora da Tela (`useInView`) para Zero Layout Shift.
  */
 function FunctionInteractiveStage({
   card,
@@ -353,10 +350,12 @@ function FunctionInteractiveStage({
   });
 
   const stageRef = useRef<HTMLDivElement>(null);
+  const isInView = useInView(stageRef, { amount: 0.2 });
   const shouldReduceMotion = useReducedMotion();
 
+  /* Só avança o ciclo se o palco estiver visível na tela e sem o mouse em cima */
   useEffect(() => {
-    if (shouldReduceMotion || isPaused || inspections.length === 0) {
+    if (shouldReduceMotion || isPaused || !isInView || inspections.length === 0) {
       return;
     }
 
@@ -367,7 +366,7 @@ function FunctionInteractiveStage({
     return () => {
       window.clearInterval(timer);
     };
-  }, [shouldReduceMotion, isPaused, inspections.length]);
+  }, [shouldReduceMotion, isPaused, isInView, inspections.length]);
 
   const handleMouseMove = (event: ReactMouseEvent<HTMLDivElement>) => {
     if (shouldReduceMotion || !stageRef.current) {
@@ -382,8 +381,8 @@ function FunctionInteractiveStage({
     const normalizedY = mouseY / rect.height - 0.5;
 
     setTilt({
-      rotateX: Number((-normalizedY * 4.8).toFixed(2)),
-      rotateY: Number((normalizedX * 5.8).toFixed(2)),
+      rotateX: Number((-normalizedY * 4.5).toFixed(2)),
+      rotateY: Number((normalizedX * 5.5).toFixed(2)),
     });
 
     setSpotlight({
@@ -399,14 +398,6 @@ function FunctionInteractiveStage({
     setSpotlight((prev) => ({ ...prev, opacity: 0 }));
   };
 
-  const sceneVariants = selectMotionPreset(
-    shouldReduceMotion,
-    MOCKUP_SCENE_VARIANTS,
-    REDUCED_MOTION_VARIANTS.mockupScene
-  );
-
-  const activeInspection = inspections[activeIndex] ?? inspections[0];
-
   const StageHeaderIcon =
     card.index === "01" ? Compass : card.index === "02" ? Library : FileText;
 
@@ -417,7 +408,7 @@ function FunctionInteractiveStage({
       onMouseMove={handleMouseMove}
       onMouseLeave={handleMouseLeave}
       style={{ perspective: "1400px" }}
-      className="relative flex h-full w-full select-none flex-col justify-between"
+      className="relative flex h-full w-full select-none flex-col justify-between [overflow-anchor:none]"
     >
       {/* Glow Radial Dourado Profundo atrás do Palco */}
       <div
@@ -428,34 +419,17 @@ function FunctionInteractiveStage({
       <motion.div
         animate={
           shouldReduceMotion
-            ? { rotateX: 0, rotateY: 0, y: 0 }
+            ? { rotateX: 0, rotateY: 0 }
             : {
                 rotateX: tilt.rotateX,
                 rotateY: tilt.rotateY,
-                y: isPaused ? 0 : [0, -3.5, 0],
               }
         }
-        transition={
-          shouldReduceMotion
-            ? { duration: 0 }
-            : {
-                rotateX: {
-                  type: "tween",
-                  duration: 0.22,
-                  ease: [0.16, 1, 0.3, 1],
-                },
-                rotateY: {
-                  type: "tween",
-                  duration: 0.22,
-                  ease: [0.16, 1, 0.3, 1],
-                },
-                y: {
-                  duration: 6.4,
-                  repeat: Infinity,
-                  ease: "easeInOut",
-                },
-              }
-        }
+        transition={{
+          type: "tween",
+          duration: 0.22,
+          ease: [0.16, 1, 0.3, 1],
+        }}
         style={{ transformStyle: "preserve-3d" }}
         className="relative flex h-full flex-col justify-between overflow-hidden rounded-la-xl border border-white/12 bg-[#07090F]/95 shadow-[inset_0_1px_1px_rgba(255,255,255,0.12),0_26px_60px_rgba(0,0,0,0.85),0_0_72px_rgba(207,169,101,0.10)] backdrop-blur-xl"
       >
@@ -494,18 +468,8 @@ function FunctionInteractiveStage({
             </div>
 
             <span className="inline-flex items-center gap-1.5 rounded-la-full border border-la-border-gold/55 bg-la-gold-faint px-2.5 py-0.5 font-la-mono text-[0.625rem] font-medium text-la-gold-light">
-              <motion.span
+              <span
                 aria-hidden="true"
-                animate={
-                  shouldReduceMotion
-                    ? { opacity: 1 }
-                    : { opacity: [0.4, 1, 0.4], scale: [0.92, 1.15, 0.92] }
-                }
-                transition={{
-                  duration: 2.2,
-                  repeat: Infinity,
-                  ease: "easeInOut",
-                }}
                 className="h-1.5 w-1.5 rounded-la-full bg-la-gold shadow-[0_0_8px_#CFA965]"
               />
               <span>{card.publicName}</span>
@@ -520,7 +484,6 @@ function FunctionInteractiveStage({
             />
 
             <div className="relative z-10 grid grid-cols-1 items-center gap-4 sm:grid-cols-12">
-              {/* Esquerda da Câmara (7 cols): Síntese de Amostras da Função */}
               <div className="flex flex-col gap-2 sm:col-span-7">
                 <div className="flex items-center gap-2">
                   <Sparkles
@@ -567,15 +530,18 @@ function FunctionInteractiveStage({
                 </div>
               </div>
 
-              {/* Direita da Câmara (5 cols): Núcleo 3D Girando no Próprio Eixo */}
+              {/* Núcleo 3D Girando no Próprio Eixo */}
               <div
                 aria-hidden="true"
                 className="relative flex h-[9.75rem] items-center justify-center sm:col-span-5"
                 style={{ perspective: "900px" }}
               >
-                {/* Anel Orbital Contínuo */}
                 <motion.div
-                  animate={shouldReduceMotion ? { rotateZ: 0 } : { rotateZ: 360 }}
+                  animate={
+                    shouldReduceMotion || !isInView
+                      ? { rotateZ: 0 }
+                      : { rotateZ: 360 }
+                  }
                   transition={{
                     duration: 24,
                     repeat: Infinity,
@@ -584,10 +550,9 @@ function FunctionInteractiveStage({
                   className="pointer-events-none absolute h-32 w-32 rounded-la-full border border-dashed border-la-gold/35"
                 />
 
-                {/* Segundo Anel Orbital 3D */}
                 <motion.div
                   animate={
-                    shouldReduceMotion
+                    shouldReduceMotion || !isInView
                       ? { rotateX: 60, rotateZ: 0 }
                       : { rotateX: 60, rotateZ: -360 }
                   }
@@ -599,10 +564,9 @@ function FunctionInteractiveStage({
                   className="pointer-events-none absolute h-36 w-36 rounded-la-full border border-white/15 shadow-[0_0_24px_rgba(207,169,101,0.14)]"
                 />
 
-                {/* Prisma 3D de 3 Camadas Oscilando no Próprio Eixo */}
                 <motion.div
                   animate={
-                    shouldReduceMotion
+                    shouldReduceMotion || !isInView
                       ? { rotateX: 24, rotateY: -28, rotateZ: 0 }
                       : {
                           rotateX: [22, 30, 22],
@@ -658,7 +622,7 @@ function FunctionInteractiveStage({
             </div>
           </div>
 
-          {/* 3. Barra de Abas Clicáveis com Moldura FLIP (`layoutId`) e Varredura Dourada */}
+          {/* 3. Barra de Abas Clicáveis com Moldura FLIP (`layoutId`) */}
           <div className="relative z-10 border-b border-white/10 bg-black/45 px-4 py-3 sm:px-5">
             <div
               aria-label={`Camadas operacionais da ${card.categoryTag}`}
@@ -681,7 +645,6 @@ function FunctionInteractiveStage({
                         : "border-white/10 bg-white/[0.02] text-la-text-secondary hover:border-white/25 hover:bg-white/[0.04]"
                     )}
                   >
-                    {/* Moldura Deslizante FLIP (`layoutId`) */}
                     {isSelected ? (
                       <motion.div
                         layoutId={`function-${card.index}-active-tab`}
@@ -697,8 +660,7 @@ function FunctionInteractiveStage({
                       />
                     ) : null}
 
-                    {/* Véu Dourado Translúcido + Filete Inferior Dourado Embutido */}
-                    {isSelected && !shouldReduceMotion && !isPaused ? (
+                    {isSelected && !shouldReduceMotion && !isPaused && isInView ? (
                       <motion.div
                         key={`fn-${card.index}-sweep-${activeIndex}`}
                         aria-hidden="true"
@@ -740,63 +702,68 @@ function FunctionInteractiveStage({
             </div>
           </div>
 
-          {/* 4. Painel Dinâmico de Evidência da Camada Ativa */}
-          <div className="relative z-10 p-4 sm:p-5">
-            <AnimatePresence mode="wait">
-              <motion.div
-                key={activeInspection.code}
-                initial="enter"
-                animate="center"
-                exit="exit"
-                variants={sceneVariants}
-                className="flex flex-col gap-3.5"
-              >
-                <div className="flex flex-col gap-1 border-b border-white/10 pb-3">
-                  <div className="flex flex-wrap items-center justify-between gap-2">
-                    <span className="font-la-mono text-[0.625rem] font-semibold uppercase tracking-[0.08em] text-la-gold-light">
-                      {activeInspection.code} · {activeInspection.tabLabel}
-                    </span>
-                    <span className="rounded-la-full border border-white/10 bg-black/50 px-2.5 py-0.5 font-la-mono text-[0.625rem] text-la-text-secondary">
-                      Projeto Editorial Ativo
-                    </span>
-                  </div>
+          {/* 4. Painel de Evidência Travado em Célula Única de Grid (Altura 100% Fixa e Imutável) */}
+          <div className="relative z-10 grid grid-cols-1 p-4 sm:p-5">
+            {inspections.map((inspectionItem, idx) => {
+              const isCurrent = activeIndex === idx;
 
-                  <h4 className="mt-1 font-la-sans text-[0.9375rem] font-semibold text-la-text-primary">
-                    {activeInspection.headline}
-                  </h4>
-
-                  <p className="w-full text-justify [text-align-last:left] hyphens-auto font-la-sans text-[0.8125rem] leading-[1.55] text-la-text-secondary">
-                    {activeInspection.description}
-                  </p>
-                </div>
-
-                {/* 3 Cards de Evidência Operacional */}
-                <div className="grid grid-cols-1 gap-2.5">
-                  {activeInspection.items.map((item) => (
-                    <div
-                      key={item.tag}
-                      className="flex items-start justify-between gap-3 rounded-la-md border border-white/10 bg-white/[0.025] px-3.5 py-2.5 transition-colors hover:border-white/20"
-                    >
-                      <div className="min-w-0 flex-1">
-                        <span className="font-la-mono text-[0.5625rem] font-semibold uppercase tracking-[0.08em] text-la-gold-light">
-                          {item.tag}
-                        </span>
-                        <p className="mt-0.5 font-la-sans text-[0.8125rem] font-semibold leading-[1.35] text-la-text-primary">
-                          {item.title}
-                        </p>
-                        <p className="mt-0.5 w-full text-justify [text-align-last:left] hyphens-auto font-la-sans text-[0.75rem] leading-[1.45] text-la-text-secondary">
-                          {item.detail}
-                        </p>
-                      </div>
-
-                      <span className="shrink-0 rounded-la-full border border-white/10 bg-black/50 px-2 py-0.5 font-la-mono text-[0.5625rem] text-la-gold-light">
-                        {item.status}
+              return (
+                <div
+                  key={inspectionItem.code}
+                  aria-hidden={!isCurrent}
+                  className={clsx(
+                    "col-start-1 row-start-1 flex flex-col gap-3.5 transition-opacity duration-250",
+                    isCurrent
+                      ? "relative z-10 opacity-100"
+                      : "pointer-events-none z-0 opacity-0 select-none"
+                  )}
+                >
+                  <div className="flex flex-col gap-1 border-b border-white/10 pb-3">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <span className="font-la-mono text-[0.625rem] font-semibold uppercase tracking-[0.08em] text-la-gold-light">
+                        {inspectionItem.code} · {inspectionItem.tabLabel}
+                      </span>
+                      <span className="rounded-la-full border border-white/10 bg-black/50 px-2.5 py-0.5 font-la-mono text-[0.625rem] text-la-text-secondary">
+                        Projeto Editorial Ativo
                       </span>
                     </div>
-                  ))}
+
+                    <h4 className="mt-1 font-la-sans text-[0.9375rem] font-semibold text-la-text-primary">
+                      {inspectionItem.headline}
+                    </h4>
+
+                    <p className="w-full text-justify [text-align-last:left] hyphens-auto font-la-sans text-[0.8125rem] leading-[1.55] text-la-text-secondary">
+                      {inspectionItem.description}
+                    </p>
+                  </div>
+
+                  <div className="grid grid-cols-1 gap-2.5">
+                    {inspectionItem.items.map((item) => (
+                      <div
+                        key={item.tag}
+                        className="flex items-start justify-between gap-3 rounded-la-md border border-white/10 bg-white/[0.025] px-3.5 py-2.5 transition-colors hover:border-white/20"
+                      >
+                        <div className="min-w-0 flex-1">
+                          <span className="font-la-mono text-[0.5625rem] font-semibold uppercase tracking-[0.08em] text-la-gold-light">
+                            {item.tag}
+                          </span>
+                          <p className="mt-0.5 font-la-sans text-[0.8125rem] font-semibold leading-[1.35] text-la-text-primary">
+                            {item.title}
+                          </p>
+                          <p className="mt-0.5 w-full text-justify [text-align-last:left] hyphens-auto font-la-sans text-[0.75rem] leading-[1.45] text-la-text-secondary">
+                            {item.detail}
+                          </p>
+                        </div>
+
+                        <span className="shrink-0 rounded-la-full border border-white/10 bg-black/50 px-2 py-0.5 font-la-mono text-[0.5625rem] text-la-gold-light">
+                          {item.status}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
                 </div>
-              </motion.div>
-            </AnimatePresence>
+              );
+            })}
           </div>
         </div>
 
@@ -818,16 +785,6 @@ function FunctionInteractiveStage({
 
 /**
  * Seção 08 — Três Funções (`id="funcoes"`).
- *
- * Referências dominantes: Linear (precisão operacional) + Attio (produto como evidência) + Resend (física 3D no escuro).
- * Intensidade: 3/5 | Profundidade: Nível 2 (Elevado).
- *
- * Regras inegociáveis (Etapa 2D §4.7, CONTENT-LANDING.md §08 & ACCEPTANCE-LANDING.md §21):
- * - Eyebrow estritamente canônico: "O QUE O LEGION ALTAIRE ORGANIZA".
- * - Apresenta FUNÇÃO 01 — DIREÇÃO, FUNÇÃO 02 — TEMAS E ÂNGULOS e FUNÇÃO 03 — PRODUÇÃO E ATIVOS sem tripla repetição de rótulo.
- * - O benefício principal de cada função aparece antes da explicação funcional.
- * - Inclui as 3 origens e a nota da Biblioteca na Função 02, e o Contexto preservado na Função 03.
- * - Textos justificados em todas as dimensões (`text-justify [text-align-last:left] hyphens-auto`).
  */
 export function FunctionsSection({
   content = landingContent.functions,
@@ -839,18 +796,6 @@ export function FunctionsSection({
   const revealVariants = selectMotionPreset(
     shouldReduceMotion,
     SECTION_REVEAL_VARIANTS,
-    REDUCED_MOTION_VARIANTS.reveal
-  );
-
-  const staggerContainerVariants = selectMotionPreset(
-    shouldReduceMotion,
-    STAGGER_CONTAINER_VARIANTS,
-    REDUCED_MOTION_VARIANTS.reveal
-  );
-
-  const staggerItemVariants = selectMotionPreset(
-    shouldReduceMotion,
-    STAGGER_ITEM_VARIANTS,
     REDUCED_MOTION_VARIANTS.reveal
   );
 
@@ -891,16 +836,15 @@ export function FunctionsSection({
       className={clsx("relative [color-scheme:dark]", className)}
     >
       <div className="flex flex-col gap-10 lg:gap-14">
-        {/* 1. Cabeçalho Editorial Equilibrado (Sem prefixo inventado no Eyebrow) */}
+        {/* 1. Cabeçalho Editorial Equilibrado */}
         <motion.div
           initial="hidden"
           whileInView="visible"
-          viewport={MOTION_VIEWPORT}
+          viewport={FAST_VIEWPORT}
           variants={revealVariants}
           className="grid grid-cols-1 items-center gap-6 lg:grid-cols-12 lg:gap-10"
         >
           <div className="flex flex-col items-start lg:col-span-7">
-            {/* Eyebrow Canônico: "O QUE O LEGION ALTAIRE ORGANIZA" */}
             <SectionEyebrow label={content.eyebrow} variant="pill" />
 
             {content.headline ? (
@@ -938,11 +882,11 @@ export function FunctionsSection({
           </div>
         </motion.div>
 
-        {/* 2. Barramento Alimentador: Projeto Editorial & Base Estratégica (Núcleo, nunca 4ª função) */}
+        {/* 2. Barramento Alimentador: Projeto Editorial & Base Estratégica */}
         <motion.div
           initial="hidden"
           whileInView="visible"
-          viewport={MOTION_VIEWPORT}
+          viewport={FAST_VIEWPORT}
           variants={revealVariants}
           className="relative overflow-hidden rounded-la-xl border border-la-border-gold/45 bg-la-surface-1/90 p-5 shadow-[var(--la-elevation-1)] sm:p-6"
         >
@@ -994,14 +938,8 @@ export function FunctionsSection({
           </div>
         </motion.div>
 
-        {/* 3. Os Três Grandes Blocos Conectados (Função 01, Função 02 e Função 03) */}
-        <motion.div
-          initial="hidden"
-          whileInView="visible"
-          viewport={MOTION_VIEWPORT}
-          variants={staggerContainerVariants}
-          className="relative flex flex-col gap-8 lg:gap-10"
-        >
+        {/* 3. Os Três Grandes Blocos Conectados (Cada função anima individualmente ao entrar na tela!) */}
+        <div className="relative flex flex-col gap-8 lg:gap-10">
           {content.cards.map((card, idx) => {
             const isFunction03 = card.index === "03";
             const stageInspections = resolveInspections(card.index);
@@ -1009,11 +947,13 @@ export function FunctionsSection({
             return (
               <motion.article
                 key={card.index}
-                variants={staggerItemVariants}
+                initial="hidden"
+                whileInView="visible"
+                viewport={FAST_VIEWPORT}
+                variants={revealVariants}
                 aria-label={`${card.categoryTag} — ${card.publicName}`}
                 className="relative flex flex-col"
               >
-                {/* Conector Vertical do Fio Estratégico entre os blocos */}
                 {idx > 0 ? (
                   <div
                     aria-hidden="true"
@@ -1044,10 +984,9 @@ export function FunctionsSection({
                   ) : null}
 
                   <div className="grid grid-cols-1 items-stretch gap-8 lg:grid-cols-12 lg:gap-10">
-                    {/* Coluna Editorial da Função (5 cols): Identificação Única -> Título -> Benefício -> Texto -> Escopo/Origens -> Resultado */}
+                    {/* Coluna Editorial da Função (5 cols) */}
                     <div className="flex flex-col justify-between gap-6 lg:col-span-5">
                       <div className="flex flex-col items-start">
-                        {/* Identificação Secundária Única (Sem tripla repetição) */}
                         <div className="flex items-center gap-2.5">
                           <span className="inline-flex h-7 w-7 items-center justify-center rounded-la-sm border border-la-border-gold bg-la-gold-faint font-la-mono text-[0.75rem] font-semibold text-la-gold-light">
                             {card.index}
@@ -1057,12 +996,10 @@ export function FunctionsSection({
                           </span>
                         </div>
 
-                        {/* Título Público Canônico (`card.publicName`) */}
                         <h3 className="mt-3.5 text-balance font-la-sans text-[1.5rem] font-semibold leading-[1.2] tracking-[-0.022em] text-la-text-primary sm:text-[1.75rem]">
                           {card.publicName}
                         </h3>
 
-                        {/* Benefício Principal ANTES da descrição funcional (Regra Canônica §08) */}
                         <div className="mt-4 w-full rounded-la-md border border-la-border-gold/45 bg-la-gold-faint px-4 py-3.5">
                           <span className="block font-la-mono text-[0.625rem] font-semibold uppercase tracking-[0.08em] text-la-gold-light">
                             Benefício principal
@@ -1072,12 +1009,10 @@ export function FunctionsSection({
                           </p>
                         </div>
 
-                        {/* Texto Funcional Canônico Justificado */}
                         <p className="mt-4 w-full text-justify [text-align-last:left] hyphens-auto font-la-sans text-[0.9375rem] leading-[1.68] text-la-text-secondary">
                           {card.description}
                         </p>
 
-                        {/* Se a função possuir as 3 Origens + Biblioteca (Função 02 — CONTENT-LANDING.md §08) */}
                         {card.origins && card.origins.length > 0 ? (
                           <div className="mt-5 flex w-full flex-col gap-2.5 border-t border-white/10 pt-4">
                             <span className="font-la-mono text-[0.625rem] font-semibold uppercase tracking-[0.08em] text-la-text-muted">
@@ -1110,7 +1045,6 @@ export function FunctionsSection({
                             ) : null}
                           </div>
                         ) : (
-                          /* Grade de Itens Organizados / Pacote de Execução (Funções 01 e 03) */
                           <div className="mt-5 w-full border-t border-white/10 pt-4">
                             <span className="font-la-mono text-[0.625rem] font-semibold uppercase tracking-[0.08em] text-la-text-muted">
                               {card.highlightsLabel}
@@ -1132,7 +1066,6 @@ export function FunctionsSection({
                           </div>
                         )}
 
-                        {/* Contexto Preservado (Exclusivo da Função 03 — CONTENT-LANDING.md §08) */}
                         {card.preservedContext ? (
                           <div className="mt-4 w-full rounded-la-md border border-white/10 bg-black/40 px-4 py-3">
                             <span className="block font-la-mono text-[0.625rem] font-semibold uppercase tracking-[0.08em] text-la-gold-light">
@@ -1145,7 +1078,6 @@ export function FunctionsSection({
                         ) : null}
                       </div>
 
-                      {/* Resultado Canônico da Função (`card.resultText`) */}
                       <div className="rounded-la-md border border-white/10 bg-black/55 px-4 py-3.5">
                         <div className="flex items-center gap-2">
                           <Sparkles
@@ -1174,13 +1106,13 @@ export function FunctionsSection({
               </motion.article>
             );
           })}
-        </motion.div>
+        </div>
 
-        {/* 4. Faixa de Continuidade do Sistema (Microcopy Canônica §08: "Base Estratégica → Direção → Temas → Execução.") */}
+        {/* 4. Faixa de Continuidade do Sistema */}
         <motion.div
           initial="hidden"
           whileInView="visible"
-          viewport={MOTION_VIEWPORT}
+          viewport={FAST_VIEWPORT}
           variants={revealVariants}
           className="flex flex-col gap-3 rounded-la-xl border border-white/12 bg-la-surface-1/85 px-5 py-4 sm:px-6"
         >
@@ -1242,7 +1174,7 @@ export function FunctionsSection({
               strokeWidth="2"
               initial="hidden"
               whileInView="visible"
-              viewport={MOTION_VIEWPORT}
+              viewport={FAST_VIEWPORT}
               variants={lineVariants}
             />
           </svg>
