@@ -59,6 +59,9 @@ class CalendarItemSubDoc {
   @Prop()
   theme?: string;
 
+  @Prop({ type: Types.ObjectId, ref: 'EditorialTheme' })
+  themeId?: Types.ObjectId;
+
   @Prop()
   referenceUrl?: string;
 

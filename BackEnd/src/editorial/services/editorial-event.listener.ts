@@ -60,4 +60,26 @@ export class EditorialEventListener {
       `Calendário duplicado — novo ${calendarId} (original: ${payload.metadata?.originalId}) no projeto ${payload.projectId}`,
     );
   }
+
+  @OnEvent(EDITORIAL_EVENTS.THEME_GENERATED)
+  handleThemeGenerated(payload: EditorialEventPayload): void {
+    const count = payload.metadata?.count ?? 0;
+    this.logger.log(
+      `Temas gerados — lote ${payload.entityId} (${count} temas, modo ${payload.metadata?.mode}) no projeto ${payload.projectId}`,
+    );
+  }
+
+  @OnEvent(EDITORIAL_EVENTS.SCRIPT_CREATED)
+  handleScriptCreated(payload: EditorialEventPayload): void {
+    this.logger.log(
+      `Roteiro criado — ${payload.entityId} (${payload.metadata?.format}) no projeto ${payload.projectId}, por: ${payload.triggeredBy}`,
+    );
+  }
+
+  @OnEvent(EDITORIAL_EVENTS.SCRIPT_GENERATED)
+  handleScriptGenerated(payload: EditorialEventPayload): void {
+    this.logger.log(
+      `Roteiro gerado — ${payload.entityId} (${payload.metadata?.blocks ?? 0} blocos) no projeto ${payload.projectId}`,
+    );
+  }
 }

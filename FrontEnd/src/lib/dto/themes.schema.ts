@@ -72,6 +72,8 @@ export const ThemeSchema = z.object({
   flags: z.array(ThemeFlagSchema).optional(),
   sourceContext: z.string().optional(),
   batchId: z.string().optional(),
+  angle: z.string().optional(),
+  approach: z.string().optional(),
   createdAt: z.coerce.date(),
   updatedAt: z.coerce.date(),
 });
@@ -86,6 +88,8 @@ export const ThemeUpdateSchema = z.object({
   platforms: z.array(PlatformSchema).optional(),
   status: ThemeStatusSchema.optional(),
   flags: z.array(ThemeFlagSchema).optional(),
+  angle: z.string().optional(),
+  approach: z.string().optional(),
 });
 
 // ===== Parâmetros de geração por modo =====

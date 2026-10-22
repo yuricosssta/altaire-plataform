@@ -172,6 +172,7 @@ export const CalendarItemSchema = z.object({
   objective: z.string(),
   suggestedTime: z.string(),
   theme: z.string().optional(),
+  themeId: objectIdSchema.optional(),
   referenceUrl: z.string().optional(),
   status: CalendarStatusSchema,
   provisionalName: z.string().optional(),
@@ -303,14 +304,7 @@ export type CalendarItemUpdate = z.infer<typeof CalendarItemUpdateSchema>;
 
 // ===== Função 03 – Roteiros por Formato =====
 
-export const ScriptFormatSchema = z.enum([
-  'video_curto',
-  'video_longo',
-  'live',
-  'carrossel',
-  'post_estatico',
-  'stories_sequence',
-]);
+export const ScriptFormatSchema = ContentFormatSchema;
 
 export const ScriptModeSchema = z.enum(['seguranca', 'conexao']);
 
@@ -545,6 +539,13 @@ export const BrandStorySchema = z.object({
   updatedAt: z.coerce.date(),
 });
 
+export const BrandStoryUpsertSchema = BrandStorySchema.omit({
+  id: true,
+  organizationId: true,
+  userId: true,
+  updatedAt: true,
+}).partial();
+
 export const GenerationRequestSchema = z.object({
   scriptId: objectIdSchema,
   briefing: ScriptBriefingSchema,
@@ -592,6 +593,7 @@ export type Script = z.infer<typeof ScriptSchema>;
 export type CalendarSlotForScript = z.infer<typeof CalendarSlotForScriptSchema>;
 export type ThemeForScript = z.infer<typeof ThemeForScriptSchema>;
 export type BrandStory = z.infer<typeof BrandStorySchema>;
+export type BrandStoryUpsert = z.infer<typeof BrandStoryUpsertSchema>;
 export type GenerationRequest = z.infer<typeof GenerationRequestSchema>;
 export type GenerationProgress = z.infer<typeof GenerationProgressSchema>;
 export type GenerationResult = z.infer<typeof GenerationResultSchema>;

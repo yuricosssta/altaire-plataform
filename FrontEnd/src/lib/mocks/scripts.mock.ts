@@ -1,47 +1,55 @@
 import { BrandStory } from "../dto/editorial.schema";
 
 export const FORMAT_LABELS: Record<string, string> = {
+  reel: 'Reels / Vídeo Curto',
+  long_video: 'Vídeo Longo',
+  carousel: 'Carrossel',
+  static_post: 'Post Estático',
+  live: 'Live',
+  stories_sequence: 'Sequência de Stories',
   video_curto: 'Vídeo Curto',
-  video_medio: 'Vídeo Médio',
   video_longo: 'Vídeo Longo',
-  podcast: 'Podcast',
-  artigo: 'Artigo',
-  post_blog: 'Post Blog',
-  news: 'Newsletter',
-  social: 'Social Media',
+  carrossel: 'Carrossel',
+  post_estatico: 'Post Estático',
 };
 
 export const FORMAT_DESCRIPTIONS: Record<string, string> = {
+  reel: '30-60 segundos',
+  long_video: '8-15 minutos',
+  carousel: 'Carrossel informativo',
+  static_post: 'Imagem única ou texto',
+  live: 'Transmissão ao vivo',
+  stories_sequence: 'Sequência de 4 etapas',
   video_curto: '30-60 segundos',
-  video_medio: '2-5 minutos',
   video_longo: '8-15 minutos',
-  podcast: 'Áudio',
-  artigo: 'Texto longo',
-  post_blog: 'Texto médio',
-  news: 'E-mail',
-  social: 'Redes sociais',
+  carrossel: 'Carrossel informativo',
+  post_estatico: 'Imagem única ou texto',
 };
 
 export const FORMAT_ICONS: Record<string, string> = {
+  reel: 'Video',
+  long_video: 'Video',
+  carousel: 'FileText',
+  static_post: 'FileText',
+  live: 'Radio',
+  stories_sequence: 'Layers',
   video_curto: 'Video',
-  video_medio: 'Video',
   video_longo: 'Video',
-  podcast: 'Podcast',
-  artigo: 'FileText',
-  post_blog: 'FileText',
-  news: 'Mail',
-  social: 'MessageCircle',
+  carrossel: 'FileText',
+  post_estatico: 'FileText',
 };
 
 export const FORMAT_ROUTE: Record<string, string> = {
-  video_curto: 'video-curto',
-  video_medio: 'video-medio',
-  video_longo: 'video-longo',
-  podcast: 'podcast',
-  artigo: 'artigo',
-  post_blog: 'post-blog',
-  news: 'newsletter',
-  social: 'social',
+  reel: 'reel',
+  long_video: 'long_video',
+  carousel: 'carousel',
+  static_post: 'static_post',
+  live: 'live',
+  stories_sequence: 'stories_sequence',
+  video_curto: 'reel',
+  video_longo: 'long_video',
+  carrossel: 'carousel',
+  post_estatico: 'static_post',
 };
 
 export const mockScripts: Record<string, any[]> = {};
