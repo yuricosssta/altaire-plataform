@@ -10,8 +10,11 @@ import {
 } from '@nestjs/common';
 import { AuthGuard } from '../../auth/auth.guard';
 import { ZodValidationPipe } from '../../shared/pipe/zod-validation.pipe';
-import { GetUser } from '../../shared/decorators/get-user-decorator';
-import { EditorialCalendarService } from '../services/editorial-calendar.service';
+import {
+  EditorialCalendarService,
+  CalendarSetup,
+} from '../services/editorial-calendar.service';
+import { IUpdateEditorialCalendar } from '../schemas/models/editorial-calendar.interface';
 import {
   calendarSetupSchema,
   calendarPatchSchema,
@@ -38,7 +41,7 @@ export class EditorialCalendarController {
     @Param('projectId') projectId: string,
     @Body(new ZodValidationPipe(calendarSetupSchema)) data: CalendarSetupInput,
   ) {
-    return this.calendarService.create(projectId, data);
+    return this.calendarService.create(projectId, data as CalendarSetup);
   }
 
   @Get('calendars/:calendarId')
@@ -51,7 +54,10 @@ export class EditorialCalendarController {
     @Param('calendarId') calendarId: string,
     @Body(new ZodValidationPipe(calendarPatchSchema)) data: CalendarPatchInput,
   ) {
-    return this.calendarService.update(calendarId, data);
+    return this.calendarService.update(
+      calendarId,
+      data as IUpdateEditorialCalendar,
+    );
   }
 
   @Delete('calendars/:calendarId')
