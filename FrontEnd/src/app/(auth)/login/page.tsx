@@ -288,7 +288,8 @@ export default function LoginPage() {
       return;
     }
 
-    const destination = data.redirectUrl || "/editorial/base";
+    // const destination = data.redirectUrl || "/editorial/base";
+    const destination = data.redirectUrl || "/dashboard";
     setAuthSuccessMessage(
       data.user?.hasActiveProject
         ? "Sessão autenticada. Carregando seu Projeto Editorial ativo..."

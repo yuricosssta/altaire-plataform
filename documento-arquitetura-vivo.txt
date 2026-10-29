@@ -1,3 +1,34 @@
+## OTIMIZAÇÃO DE AMBIENTE E CONTAINERS (WSL2 / DOCKER / VSCODE) - 29/10/2026 ##
+Resumo Técnico — Resolução de Sobrecarga, Concorrência de I/O e Travamento do VSCode:
+
+1. Diagnóstico de Gargalos (WSL2 + Docker Desktop):
+   - Concorrência de CPU e RAM no WSL2: ambiente com recursos limitados compartilhados entre VSCode Server, TypeScript Server e containers Docker.
+   - Tempestade de I/O por Bind Mounts Amplos: a montagem integral de `./BackEnd:/app` e `./FrontEnd:/app` forçava a sincronização contínua de pastas pesadas (`node_modules`, `.next`, `dist`, `tsconfig.tsbuildinfo`), gerando inotify flood e travamentos no host ao salvar arquivos.
+   - Envio Excessivo de Contexto Docker: ausência de `.dockerignore` nos subprojetos causava envio de mais de 1.14 GB ao Docker Daemon por build.
+   - Webpack Dev Overhead: Next.js 15 em modo padrão consumia picos elevados de RAM e CPU no Hot Module Reload (HMR).
+   - Bloqueio EBUSY no NestJS: `"deleteOutDir": true` no `nest-cli.json` tentava executar `rmdir` em diretórios de compilação montados.
+
+2. Ações Implementadas:
+   - Volumes Cirúrgicos em `docker-compose.dev.yml`:
+     - Bind mount restrito ao código-fonte: `./BackEnd/src:/app/src`, `./FrontEnd/src:/app/src` e `./FrontEnd/public:/app/public`.
+     - `node_modules`, `.next` e `dist` mantidos 100% no filesystem nativo OverlayFS dos containers, sem tráfego de I/O cruzado com o host.
+   - Tetos Rígidos de Recursos (CPU e RAM) no Docker Compose:
+     - Frontend: `cpus: 1.5`, `mem_limit: 1536m`, `memswap_limit: 1536m`, `NODE_OPTIONS=--max-old-space-size=1024`.
+     - Backend: `cpus: 1.0`, `mem_limit: 1g`, `memswap_limit: 1g`, `NODE_OPTIONS=--max-old-space-size=768`.
+     - Reserva garantida para o host: containers limitados a no máximo 2.5 vCPUs de 4.0 disponíveis, garantindo 1.5 vCPUs e folga de memória dedicada ao VSCode.
+   - Turbopack no Frontend (`FrontEnd/Dockerfile.dev`):
+     - Comando de execução alterado para `pnpm dev --turbopack --disable-source-maps`, reduzindo drasticamente o tempo de compilação incremental e consumo de memória.
+   - Correção de EBUSY e Pré-aquecimento do Backend (`BackEnd/Dockerfile.dev` e `nest-cli.json`):
+     - `BackEnd/nest-cli.json`: alterado para `"deleteOutDir": false`, evitando tentativa de remoção da raiz de compilação.
+     - `BackEnd/Dockerfile.dev`: adicionados `COPY src ./src` e `RUN pnpm run build` na geração da imagem para pré-aquecer `dist/` e `tsconfig.build.tsbuildinfo`. O `nest start --watch` passa a iniciar incrementalmente em ~2s.
+     - `BackEnd/tsconfig.json`: desativadas declarações e source-maps em compilação de desenvolvimento (`"declaration": false`, `"sourceMap": false`), com exclusão explícita de `dist`, `node_modules` e `coverage`.
+   - Criação de `.dockerignore` e Cache BuildKit:
+     - Criados `BackEnd/.dockerignore` e `FrontEnd/.dockerignore` (ignorando dependências, builds, logs e arquivos de ambiente), reduzindo o envio de contexto de build de ~1.14 GB para ~3 MB.
+     - BuildKit Cache Mount (`--mount=type=cache,target=/pnpm/store`) nos Dockerfiles para otimizar reinstalações do `pnpm`.
+   - Proteção de Watcher e Indexação no Editor (`.vscode/settings.json`):
+     - Inclusão de `files.watcherExclude` e `search.exclude` para pastas geradas (`.next`, `dist`, `node_modules`, `coverage`, `*.tsbuildinfo`).
+     - Teto de memória ajustado para `typescript.tsserver.maxTsServerMemory: 768` e desativação de autodetecção de tasks desnecessárias.
+
 ## SPRINT 13 - 20/10/2026 ##
 Resumo Técnico de Fechamento
 
