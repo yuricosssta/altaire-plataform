@@ -1,7 +1,7 @@
 //src/components/editorial/NewProjectDialog.tsx
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Loader2, Plus } from 'lucide-react';
@@ -20,10 +20,17 @@ import { editorialService } from '@/lib/services/editorialService';
 
 interface NewProjectDialogProps {
   onCreated: (project: any) => void;
+  autoOpen?: boolean;
 }
 
-export function NewProjectDialog({ onCreated }: NewProjectDialogProps) {
+export function NewProjectDialog({ onCreated, autoOpen = false }: NewProjectDialogProps) {
   const [open, setOpen] = useState(false);
+
+  useEffect(() => {
+    if (autoOpen) {
+      setOpen(true);
+    }
+  }, [autoOpen]);
 
   const {
     register,

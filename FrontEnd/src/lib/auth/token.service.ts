@@ -54,7 +54,10 @@ export async function getAuthTokenFromRequest(request: Request): Promise<string 
   }
 
   const cookieStore = await cookies();
-  const cookie = cookieStore.get('auth_token')?.value;
+  const cookie =
+    cookieStore.get('auth_token')?.value ||
+    cookieStore.get('access_token')?.value ||
+    cookieStore.get('la_session_token')?.value;
   if (cookie) return cookie;
 
   return null;

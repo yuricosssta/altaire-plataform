@@ -20,9 +20,18 @@ const initialState: UserState = {
 
 export const fetchUserProfile = createAsyncThunk<IUser>(
   'user/fetchProfile',
-  async () => {
-    const response = await http.get('/users/profile');
-    return response.data;
+  async (_, { getState }) => {
+    const state = getState() as { auth?: { token?: string | null } };
+    const token = state.auth?.token;
+    const res = await fetch('/api/auth/profile', {
+      headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+      credentials: 'include',
+    });
+    if (!res.ok) {
+      throw new Error('Falha ao buscar perfil');
+    }
+    const json = await res.json();
+    return (json?.data ?? json) as IUser;
   }
 );
 

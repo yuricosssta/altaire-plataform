@@ -11,7 +11,12 @@ import {
 } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { useDispatch } from "react-redux";
 import { AnimatePresence, motion, useInView, useReducedMotion } from "motion/react";
+import { AppDispatch } from "@/lib/redux/store";
+import { setAuthState } from "@/lib/redux/slices/authSlice";
+import { fetchUserProfile } from "@/lib/redux/slices/userSlice";
+import { fetchMyOrganizations } from "@/lib/redux/slices/organizationSlice";
 import {
   AlertCircle,
   ArrowLeft,
@@ -143,6 +148,7 @@ function MicrosoftBrandIcon() {
  */
 export default function LoginPage() {
   const router = useRouter();
+  const dispatch = useDispatch<AppDispatch>();
   const shouldReduceMotion = useReducedMotion();
 
   const [formData, setFormData] = useState<LoginFormData>({
@@ -288,16 +294,22 @@ export default function LoginPage() {
       return;
     }
 
-    // const destination = data.redirectUrl || "/editorial/base";
-    const destination = data.redirectUrl || "/dashboard";
+    if (data.token) {
+      localStorage.setItem("token", data.token);
+      dispatch(setAuthState({ token: data.token }));
+      dispatch(fetchUserProfile());
+      dispatch(fetchMyOrganizations());
+    }
+
+    const destination = data.redirectUrl || "/dashboard/editorial";
     setAuthSuccessMessage(
       data.user?.hasActiveProject
         ? "Sessão autenticada. Carregando seu Projeto Editorial ativo..."
-        : "Sessão autenticada. Redirecionando para a estruturação do seu primeiro Projeto Editorial..."
+        : "Sessão autenticada. Redirecionando para a criação do seu primeiro Projeto Editorial..."
     );
 
     window.setTimeout(() => {
-      router.push(destination);
+      window.location.assign(destination);
     }, 550);
   };
 

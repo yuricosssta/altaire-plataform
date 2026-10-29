@@ -2,7 +2,6 @@
 "use client";
 
 import {
-  useEffect,
   useMemo,
   useRef,
   useState,
@@ -12,23 +11,20 @@ import {
 } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { useDispatch } from "react-redux";
 import { AnimatePresence, motion, useInView, useReducedMotion } from "motion/react";
 import {
   AlertCircle,
   ArrowLeft,
   ArrowRight,
-  Briefcase,
   Check,
   CheckCircle2,
-  Compass,
   Eye,
   EyeOff,
-  FolderKanban,
   KeyRound,
   Layers,
   Lock,
   Mail,
-  Phone,
   ShieldCheck,
   Sparkles,
   Target,
@@ -38,59 +34,20 @@ import { clsx } from "clsx";
 import LogoBloco from "@/components/LogoBloco";
 import { ROUTES } from "@/lib/constants/routes";
 import {
-  onboardingSchema,
   registerSchema,
-  type OnboardingFormData,
   type RegisterFormData,
 } from "@/lib/validations/auth";
 import type { AuthResponse } from "@/types/auth";
+import { AppDispatch } from "@/lib/redux/store";
+import { setAuthState } from "@/lib/redux/slices/authSlice";
+import { fetchUserProfile } from "@/lib/redux/slices/userSlice";
+import { fetchMyOrganizations } from "@/lib/redux/slices/organizationSlice";
 
-type RegistrationStep = 1 | 2 | 3;
-
-type OperationProfileOption = {
-  readonly id: string;
-  readonly label: string;
-  readonly subtitle: string;
-};
-
-const OPERATION_PROFILES: readonly OperationProfileOption[] = [
-  {
-    id: "especialista",
-    label: "Especialista / Profissional",
-    subtitle: "Consultoria, serviço ou marca pessoal",
-  },
-  {
-    id: "infoprodutor",
-    label: "Infoprodutor / Mentor",
-    subtitle: "Cursos, mentorias, perpétuo ou lançamentos",
-  },
-  {
-    id: "agencia",
-    label: "Agência / Estrategista",
-    subtitle: "Gestão de múltiplos clientes ou contas",
-  },
-  {
-    id: "empresa",
-    label: "Empresa B2B / SaaS",
-    subtitle: "Demanda comercial e autoridade corporativa",
-  },
-] as const;
-
-type PrimaryGoalOption = {
-  readonly id: string;
-  readonly label: string;
-};
-
-const PRIMARY_GOALS: readonly PrimaryGoalOption[] = [
-  { id: "autoridade", label: "Construir Autoridade & Posicionamento" },
-  { id: "vendas", label: "Gerar Demanda & Vendas para a Oferta" },
-  { id: "calendario", label: "Organizar Linha Editorial & Calendário" },
-  { id: "escala", label: "Escalar Roteiros sem Perder Identidade" },
-] as const;
+type RegistrationStep = 1 | 2;
 
 type BlueprintStageNode = {
   readonly stepNumber: RegistrationStep;
-  readonly code: "01" | "02" | "03";
+  readonly code: "01" | "02";
   readonly badge: string;
   readonly headline: string;
   readonly description: string;
@@ -108,18 +65,10 @@ const BLUEPRINT_STAGE_NODES: readonly BlueprintStageNode[] = [
   {
     stepNumber: 2,
     code: "02",
-    badge: "PASSO 02 · SEMENTE DO 1º PROJETO EDITORIAL",
-    headline: "Sua oferta e seu nicho já entram configurando a Base Estratégica.",
+    badge: "PASSO 02 · VALIDAÇÃO E ENTRADA NA OPERAÇÃO",
+    headline: "Confirmação de titularidade e abertura imediata da Central Estratégica.",
     description:
-      "Em vez de jogar você em uma tela em branco, usamos as informações iniciais do seu negócio para preparar seu primeiro Projeto Editorial.",
-  },
-  {
-    stepNumber: 3,
-    code: "03",
-    badge: "PASSO 03 · VALIDAÇÃO E ENTRADA NA BASE",
-    headline: "Confirmação de titularidade e abertura imediata da operação.",
-    description:
-      "Assim que validado, você aterrissa diretamente na Base Estratégica para revisar sua direção editorial e gerar seu calendário.",
+      "Assim que validado, você é direcionado para criar seu primeiro Projeto Editorial e estruturar sua linha de conteúdo.",
   },
 ] as const;
 
@@ -155,6 +104,7 @@ function MicrosoftBrandIcon() {
 
 export default function CadastroPage() {
   const router = useRouter();
+  const dispatch = useDispatch<AppDispatch>();
   const shouldReduceMotion = useReducedMotion();
 
   const [currentStep, setCurrentStep] = useState<RegistrationStep>(1);
@@ -173,25 +123,13 @@ export default function CadastroPage() {
     Partial<Record<keyof RegisterFormData, string>>
   >({});
 
-  /* Passo 2: Onboarding */
-  const [onboarding, setOnboarding] = useState<OnboardingFormData>({
-    niche: "",
-    mainOffer: "",
-    firstProjectName: "",
-  });
-  const [operationProfile, setOperationProfile] = useState<string>("especialista");
-  const [primaryGoal, setPrimaryGoal] = useState<string>("autoridade");
-  const [whatsappPhone, setWhatsappPhone] = useState<string>("");
-  const [step2Errors, setStep2Errors] = useState<
-    Partial<Record<keyof OnboardingFormData, string>>
-  >({});
-
-  /* Passo 3: Verificação de E-mail */
+  /* Passo 2: Verificação de E-mail */
   const [verificationCode, setVerificationCode] = useState<string>("842910");
   const [codeResentFeedback, setCodeResentFeedback] = useState<boolean>(false);
   const [redirectUrl, setRedirectUrl] = useState<string>(
-    "/editorial/base?onboarding=true"
+    "/dashboard/editorial?newProject=true"
   );
+  const [authToken, setAuthToken] = useState<string | null>(null);
 
   /* Estados Gerais */
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
@@ -254,20 +192,6 @@ export default function CadastroPage() {
     return "Nível 4 · Senha Forte Validada";
   }, [credentials.password.length, passwordStrengthScore]);
 
-  useEffect(() => {
-    if (
-      currentStep === 2 &&
-      !onboarding.firstProjectName.trim() &&
-      credentials.fullName.trim()
-    ) {
-      const firstName = credentials.fullName.trim().split(" ")[0];
-      setOnboarding((prev) => ({
-        ...prev,
-        firstProjectName: `Projeto Editorial — ${firstName}`,
-      }));
-    }
-  }, [currentStep, credentials.fullName, onboarding.firstProjectName]);
-
   const handleStageMouseMove = (event: ReactMouseEvent<HTMLDivElement>) => {
     if (shouldReduceMotion || !stageRef.current) return;
     const rect = stageRef.current.getBoundingClientRect();
@@ -326,25 +250,49 @@ export default function CadastroPage() {
     }
   };
 
-  const handleStep2InputChange = (
-    event: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
-  ) => {
-    const { name, value } = event.target;
-    setOnboarding((prev) => ({
-      ...prev,
-      [name]: value,
-    }));
+  const executeRegistration = async (payload: RegisterFormData) => {
+    setIsSubmitting(true);
+    setServerError(null);
+    try {
+      const response = await fetch("/api/auth/register", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
 
-    const fieldKey = name as keyof OnboardingFormData;
-    if (step2Errors[fieldKey]) {
-      setStep2Errors((prev) => ({ ...prev, [fieldKey]: undefined }));
-    }
-    if (serverError) {
-      setServerError(null);
+      const data = (await response.json()) as AuthResponse;
+
+      if (!response.ok || !data.success) {
+        setServerError(
+          data.message ||
+            "Não foi possível concluir o cadastro. Verifique os dados informados."
+        );
+        return;
+      }
+
+      if (data.token) {
+        setAuthToken(data.token);
+        localStorage.setItem("token", data.token);
+        dispatch(setAuthState({ token: data.token }));
+        dispatch(fetchUserProfile());
+        dispatch(fetchMyOrganizations());
+      }
+
+      if (data.redirectUrl) {
+        setRedirectUrl(data.redirectUrl);
+      }
+
+      setCurrentStep(2);
+    } catch {
+      setServerError(
+        "Falha de comunicação com o servidor ao criar sua conta. Tente novamente."
+      );
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
-  const handleStep1Continue = (event: FormEvent<HTMLFormElement>) => {
+  const handleStep1Submit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setStep1Errors({});
     setServerError(null);
@@ -362,88 +310,39 @@ export default function CadastroPage() {
       return;
     }
 
-    setCurrentStep(2);
+    await executeRegistration(validation.data);
   };
 
-  const handleSocialQuickRegister = (provider: "google" | "apple" | "microsoft") => {
+  const handleSocialQuickRegister = async (
+    provider: "google" | "apple" | "microsoft"
+  ) => {
     setIsSocialLoading(true);
     setStep1Errors({});
     setServerError(null);
 
-    window.setTimeout(() => {
-      setCredentials({
-        fullName: credentials.fullName.trim() || `Especialista ${provider}`,
-        email: credentials.email.trim() || `${provider}.auth@legionaltaire.com.br`,
-        password: "OAuth2VerifiedPassword9",
-        confirmPassword: "OAuth2VerifiedPassword9",
-        acceptTerms: true,
-      });
-      setIsSocialLoading(false);
-      setCurrentStep(2);
-    }, 450);
-  };
+    const socialPayload: RegisterFormData = {
+      fullName: credentials.fullName.trim() || `Especialista ${provider}`,
+      email:
+        credentials.email.trim() || `${provider}.auth@legionaltaire.com.br`,
+      password: "OAuth2VerifiedPassword9",
+      confirmPassword: "OAuth2VerifiedPassword9",
+      acceptTerms: true,
+    };
 
-  const handleStep2Submit = async (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    setStep2Errors({});
-    setServerError(null);
-
-    const validation = onboardingSchema.safeParse(onboarding);
-    if (!validation.success) {
-      const nextErrors: Partial<Record<keyof OnboardingFormData, string>> = {};
-      for (const issue of validation.error.issues) {
-        const key = issue.path[0] as keyof OnboardingFormData;
-        if (key && !nextErrors[key]) {
-          nextErrors[key] = issue.message;
-        }
-      }
-      setStep2Errors(nextErrors);
-      return;
-    }
-
-    setIsSubmitting(true);
-    try {
-      const response = await fetch("/api/auth/register", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          ...credentials,
-          onboarding: {
-            ...validation.data,
-            operationProfile,
-            primaryGoal,
-            whatsappPhone: whatsappPhone.trim(),
-          },
-        }),
-      });
-
-      const data = (await response.json()) as AuthResponse;
-
-      if (!response.ok || !data.success) {
-        setServerError(
-          data.message ||
-            "Não foi possível concluir o cadastro. Verifique os dados informados."
-        );
-        return;
-      }
-
-      if (data.redirectUrl) {
-        setRedirectUrl(data.redirectUrl);
-      }
-
-      setCurrentStep(3);
-    } catch {
-      setServerError(
-        "Falha de comunicação com o servidor ao criar sua conta. Tente novamente."
-      );
-    } finally {
-      setIsSubmitting(false);
-    }
+    setCredentials(socialPayload);
+    await executeRegistration(socialPayload);
+    setIsSocialLoading(false);
   };
 
   const handleCompleteVerification = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    router.push(redirectUrl);
+    if (authToken) {
+      localStorage.setItem("token", authToken);
+      dispatch(setAuthState({ token: authToken }));
+      dispatch(fetchUserProfile());
+      dispatch(fetchMyOrganizations());
+    }
+    window.location.assign(redirectUrl);
   };
 
   const handleResendCode = () => {
@@ -536,11 +435,10 @@ export default function CadastroPage() {
               />
 
               <div className="relative z-10 flex flex-col">
-                <div className="mb-5 grid grid-cols-3 gap-2 border-b border-white/10 pb-4">
+                <div className="mb-5 grid grid-cols-2 gap-3 border-b border-white/10 pb-4">
                   {[
                     { step: 1 as const, label: "01 · Credenciais" },
-                    { step: 2 as const, label: "02 · 1º Projeto" },
-                    { step: 3 as const, label: "03 · Confirmação" },
+                    { step: 2 as const, label: "02 · Confirmação" },
                   ].map((item) => {
                     const isActive = currentStep === item.step;
                     const isCompleted = currentStep > item.step;
@@ -615,15 +513,15 @@ export default function CadastroPage() {
                         Crie sua conta no Legion Altaire
                       </h1>
                       <p className="mt-1.5 w-full text-justify [text-align-last:left] hyphens-auto font-la-sans text-[0.875rem] leading-[1.6] text-la-text-secondary">
-                        Comece configurando suas credenciais de acesso para
-                        estruturar seu primeiro Projeto Editorial.
+                        Configure suas credenciais de titularidade para acessar a
+                        plataforma e iniciar sua operação editorial.
                       </p>
 
                       {/* GRADE DE LOGIN SOCIAL: Google (Principal) + Apple + Microsoft */}
                       <div className="mt-5 grid grid-cols-1 gap-2.5 sm:grid-cols-12">
                         <button
                           type="button"
-                          disabled={isSocialLoading}
+                          disabled={isSocialLoading || isSubmitting}
                           onClick={() => handleSocialQuickRegister("google")}
                           className="flex min-h-[2.875rem] items-center justify-center gap-3 rounded-la-md border border-white/14 bg-white/[0.04] px-4 py-2 font-la-sans text-[0.875rem] font-semibold text-la-text-primary transition-all duration-200 hover:border-la-border-gold/65 hover:bg-white/[0.08] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-la-gold-light sm:col-span-8"
                         >
@@ -640,7 +538,7 @@ export default function CadastroPage() {
                         <div className="grid grid-cols-2 gap-2.5 sm:col-span-4">
                           <button
                             type="button"
-                            disabled={isSocialLoading}
+                            disabled={isSocialLoading || isSubmitting}
                             aria-label="Cadastrar com a Apple"
                             onClick={() => handleSocialQuickRegister("apple")}
                             className="flex min-h-[2.875rem] items-center justify-center rounded-la-md border border-white/14 bg-white/[0.04] px-4 py-2 transition-all duration-200 hover:border-la-border-gold/65 hover:bg-white/[0.08] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-la-gold-light"
@@ -650,7 +548,7 @@ export default function CadastroPage() {
 
                           <button
                             type="button"
-                            disabled={isSocialLoading}
+                            disabled={isSocialLoading || isSubmitting}
                             aria-label="Cadastrar com a Microsoft"
                             onClick={() => handleSocialQuickRegister("microsoft")}
                             className="flex min-h-[2.875rem] items-center justify-center rounded-la-md border border-white/14 bg-white/[0.04] px-4 py-2 transition-all duration-200 hover:border-la-border-gold/65 hover:bg-white/[0.08] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-la-gold-light"
@@ -669,7 +567,7 @@ export default function CadastroPage() {
                       </div>
 
                       <form
-                        onSubmit={handleStep1Continue}
+                        onSubmit={handleStep1Submit}
                         noValidate
                         className="flex flex-col gap-3.5"
                       >
@@ -940,250 +838,21 @@ export default function CadastroPage() {
 
                         <button
                           type="submit"
-                          className="mt-2 inline-flex min-h-[3rem] w-full items-center justify-center gap-2 rounded-la-md bg-la-gold px-6 py-3 font-la-sans text-[0.9375rem] font-semibold text-la-text-inverse shadow-[var(--la-elevation-gold)] transition-colors hover:bg-la-gold-light focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-la-gold-light"
-                        >
-                          <span>Avançar para o 1º Projeto Editorial</span>
-                          <ArrowRight aria-hidden="true" className="h-4 w-4" />
-                        </button>
-                      </form>
-                    </motion.div>
-                  ) : null}
-
-                  {currentStep === 2 ? (
-                    <motion.div
-                      key="register-step-2"
-                      initial={
-                        shouldReduceMotion ? { opacity: 1 } : { opacity: 0, x: 14 }
-                      }
-                      animate={{ opacity: 1, x: 0 }}
-                      exit={
-                        shouldReduceMotion ? { opacity: 0 } : { opacity: 0, x: -14 }
-                      }
-                      transition={{ duration: 0.22 }}
-                      className="flex flex-col"
-                    >
-                      <div className="flex items-center justify-between gap-2">
-                        <h2 className="text-balance font-la-sans text-[1.5rem] font-semibold leading-[1.18] text-la-text-primary sm:text-[1.6875rem]">
-                          Configure seu 1º Projeto Editorial
-                        </h2>
-                        <button
-                          type="button"
-                          onClick={() => setCurrentStep(1)}
-                          className="inline-flex items-center gap-1 font-la-mono text-[0.6875rem] text-la-gold-light hover:underline"
-                        >
-                          <ArrowLeft className="h-3 w-3" />
-                          <span>Voltar</span>
-                        </button>
-                      </div>
-
-                      <p className="mt-1.5 w-full text-justify [text-align-last:left] hyphens-auto font-la-sans text-[0.8125rem] leading-[1.58] text-la-text-secondary">
-                        Essas informações alimentam a semente da sua Base
-                        Estratégica e personalizam a plataforma para o momento
-                        real da sua operação.
-                      </p>
-
-                      <form
-                        onSubmit={handleStep2Submit}
-                        noValidate
-                        className="mt-4 flex flex-col gap-3.5"
-                      >
-                        <div className="flex flex-col gap-1.5">
-                          <span className="font-la-mono text-[0.6875rem] font-semibold uppercase tracking-[0.08em] text-la-text-secondary">
-                            Qual é o perfil da sua operação?
-                          </span>
-                          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-                            {OPERATION_PROFILES.map((prof) => {
-                              const isSelected = operationProfile === prof.id;
-                              return (
-                                <button
-                                  key={prof.id}
-                                  type="button"
-                                  aria-pressed={isSelected}
-                                  onClick={() => setOperationProfile(prof.id)}
-                                  className={clsx(
-                                    "flex flex-col rounded-la-md border px-3 py-2 text-left transition-colors",
-                                    isSelected
-                                      ? "border-la-gold bg-la-gold-faint text-la-text-primary"
-                                      : "border-white/10 bg-black/45 text-la-text-secondary hover:border-white/25"
-                                  )}
-                                >
-                                  <span className="font-la-sans text-[0.8125rem] font-semibold text-la-text-primary">
-                                    {prof.label}
-                                  </span>
-                                  <span className="font-la-sans text-[0.6875rem] text-la-text-secondary">
-                                    {prof.subtitle}
-                                  </span>
-                                </button>
-                              );
-                            })}
-                          </div>
-                        </div>
-
-                        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                          <div className="flex flex-col gap-1.5">
-                            <label
-                              htmlFor="reg-primaryGoal"
-                              className="font-la-mono text-[0.6875rem] font-semibold uppercase tracking-[0.08em] text-la-text-secondary"
-                            >
-                              Foco do Período
-                            </label>
-                            <select
-                              id="reg-primaryGoal"
-                              value={primaryGoal}
-                              onChange={(e) => setPrimaryGoal(e.target.value)}
-                              className="min-h-[2.625rem] w-full rounded-la-md border border-white/12 bg-black/60 px-3 py-2 font-la-sans text-[0.8125rem] text-la-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-la-gold-light"
-                            >
-                              {PRIMARY_GOALS.map((g) => (
-                                <option
-                                  key={g.id}
-                                  value={g.id}
-                                  className="bg-[#0B0E17]"
-                                >
-                                  {g.label}
-                                </option>
-                              ))}
-                            </select>
-                          </div>
-
-                          <div className="flex flex-col gap-1.5">
-                            <label
-                              htmlFor="reg-whatsapp"
-                              className="font-la-mono text-[0.6875rem] font-semibold uppercase tracking-[0.08em] text-la-text-secondary"
-                            >
-                              WhatsApp (Opcional)
-                            </label>
-                            <div className="relative flex items-center">
-                              <Phone
-                                aria-hidden="true"
-                                className="pointer-events-none absolute left-3 h-3.5 w-3.5 text-la-gold/80"
-                              />
-                              <input
-                                id="reg-whatsapp"
-                                type="tel"
-                                placeholder="(11) 99999-9999"
-                                value={whatsappPhone}
-                                onChange={(e) => setWhatsappPhone(e.target.value)}
-                                className="min-h-[2.625rem] w-full rounded-la-md border border-white/12 bg-black/55 py-2 pr-3 pl-9 font-la-sans text-[0.8125rem] text-la-text-primary placeholder:text-white/25 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-la-gold-light"
-                              />
-                            </div>
-                          </div>
-                        </div>
-
-                        <div className="flex flex-col gap-1.5">
-                          <label
-                            htmlFor="reg-firstProjectName"
-                            className="font-la-mono text-[0.6875rem] font-semibold uppercase tracking-[0.08em] text-la-text-secondary"
-                          >
-                            Nome do 1º Projeto Editorial *
-                          </label>
-                          <div className="relative flex items-center">
-                            <FolderKanban
-                              aria-hidden="true"
-                              className="pointer-events-none absolute left-3.5 h-4 w-4 text-la-gold/80"
-                            />
-                            <input
-                              id="reg-firstProjectName"
-                              name="firstProjectName"
-                              type="text"
-                              placeholder="Ex.: Operação Principal — Mentoria High-Ticket"
-                              value={onboarding.firstProjectName}
-                              onChange={handleStep2InputChange}
-                              className={clsx(
-                                "min-h-[2.75rem] w-full rounded-la-md border bg-black/55 py-2 pr-4 pl-10 font-la-sans text-[0.875rem] text-la-text-primary placeholder:text-white/25",
-                                "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-la-gold-light",
-                                step2Errors.firstProjectName
-                                  ? "border-red-500/70"
-                                  : "border-white/12 hover:border-white/25"
-                              )}
-                            />
-                          </div>
-                          {step2Errors.firstProjectName ? (
-                            <p className="font-la-mono text-[0.6875rem] text-red-400">
-                              {step2Errors.firstProjectName}
-                            </p>
-                          ) : null}
-                        </div>
-
-                        <div className="flex flex-col gap-1.5">
-                          <label
-                            htmlFor="reg-niche"
-                            className="font-la-mono text-[0.6875rem] font-semibold uppercase tracking-[0.08em] text-la-text-secondary"
-                          >
-                            Nicho / Segmento de Atuação *
-                          </label>
-                          <div className="relative flex items-center">
-                            <Briefcase
-                              aria-hidden="true"
-                              className="pointer-events-none absolute left-3.5 h-4 w-4 text-la-gold/80"
-                            />
-                            <input
-                              id="reg-niche"
-                              name="niche"
-                              type="text"
-                              placeholder="Ex.: Consultoria Financeira B2B, Saúde Integrativa, SaaS..."
-                              value={onboarding.niche}
-                              onChange={handleStep2InputChange}
-                              className={clsx(
-                                "min-h-[2.75rem] w-full rounded-la-md border bg-black/55 py-2 pr-4 pl-10 font-la-sans text-[0.875rem] text-la-text-primary placeholder:text-white/25",
-                                "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-la-gold-light",
-                                step2Errors.niche
-                                  ? "border-red-500/70"
-                                  : "border-white/12 hover:border-white/25"
-                              )}
-                            />
-                          </div>
-                          {step2Errors.niche ? (
-                            <p className="font-la-mono text-[0.6875rem] text-red-400">
-                              {step2Errors.niche}
-                            </p>
-                          ) : null}
-                        </div>
-
-                        <div className="flex flex-col gap-1.5">
-                          <label
-                            htmlFor="reg-mainOffer"
-                            className="font-la-mono text-[0.6875rem] font-semibold uppercase tracking-[0.08em] text-la-text-secondary"
-                          >
-                            Sua Oferta Principal (O que você vende?) *
-                          </label>
-                          <textarea
-                            id="reg-mainOffer"
-                            name="mainOffer"
-                            rows={2}
-                            placeholder="Descreva em 1 frase sua oferta principal ou serviço que o conteúdo deve apoiar..."
-                            value={onboarding.mainOffer}
-                            onChange={handleStep2InputChange}
-                            className={clsx(
-                              "w-full rounded-la-md border bg-black/55 px-3.5 py-2 font-la-sans text-[0.875rem] text-la-text-primary placeholder:text-white/25",
-                              "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-la-gold-light",
-                              step2Errors.mainOffer
-                                ? "border-red-500/70"
-                                : "border-white/12 hover:border-white/25"
-                            )}
-                          />
-                          {step2Errors.mainOffer ? (
-                            <p className="font-la-mono text-[0.6875rem] text-red-400">
-                              {step2Errors.mainOffer}
-                            </p>
-                          ) : null}
-                        </div>
-
-                        <button
-                          type="submit"
-                          disabled={isSubmitting}
+                          disabled={isSubmitting || isSocialLoading}
                           className={clsx(
                             "mt-2 inline-flex min-h-[3rem] w-full items-center justify-center gap-2 rounded-la-md bg-la-gold px-6 py-3 font-la-sans text-[0.9375rem] font-semibold text-la-text-inverse shadow-[var(--la-elevation-gold)] transition-colors hover:bg-la-gold-light focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-la-gold-light",
-                            isSubmitting && "cursor-not-allowed opacity-75"
+                            (isSubmitting || isSocialLoading) &&
+                              "cursor-not-allowed opacity-75"
                           )}
                         >
                           {isSubmitting ? (
                             <>
                               <span className="h-4 w-4 animate-spin rounded-full border-2 border-la-text-inverse border-t-transparent" />
-                              <span>Provisionando Projeto Editorial...</span>
+                              <span>Criando sua conta...</span>
                             </>
                           ) : (
                             <>
-                              <span>Concluir cadastro e validar acesso</span>
+                              <span>Criar conta e validar acesso</span>
                               <ArrowRight aria-hidden="true" className="h-4 w-4" />
                             </>
                           )}
@@ -1192,9 +861,9 @@ export default function CadastroPage() {
                     </motion.div>
                   ) : null}
 
-                  {currentStep === 3 ? (
+                  {currentStep === 2 ? (
                     <motion.div
-                      key="register-step-3"
+                      key="register-step-2"
                       initial={
                         shouldReduceMotion
                           ? { opacity: 1 }
@@ -1209,7 +878,7 @@ export default function CadastroPage() {
                       </div>
 
                       <span className="mt-4 font-la-mono text-[0.6875rem] font-semibold uppercase tracking-[0.08em] text-la-gold-light">
-                        Conta & 1º Projeto Editorial Criados
+                        Conta Criada com Sucesso
                       </span>
 
                       <h2 className="mt-1 text-balance font-la-sans text-[1.625rem] font-semibold leading-[1.18] text-la-text-primary">
@@ -1221,11 +890,8 @@ export default function CadastroPage() {
                         <strong className="text-la-gold-light">
                           {credentials.email}
                         </strong>
-                        . Seu ambiente{" "}
-                        <strong className="text-la-text-primary">
-                          &ldquo;{onboarding.firstProjectName}&rdquo;
-                        </strong>{" "}
-                        já está preparado para iniciar a Base Estratégica.
+                        . Confirme abaixo para entrar na plataforma e criar o
+                        seu primeiro Projeto Editorial.
                       </p>
 
                       <form
@@ -1273,7 +939,7 @@ export default function CadastroPage() {
                           type="submit"
                           className="inline-flex min-h-[3.125rem] w-full items-center justify-center gap-2 rounded-la-md bg-la-gold px-6 py-3 font-la-sans text-[0.9375rem] font-semibold text-la-text-inverse shadow-[var(--la-elevation-gold)] transition-colors hover:bg-la-gold-light focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-la-gold-light"
                         >
-                          <span>Confirmar e entrar na Base Estratégica</span>
+                          <span>Confirmar e criar 1º Projeto Editorial</span>
                           <ArrowRight aria-hidden="true" className="h-4 w-4" />
                         </button>
                       </form>
@@ -1353,40 +1019,37 @@ export default function CadastroPage() {
                       className="ml-1 h-4 w-4 text-la-gold"
                     />
                     <span className="font-la-mono text-[0.6875rem] font-semibold uppercase tracking-[0.08em] text-la-gold-light">
-                      Blueprint do Projeto Editorial · Etapa 0{currentStep}/03
+                      Ativação de Conta · Etapa 0{currentStep}/02
                     </span>
                   </div>
 
                   <span className="rounded-la-full border border-la-border-gold/55 bg-la-gold-faint px-2.5 py-0.5 font-la-mono text-[0.625rem] font-semibold text-la-gold-light">
-                    Setup Guiado
+                    Acesso Direto
                   </span>
                 </div>
 
                 <div className="relative z-10 mt-5 grid grid-cols-12 items-center gap-5">
                   <div className="col-span-7 flex flex-col gap-2.5">
                     <span className="font-la-mono text-[0.625rem] font-semibold uppercase tracking-[0.08em] text-la-gold-light">
-                      PREVIEW EM TEMPO REAL DA SUA OPERAÇÃO
+                      IDENTIDADE DE OPERAÇÃO
                     </span>
 
                     <div className="rounded-la-lg border border-la-border-gold/45 bg-black/55 p-3.5">
                       <div className="flex items-center justify-between">
                         <span className="font-la-mono text-[0.5625rem] uppercase text-la-text-muted">
-                          Projeto Editorial
+                          Titular da Conta
                         </span>
                         <span className="font-la-mono text-[0.5625rem] text-la-gold-light">
-                          {operationProfile.toUpperCase()}
+                          OWNER
                         </span>
                       </div>
                       <p className="mt-1 truncate font-la-sans text-[0.9375rem] font-semibold text-la-text-primary">
-                        {onboarding.firstProjectName.trim() ||
-                          (credentials.fullName.trim()
-                            ? `Projeto Editorial — ${credentials.fullName.trim().split(" ")[0]}`
-                            : "Seu 1º Projeto Editorial")}
+                        {credentials.fullName.trim() || "Aguardando identificação"}
                       </p>
                       <p className="mt-1 truncate font-la-mono text-[0.6875rem] text-la-text-secondary">
-                        Nicho:{" "}
+                        E-mail:{" "}
                         <span className="text-la-gold-light">
-                          {onboarding.niche.trim() || "Em configuração..."}
+                          {credentials.email.trim() || "Em configuração..."}
                         </span>
                       </p>
                     </div>
@@ -1394,10 +1057,10 @@ export default function CadastroPage() {
                     <div className="grid grid-cols-2 gap-2">
                       <div className="rounded-la-md border border-white/10 bg-white/[0.025] p-2.5">
                         <span className="block font-la-mono text-[0.5625rem] uppercase text-la-text-muted">
-                          Titular da Conta
+                          Status
                         </span>
                         <span className="mt-0.5 block truncate font-la-sans text-[0.75rem] font-semibold text-la-text-primary">
-                          {credentials.fullName.trim() || "Aguardando nome"}
+                          {currentStep === 2 ? "Validado" : "Credenciais"}
                         </span>
                       </div>
                       <div className="rounded-la-md border border-white/10 bg-white/[0.025] p-2.5">
@@ -1405,7 +1068,7 @@ export default function CadastroPage() {
                           Próximo Destino
                         </span>
                         <span className="mt-0.5 block truncate font-la-sans text-[0.75rem] font-semibold text-la-gold-light">
-                          Base Estratégica
+                          Novo Projeto Editorial
                         </span>
                       </div>
                     </div>
@@ -1447,9 +1110,9 @@ export default function CadastroPage() {
                       style={{ transformStyle: "preserve-3d" }}
                       className="relative flex h-24 w-24 items-center justify-center"
                     >
-                      {[1, 2, 3].map((stepLayer, idx) => {
+                      {[1, 2].map((stepLayer, idx) => {
                         const isLayerActive = currentStep === stepLayer;
-                        const zPos = idx === 2 ? 22 : idx === 1 ? 0 : -20;
+                        const zPos = idx === 1 ? 16 : -16;
 
                         return (
                           <motion.div

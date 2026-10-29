@@ -5,7 +5,7 @@ import { useEffect } from 'react';
 import { useDispatch } from 'react-redux';
 import { setAuthState } from '../lib/redux/slices/authSlice';
 import { fetchUserProfile } from '../lib/redux/slices/userSlice';
-import { AppDispatch } from '../lib/redux/store';
+import { AppDispatch, store } from '../lib/redux/store';
 import { fetchMyOrganizations } from '@/lib/redux/slices/organizationSlice';
 import { SessionExpiredModal } from '@/components/auth/SessionExpiredModal';
 import { SessionWarningModal } from '@/components/auth/SessionWarningModal';
@@ -18,8 +18,11 @@ export default function AuthInitializer({ children }: { children: React.ReactNod
 
     if (token) {
       dispatch(setAuthState({ token }));
-      dispatch(fetchUserProfile());
-      dispatch(fetchMyOrganizations());
+      // Só busca perfil e organizações se o token decodificado for válido e não expirado
+      if (store.getState().auth.isAuthenticated) {
+        dispatch(fetchUserProfile());
+        dispatch(fetchMyOrganizations());
+      }
     }
   }, [dispatch]);
 

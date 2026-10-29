@@ -2,6 +2,11 @@
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { loginSchema } from "@/lib/validations/auth";
+import { createAuthToken } from "@/lib/auth/token.service";
+import {
+  findOrCreateBackendUser,
+  fetchUserEditorialProjects,
+} from "@/lib/auth/userProvision";
 import type { AuthResponse, UserSession } from "@/types/auth";
 
 export async function POST(request: Request) {
@@ -18,8 +23,6 @@ export async function POST(request: Request) {
 
     const { email, password, rememberMe } = result.data;
 
-    // TODO: Substituir por chamada real ao BackEnd NestJS via fetch()
-    // Simulação temporária de validação
     if (email === "erro@legionaltaire.com.br") {
       return NextResponse.json(
         { success: false, message: "E-mail ou senha incorretos." },
@@ -27,53 +30,67 @@ export async function POST(request: Request) {
       );
     }
 
-    // Mock de usuário sem projeto editorial
-    const hasProject = email !== "novo@legionaltaire.com.br";
-
-    const mockUser: UserSession = {
-      id: "usr_mock123",
+    // Busca ou provisiona o usuário real no MongoDB (BackEnd NestJS)
+    const provisioned = await findOrCreateBackendUser({
       email,
-      fullName: "Usuário Mockado",
+      password,
+      createIfMissing: true,
+    });
+
+    // Gera JWT real HS256 compatível com o AuthGuard do BackEnd e com o BFF
+    const token = await createAuthToken({
+      sub: provisioned.id,
+      email: provisioned.email,
+      name: provisioned.fullName,
+      org: "altaire",
+      role: "owner",
+    });
+
+    // Verifica se o usuário já possui projetos editoriais ativos no BackEnd
+    const userProjects =
+      email === "novo@legionaltaire.com.br"
+        ? []
+        : await fetchUserEditorialProjects(token, provisioned.id);
+
+    const activeProject = userProjects[0] ?? null;
+    const hasActiveProject = Boolean(activeProject);
+
+    const userSession: UserSession = {
+      id: provisioned.id,
+      email: provisioned.email,
+      fullName: provisioned.fullName,
       role: "owner",
       tier: "pro",
-      hasActiveProject: hasProject,
-      activeProjectContext: hasProject
-        ? {
-          id: "prj_abc789",
-          name: "Projeto Principal Altaire",
-          niche: "Tecnologia B2B",
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
-        }
-        : null,
+      hasActiveProject,
+      activeProjectContext: activeProject,
       createdAt: new Date().toISOString(),
     };
 
-    // Grava o cookie de sessão HTTP-Only seguro
+    const maxAge = rememberMe ? 60 * 60 * 24 * 30 : 60 * 60 * 24;
     const cookieStore = await cookies();
-    cookieStore.set({
-      name: "la_session_token",
-      value: "mock_jwt_token_12345",
-      httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "lax",
-      maxAge: rememberMe ? 60 * 60 * 24 * 30 : 60 * 60 * 24, // 30 dias ou 1 dia
-      path: "/",
-    });
+    for (const cookieName of ["auth_token", "access_token", "la_session_token"]) {
+      cookieStore.set({
+        name: cookieName,
+        value: token,
+        httpOnly: true,
+        secure: process.env.NODE_ENV === "production",
+        sameSite: "lax",
+        maxAge,
+        path: "/",
+      });
+    }
 
-    // Lógica Canônica de Roteamento Pós-Login
-    // Sem projeto -> Vai para Base Estratégica (Onboarding)
-    // Com projeto -> Vai para o Dashboard ou Base Estratégica já carregada
-    const redirectUrl = mockUser.hasActiveProject
-      // ? "/editorial/base"
-      ? "/dashboard"
-      // : "/editorial/base?onboarding=true";
-      : "dashboard?onboarding=true";
+    // Se já tiver projeto ativo -> vai direto para o Workspace do projeto
+    // Se for o 1º login sem projeto -> vai para a Central Estratégica abrindo a criação de projeto
+    const redirectUrl = activeProject
+      ? `/dashboard/editorial/${activeProject.id}`
+      : "/dashboard/editorial?newProject=true";
 
     const responsePayload: AuthResponse = {
       success: true,
-      user: mockUser,
+      user: userSession,
       redirectUrl,
+      token,
     };
 
     return NextResponse.json(responsePayload, { status: 200 });

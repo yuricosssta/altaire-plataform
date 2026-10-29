@@ -34,11 +34,17 @@ const initialState: AuthState = {
   sessionExpired: false,
 };
 
-// Função auxiliar para decodificar com segurança
+// Função auxiliar para decodificar com segurança e validar expiração
 const safeDecode = (token: string): UserPayload | null => {
   try {
     const decoded = jwtDecode<UserPayload>(token);
-    console.log("Token Decodificado (Payload):", decoded);
+    if (!decoded || typeof decoded !== 'object') {
+      return null;
+    }
+
+    if (decoded.exp && decoded.exp * 1000 <= Date.now()) {
+      return null;
+    }
 
     if (!decoded.name && decoded.email) {
       decoded.name = decoded.email.split('@')[0];
@@ -79,24 +85,37 @@ const authSlice = createSlice({
   reducers: {
     setAuthState: (state, action: PayloadAction<{ token: string | null }>) => {
       const token = action.payload.token;
+      const decoded = token ? safeDecode(token) : null;
 
-      if (token) {
+      if (token && decoded) {
         state.token = token;
         state.isAuthenticated = true;
-        state.user = safeDecode(token);
+        state.sessionExpired = false;
+        state.user = decoded;
+        if (typeof window !== 'undefined') {
+          localStorage.setItem('token', token);
+        }
       } else {
         state.token = null;
         state.isAuthenticated = false;
         state.user = null;
+        if (typeof window !== 'undefined') {
+          localStorage.removeItem('token');
+        }
       }
     },
 
-    logout: (state) => {
-      localStorage.removeItem('token');
+    logout: () => {
+      if (typeof window !== 'undefined') {
+        localStorage.removeItem('token');
+      }
       return initialState;
     },
 
     sessionExpired: (state) => {
+      if (typeof window !== 'undefined') {
+        localStorage.removeItem('token');
+      }
       state.sessionExpired = true;
       state.isAuthenticated = false;
       state.token = null;
