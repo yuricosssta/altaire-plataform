@@ -1,3 +1,27 @@
+## FLUXO DE AUTENTICAÇÃO REAL, SESSÃO BFF E ROTEAMENTO PÓS-LOGIN - 29/10/2026 ##
+Resumo Técnico — Unificação de Sessão JWT (BFF/Redux/BackEnd), Simplificação do Cadastro e Redirecionamento Inteligente:
+
+1. Diagnóstico do Problema:
+   - Redirecionamento para rotas inexistentes: `/api/auth/register` e `/cadastro` redirecionavam para `/editorial/base?onboarding=true` (inexistente no App Router), enquanto `/api/auth/login` redirecionava para `dashboard?onboarding=true` (relativo) ou `/dashboard` sem sincronizar o estado global.
+   - Expulsão imediata pelo Guard (`(main)/layout.tsx`): `login/page.tsx` e `cadastro/page.tsx` não persistiam o token no `localStorage` nem despachavam `setAuthState` no Redux; além disso, `sessionExpired` no `authSlice` não limpava tokens antigos/expirados do `localStorage`, causando falha `401` imediata no `fetchUserProfile` (que chamava o backend direto via `http.ts`) e loop de retorno para `/login`.
+   - Divergência de Tokens e Cookies: as rotas de login/cadastro emitiam strings fictícias (`mock_jwt_token_12345`) no cookie `la_session_token` com IDs não-hexadecimais (`usr_mock123`), incompatíveis com o `verifyInternalToken` do BFF (`auth_token`), `serverUtils` (`access_token`) e `AuthGuard`/Mongoose (`Types.ObjectId` de 24 hex chars) no BackEnd.
+
+2. Ações Implementadas:
+   - Provisionamento Real de Usuário e Emissão de JWT HS256 (`FrontEnd/src/lib/auth/userProvision.ts`, `/api/auth/login`, `/api/auth/register`, `/api/auth/session`):
+     - Busca ou criação automática do usuário real no MongoDB via BackEnd (`GET /users/search` e `POST /users`), garantindo que o claim `sub` do JWT seja sempre um `ObjectId` válido (24 hex chars) com fallback determinístico MD5.
+     - Assinatura de JWT interno real via `createAuthToken()` (`jose`, HS256 com `JWT_SECRET` compartilhado com o NestJS) e gravação unificada nos cookies `auth_token`, `access_token` e `la_session_token`, além do retorno de `token` no payload JSON.
+     - Isolamento de projetos por usuário (`createdBy === payload.sub`) na listagem `GET /api/editorial/projects` e normalização de `id: p.id || p._id` nos endpoints BFF de criação de projetos, versões e onboarding.
+   - Simplificação do Cadastro em 2 Etapas (`FrontEnd/src/app/(auth)/cadastro/page.tsx`):
+     - Removida a Etapa 02 ("Semente do 1º Projeto Editorial") do formulário de cadastro, mantendo apenas `01 · Credenciais` → `02 · Confirmação`.
+     - Nenhuma organização nem projeto editorial é criado durante o `/cadastro`, preservando o acionamento natural do modal obrigatório de criação de empresa (`CreateOrganizationModal` no `OrgSwitcher`) ao entrar no Dashboard.
+   - Redirecionamento Inteligente Pós-Autenticação e Abertura Automática de Novo Projeto:
+     - Usuário com projeto ativo é direcionado diretamente para o Workspace do projeto (`/dashboard/editorial/[projectId]`).
+     - Usuário no 1º acesso (sem projetos) é direcionado para `/dashboard/editorial?newProject=true`, onde o `NewProjectDialog` abre automaticamente após a existência/criação da organização e, ao criar o projeto, navega para `/dashboard/editorial/[projectId]`.
+   - Blindagem do Guard de Sessão e Migração de Perfil para BFF (`(main)/layout.tsx`, `authSlice.ts`, `userSlice.ts`, `AuthInitializer.tsx`):
+     - `MainLayout` passa a consultar primariamente `/api/auth/session` (via cookie HTTP-Only) para hidratar o Redux e o `localStorage` antes de avaliar redirecionamento para `/login`.
+     - `safeDecode` em `authSlice.ts` valida a expiração (`exp`) do JWT e remove tokens expirados ou inválidos do `localStorage` tanto em `setAuthState` quanto em `sessionExpired`.
+     - `fetchUserProfile` em `userSlice.ts` migrado de chamada direta ao backend (`http.get('/users/profile')`) para a rota BFF `/api/auth/profile`.
+
 ## OTIMIZAÇÃO DE AMBIENTE E CONTAINERS (WSL2 / DOCKER / VSCODE) - 29/10/2026 ##
 Resumo Técnico — Resolução de Sobrecarga, Concorrência de I/O e Travamento do VSCode:
 
