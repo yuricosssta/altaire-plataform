@@ -35,6 +35,7 @@ export async function POST(
     return NextResponse.json({
       version: data.version ? {
         ...data.version,
+        id: data.version.id || data.version._id,
         createdAt: data.version.createdAt ? new Date(data.version.createdAt) : undefined,
         updatedAt: data.version.updatedAt ? new Date(data.version.updatedAt) : undefined,
       } : undefined,

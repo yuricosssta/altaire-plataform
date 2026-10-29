@@ -47,6 +47,7 @@ localClient.interceptors.request.use(
 function toVersion(version: any): EditorialVersionDTO {
   return {
     ...version,
+    id: version.id || version._id,
     createdAt: version.createdAt ? new Date(version.createdAt) : undefined,
     updatedAt: version.updatedAt ? new Date(version.updatedAt) : undefined,
   };
@@ -90,6 +91,7 @@ export const editorialService = {
     const response = await localClient.get('/editorial/projects');
     return response.data.map((project: any) => ({
       ...project,
+      id: project.id || project._id,
       updatedAt: project.updatedAt ? new Date(project.updatedAt) : undefined,
     }));
   },
@@ -98,6 +100,7 @@ export const editorialService = {
     const response = await localClient.post('/editorial/projects', data);
     return {
       ...response.data,
+      id: response.data.id || response.data._id,
       updatedAt: response.data.updatedAt ? new Date(response.data.updatedAt) : undefined,
     };
   },
