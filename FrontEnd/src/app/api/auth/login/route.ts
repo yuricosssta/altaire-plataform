@@ -39,12 +39,12 @@ export async function POST(request: Request) {
       hasActiveProject: hasProject,
       activeProjectContext: hasProject
         ? {
-            id: "prj_abc789",
-            name: "Projeto Principal Altaire",
-            niche: "Tecnologia B2B",
-            createdAt: new Date().toISOString(),
-            updatedAt: new Date().toISOString(),
-          }
+          id: "prj_abc789",
+          name: "Projeto Principal Altaire",
+          niche: "Tecnologia B2B",
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        }
         : null,
       createdAt: new Date().toISOString(),
     };
@@ -65,8 +65,10 @@ export async function POST(request: Request) {
     // Sem projeto -> Vai para Base Estratégica (Onboarding)
     // Com projeto -> Vai para o Dashboard ou Base Estratégica já carregada
     const redirectUrl = mockUser.hasActiveProject
-      ? "/editorial/base"
-      : "/editorial/base?onboarding=true";
+      // ? "/editorial/base"
+      ? "/dashboard"
+      // : "/editorial/base?onboarding=true";
+      : "dashboard?onboarding=true";
 
     const responsePayload: AuthResponse = {
       success: true,

@@ -5,14 +5,16 @@ FROM node:22-alpine AS builder
 RUN apk add --no-cache python3 make g++
 WORKDIR /app
 
+ENV PNPM_HOME="/pnpm"
+ENV PATH="$PNPM_HOME:$PATH"
 # Habilita o pnpm usando o Corepack nativo do Node 22
 RUN corepack enable && corepack prepare pnpm@9 --activate
 
 # Copia apenas os arquivos de dependência
 COPY pnpm-lock.yaml package.json ./
 
-# Instala todas as dependências para o build
-RUN pnpm install --frozen-lockfile
+# Instala todas as dependências para o build com cache do store
+RUN --mount=type=cache,id=pnpm-backend,target=/pnpm/store pnpm install --frozen-lockfile
 
 # Copia o código e gera o build (dist/)
 COPY . .

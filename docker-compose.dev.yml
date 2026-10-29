@@ -7,9 +7,15 @@ services:
     ports:
       - "3001:3001"
     volumes:
-      - ./BackEnd:/app
-      - /app/node_modules
+      # Monta APENAS src/ para que dist/, node_modules/ e tsconfig.tsbuildinfo
+      # fiquem 100% no filesystem nativo do container sem tráfego de I/O com o host/WSL2
+      - ./BackEnd/src:/app/src
     env_file: ./BackEnd/.env
+    environment:
+      - NODE_OPTIONS=--max-old-space-size=768
+    cpus: 1.0
+    mem_limit: 1g
+    memswap_limit: 1g
     networks:
       - app-network
 
@@ -20,9 +26,17 @@ services:
     ports:
       - "3000:3000"
     volumes:
-      - ./FrontEnd:/app
-      - /app/node_modules
+      # Monta APENAS src/ e public/ para que .next/, node_modules/ e tsconfig.tsbuildinfo
+      # fiquem 100% isolados no container, eliminando travamentos no Docker Desktop ao salvar arquivos
+      - ./FrontEnd/src:/app/src
+      - ./FrontEnd/public:/app/public
     env_file: ./FrontEnd/.env
+    environment:
+      - NODE_OPTIONS=--max-old-space-size=1024
+      - NEXT_TELEMETRY_DISABLED=1
+    cpus: 1.5
+    mem_limit: 1536m
+    memswap_limit: 1536m
     depends_on:
       - backend
     networks:
