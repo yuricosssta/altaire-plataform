@@ -2,7 +2,6 @@
 "use client";
 
 import {
-  useEffect,
   useMemo,
   useRef,
   useState,
@@ -23,7 +22,6 @@ import {
   Compass,
   Eye,
   EyeOff,
-  FolderKanban,
   KeyRound,
   Layers,
   Lock,
@@ -76,18 +74,6 @@ const OPERATION_PROFILES: readonly OperationProfileOption[] = [
   },
 ] as const;
 
-type PrimaryGoalOption = {
-  readonly id: string;
-  readonly label: string;
-};
-
-const PRIMARY_GOALS: readonly PrimaryGoalOption[] = [
-  { id: "autoridade", label: "Construir Autoridade & Posicionamento" },
-  { id: "vendas", label: "Gerar Demanda & Vendas para a Oferta" },
-  { id: "calendario", label: "Organizar Linha Editorial & Calendário" },
-  { id: "escala", label: "Escalar Roteiros sem Perder Identidade" },
-] as const;
-
 type BlueprintStageNode = {
   readonly stepNumber: RegistrationStep;
   readonly code: "01" | "02" | "03";
@@ -101,42 +87,58 @@ const BLUEPRINT_STAGE_NODES: readonly BlueprintStageNode[] = [
     stepNumber: 1,
     code: "01",
     badge: "PASSO 01 · CREDENCIAIS DE TITULARIDADE",
-    headline: "Acesso seguro e isolamento total do seu contexto estratégico.",
+    headline: "Acesso seguro e isolamento total da sua conta.",
     description:
-      "Sua conta cria um ambiente criptografado onde suas ofertas, promessas e roteiros pertencem exclusivamente à sua operação.",
+      "Sua conta cria um workspace criptografado onde suas estratégias, linhas editoriais, calendários e roteiros pertencem exclusivamente à sua operação.",
   },
   {
     stepNumber: 2,
     code: "02",
-    badge: "PASSO 02 · SEMENTE DO 1º PROJETO EDITORIAL",
-    headline: "Sua oferta e seu nicho já entram configurando a Base Estratégica.",
+    badge: "PASSO 02 · PERFIL E SEGMENTO DE ATUAÇÃO",
+    headline: "Calibração do ambiente para o seu modelo de negócio.",
     description:
-      "Em vez de jogar você em uma tela em branco, usamos as informações iniciais do seu negócio para preparar seu primeiro Projeto Editorial.",
+      "Identificamos seu perfil operacional, nicho e segmento de atuação para preparar a Central Estratégica onde você criará seus Projetos Editoriais.",
   },
   {
     stepNumber: 3,
     code: "03",
-    badge: "PASSO 03 · VALIDAÇÃO E ENTRADA NA BASE",
-    headline: "Confirmação de titularidade e abertura imediata da operação.",
+    badge: "PASSO 03 · VALIDAÇÃO E ENTRADA NA PLATAFORMA",
+    headline: "Confirmação de titularidade e abertura da Central Estratégica.",
     description:
-      "Assim que validado, você aterrissa diretamente na Base Estratégica para revisar sua direção editorial e gerar seu calendário.",
+      "Assim que confirmado, você entra na plataforma para estruturar seu primeiro Projeto Editorial dentro do ambiente oficial.",
   },
 ] as const;
 
 function GoogleBrandIcon() {
   return (
     <svg aria-hidden="true" viewBox="0 0 24 24" className="h-4 w-4 shrink-0">
-      <path fill="#EA4335" d="M12 10.2v3.9h5.5c-.24 1.26-.96 2.33-2.04 3.05l3.3 2.56c1.92-1.77 3.03-4.38 3.03-7.49 0-.72-.06-1.41-.19-2.07H12v.05z" />
-      <path fill="#4285F4" d="M12 22c2.7 0 4.96-.89 6.62-2.42l-3.3-2.56c-.91.61-2.08.98-3.32.98-2.55 0-4.71-1.72-5.48-4.04H3.11v2.64C4.76 19.87 8.11 22 12 22z" />
-      <path fill="#FBBC05" d="M6.52 13.96A5.98 5.98 0 0 1 6.2 12c0-.68.12-1.34.32-1.96V7.4H3.11A9.98 9.98 0 0 0 2 12c0 1.61.39 3.14 1.11 4.6l3.41-2.64z" />
-      <path fill="#34A853" d="M12 6c1.47 0 2.79.51 3.83 1.5l2.87-2.87C16.95 3.01 14.7 2 12 2 8.11 2 4.76 4.13 3.11 7.4l3.41 2.64C7.29 7.72 9.45 6 12 6z" />
+      <path
+        fill="#EA4335"
+        d="M12 10.2v3.9h5.5c-.24 1.26-.96 2.33-2.04 3.05l3.3 2.56c1.92-1.77 3.03-4.38 3.03-7.49 0-.72-.06-1.41-.19-2.07H12v.05z"
+      />
+      <path
+        fill="#4285F4"
+        d="M12 22c2.7 0 4.96-.89 6.62-2.42l-3.3-2.56c-.91.61-2.08.98-3.32.98-2.55 0-4.71-1.72-5.48-4.04H3.11v2.64C4.76 19.87 8.11 22 12 22z"
+      />
+      <path
+        fill="#FBBC05"
+        d="M6.52 13.96A5.98 5.98 0 0 1 6.2 12c0-.68.12-1.34.32-1.96V7.4H3.11A9.98 9.98 0 0 0 2 12c0 1.61.39 3.14 1.11 4.6l3.41-2.64z"
+      />
+      <path
+        fill="#34A853"
+        d="M12 6c1.47 0 2.79.51 3.83 1.5l2.87-2.87C16.95 3.01 14.7 2 12 2 8.11 2 4.76 4.13 3.11 7.4l3.41 2.64C7.29 7.72 9.45 6 12 6z"
+      />
     </svg>
   );
 }
 
 function AppleBrandIcon() {
   return (
-    <svg aria-hidden="true" viewBox="0 0 24 24" className="h-4 w-4 shrink-0 fill-white">
+    <svg
+      aria-hidden="true"
+      viewBox="0 0 24 24"
+      className="h-4 w-4 shrink-0 fill-white"
+    >
       <path d="M12 1c-1.25 0-2.67.65-3.5 1.56C7.77 3.35 7.07 4.76 7.23 6.09c1.41.05 2.76-.71 3.53-1.61.73-.85 1.34-2.18 1.24-3.48zm-4.32 5.56c-2.3.08-4.32 1.44-5.45 3.42-2.3 4.02-.59 9.94 1.63 13.15 1.09 1.57 2.37 3.32 4.08 3.26 1.65-.05 2.27-1.07 4.25-1.07 1.95 0 2.52 1.07 4.28 1.04 1.8-.03 2.92-1.61 3.99-3.18 1.24-1.81 1.75-3.57 1.78-3.67-.03-.02-3.44-1.32-3.47-5.26-.03-3.3 2.69-4.88 2.82-4.96-1.54-2.25-3.95-2.55-4.81-2.61-2.05-.21-4.01 1.21-5.06 1.21-1.07 0-2.69-1.18-4.04-1.33z" />
     </svg>
   );
@@ -168,37 +170,35 @@ export default function CadastroPage() {
     acceptTerms: false,
   });
   const [showPassword, setShowPassword] = useState<boolean>(false);
-  const [showConfirmPassword, setShowConfirmPassword] = useState<boolean>(false);
+  const [showConfirmPassword, setShowConfirmPassword] =
+    useState<boolean>(false);
   const [step1Errors, setStep1Errors] = useState<
     Partial<Record<keyof RegisterFormData, string>>
   >({});
 
-  /* Passo 2: Onboarding */
-  const [onboarding, setOnboarding] = useState<OnboardingFormData>({
+  /* Passo 2: Qualificação do Perfil Operacional (Sem criar 1º Projeto no cadastro - Ponto 01) */
+  const [profileData, setProfileData] = useState<OnboardingFormData>({
+    operationProfile: "especialista",
+    whatsapp: "",
     niche: "",
-    mainOffer: "",
-    firstProjectName: "",
+    mainSegment: "",
   });
-  const [operationProfile, setOperationProfile] = useState<string>("especialista");
-  const [primaryGoal, setPrimaryGoal] = useState<string>("autoridade");
-  const [whatsappPhone, setWhatsappPhone] = useState<string>("");
   const [step2Errors, setStep2Errors] = useState<
     Partial<Record<keyof OnboardingFormData, string>>
   >({});
 
-  /* Passo 3: Verificação de E-mail */
+  /* Passo 3: Confirmação de E-mail */
   const [verificationCode, setVerificationCode] = useState<string>("842910");
   const [codeResentFeedback, setCodeResentFeedback] = useState<boolean>(false);
   const [redirectUrl, setRedirectUrl] = useState<string>(
-    "/editorial/base?onboarding=true"
+    "/dashboard/editorial"
   );
 
-  /* Estados Gerais */
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
   const [isSocialLoading, setIsSocialLoading] = useState<boolean>(false);
   const [serverError, setServerError] = useState<string | null>(null);
 
-  /* Estados do Palco 3D */
+  /* Palco 3D Lateral */
   const [tilt, setTilt] = useState<{ rotateX: number; rotateY: number }>({
     rotateX: 0,
     rotateY: 0,
@@ -226,7 +226,6 @@ export default function CadastroPage() {
   const formCardRef = useRef<HTMLDivElement>(null);
   const isStageInView = useInView(stageRef, { amount: 0.2 });
 
-  /* Força de Senha */
   const passwordChecks = useMemo(() => {
     const pwd = credentials.password;
     return {
@@ -253,20 +252,6 @@ export default function CadastroPage() {
     if (passwordStrengthScore === 3) return "Nível 3 · Boa";
     return "Nível 4 · Senha Forte Validada";
   }, [credentials.password.length, passwordStrengthScore]);
-
-  useEffect(() => {
-    if (
-      currentStep === 2 &&
-      !onboarding.firstProjectName.trim() &&
-      credentials.fullName.trim()
-    ) {
-      const firstName = credentials.fullName.trim().split(" ")[0];
-      setOnboarding((prev) => ({
-        ...prev,
-        firstProjectName: `Projeto Editorial — ${firstName}`,
-      }));
-    }
-  }, [currentStep, credentials.fullName, onboarding.firstProjectName]);
 
   const handleStageMouseMove = (event: ReactMouseEvent<HTMLDivElement>) => {
     if (shouldReduceMotion || !stageRef.current) return;
@@ -326,11 +311,9 @@ export default function CadastroPage() {
     }
   };
 
-  const handleStep2InputChange = (
-    event: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
-  ) => {
+  const handleStep2InputChange = (event: ChangeEvent<HTMLInputElement>) => {
     const { name, value } = event.target;
-    setOnboarding((prev) => ({
+    setProfileData((prev) => ({
       ...prev,
       [name]: value,
     }));
@@ -365,22 +348,25 @@ export default function CadastroPage() {
     setCurrentStep(2);
   };
 
-  const handleSocialQuickRegister = (provider: "google" | "apple" | "microsoft") => {
+  const handleSocialQuickRegister = (
+    provider: "google" | "apple" | "microsoft"
+  ) => {
     setIsSocialLoading(true);
     setStep1Errors({});
     setServerError(null);
 
     window.setTimeout(() => {
       setCredentials({
-        fullName: credentials.fullName.trim() || `Especialista ${provider}`,
-        email: credentials.email.trim() || `${provider}.auth@legionaltaire.com.br`,
+        fullName: credentials.fullName.trim() || "Roberto Zane",
+        email:
+          credentials.email.trim() || `${provider}.auth@legionaltaire.com.br`,
         password: "OAuth2VerifiedPassword9",
         confirmPassword: "OAuth2VerifiedPassword9",
         acceptTerms: true,
       });
       setIsSocialLoading(false);
       setCurrentStep(2);
-    }, 450);
+    }, 400);
   };
 
   const handleStep2Submit = async (event: FormEvent<HTMLFormElement>) => {
@@ -388,7 +374,7 @@ export default function CadastroPage() {
     setStep2Errors({});
     setServerError(null);
 
-    const validation = onboardingSchema.safeParse(onboarding);
+    const validation = onboardingSchema.safeParse(profileData);
     if (!validation.success) {
       const nextErrors: Partial<Record<keyof OnboardingFormData, string>> = {};
       for (const issue of validation.error.issues) {
@@ -409,10 +395,10 @@ export default function CadastroPage() {
         body: JSON.stringify({
           ...credentials,
           onboarding: {
-            ...validation.data,
-            operationProfile,
-            primaryGoal,
-            whatsappPhone: whatsappPhone.trim(),
+            operationProfile: validation.data.operationProfile,
+            whatsapp: validation.data.whatsapp,
+            niche: validation.data.niche,
+            mainSegment: validation.data.mainSegment,
           },
         }),
       });
@@ -427,10 +413,26 @@ export default function CadastroPage() {
         return;
       }
 
-      if (data.redirectUrl) {
-        setRedirectUrl(data.redirectUrl);
+      /* Salva apenas os dados do perfil do cliente (sem criar projeto automático no cadastro) */
+      try {
+        window.localStorage.removeItem("la-initial-project-context");
+        window.localStorage.setItem(
+          "la-user-profile-qualification",
+          JSON.stringify({
+            fullName: credentials.fullName.trim(),
+            email: credentials.email.trim(),
+            operationProfile: validation.data.operationProfile,
+            whatsapp: validation.data.whatsapp.trim(),
+            niche: validation.data.niche.trim(),
+            mainSegment: validation.data.mainSegment.trim(),
+            registeredAt: new Date().toISOString(),
+          })
+        );
+      } catch {
+        /* Ignora restrição de storage */
       }
 
+      setRedirectUrl("/dashboard/editorial");
       setCurrentStep(3);
     } catch {
       setServerError(
@@ -451,10 +453,14 @@ export default function CadastroPage() {
     window.setTimeout(() => setCodeResentFeedback(false), 3000);
   };
 
+  const selectedProfileMeta =
+    OPERATION_PROFILES.find((p) => p.id === profileData.operationProfile) ??
+    OPERATION_PROFILES[0];
+
   return (
     <div
       data-la-surface="dark"
-      className="relative flex min-h-screen w-full flex-col justify-between overflow-x-hidden bg-la-canvas font-la-sans text-la-text-primary antialiased selection:bg-la-gold/25 selection:text-la-gold-bright [color-scheme:dark] [overflow-anchor:none]"
+      className="relative flex min-h-screen w-full max-w-[100vw] flex-col justify-between overflow-x-hidden bg-la-canvas font-la-sans text-la-text-primary antialiased selection:bg-la-gold/25 selection:text-la-gold-bright [color-scheme:dark] [overflow-anchor:none]"
     >
       <div
         aria-hidden="true"
@@ -498,6 +504,7 @@ export default function CadastroPage() {
 
       <main className="relative z-10 mx-auto flex w-full max-w-[84rem] flex-1 items-center px-5 py-6 sm:px-8 lg:py-8 xl:px-10">
         <div className="grid w-full grid-cols-1 items-start gap-8 lg:grid-cols-12 lg:items-center lg:gap-10 xl:gap-12">
+          {/* COLUNA ESQUERDA (6 COLS): CARD MULTI-STEP EM VIDRO FUMÊ */}
           <div className="w-full lg:col-span-6">
             <div
               ref={formCardRef}
@@ -536,10 +543,11 @@ export default function CadastroPage() {
               />
 
               <div className="relative z-10 flex flex-col">
+                {/* Barra de Progresso dos 3 Passos (Sem menção a 1º Projeto) */}
                 <div className="mb-5 grid grid-cols-3 gap-2 border-b border-white/10 pb-4">
                   {[
                     { step: 1 as const, label: "01 · Credenciais" },
-                    { step: 2 as const, label: "02 · 1º Projeto" },
+                    { step: 2 as const, label: "02 · Perfil & Atuação" },
                     { step: 3 as const, label: "03 · Confirmação" },
                   ].map((item) => {
                     const isActive = currentStep === item.step;
@@ -602,11 +610,15 @@ export default function CadastroPage() {
                     <motion.div
                       key="register-step-1"
                       initial={
-                        shouldReduceMotion ? { opacity: 1 } : { opacity: 0, x: -12 }
+                        shouldReduceMotion
+                          ? { opacity: 1 }
+                          : { opacity: 0, x: -12 }
                       }
                       animate={{ opacity: 1, x: 0 }}
                       exit={
-                        shouldReduceMotion ? { opacity: 0 } : { opacity: 0, x: 12 }
+                        shouldReduceMotion
+                          ? { opacity: 0 }
+                          : { opacity: 0, x: 12 }
                       }
                       transition={{ duration: 0.22 }}
                       className="flex flex-col"
@@ -615,11 +627,11 @@ export default function CadastroPage() {
                         Crie sua conta no Legion Altaire
                       </h1>
                       <p className="mt-1.5 w-full text-justify [text-align-last:left] hyphens-auto font-la-sans text-[0.875rem] leading-[1.6] text-la-text-secondary">
-                        Comece configurando suas credenciais de acesso para
-                        estruturar seu primeiro Projeto Editorial.
+                        Configure suas credenciais de titularidade para acessar
+                        o Sistema Operacional Editorial.
                       </p>
 
-                      {/* GRADE DE LOGIN SOCIAL: Google (Principal) + Apple + Microsoft */}
+                      {/* Grade de Login Social: Google + Apple + Microsoft */}
                       <div className="mt-5 grid grid-cols-1 gap-2.5 sm:grid-cols-12">
                         <button
                           type="button"
@@ -652,7 +664,9 @@ export default function CadastroPage() {
                             type="button"
                             disabled={isSocialLoading}
                             aria-label="Cadastrar com a Microsoft"
-                            onClick={() => handleSocialQuickRegister("microsoft")}
+                            onClick={() =>
+                              handleSocialQuickRegister("microsoft")
+                            }
                             className="flex min-h-[2.875rem] items-center justify-center rounded-la-md border border-white/14 bg-white/[0.04] px-4 py-2 transition-all duration-200 hover:border-la-border-gold/65 hover:bg-white/[0.08] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-la-gold-light"
                           >
                             <MicrosoftBrandIcon />
@@ -745,17 +759,14 @@ export default function CadastroPage() {
                           ) : null}
                         </div>
 
-                        {/* Senha e Confirmação na Mesma Linha no Desktop */}
                         <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2">
                           <div className="flex flex-col gap-1.5">
-                            <div className="flex items-center justify-between">
-                              <label
-                                htmlFor="reg-password"
-                                className="font-la-mono text-[0.6875rem] font-semibold uppercase tracking-[0.08em] text-la-text-secondary"
-                              >
-                                Crie uma Senha *
-                              </label>
-                            </div>
+                            <label
+                              htmlFor="reg-password"
+                              className="font-la-mono text-[0.6875rem] font-semibold uppercase tracking-[0.08em] text-la-text-secondary"
+                            >
+                              Crie uma Senha *
+                            </label>
                             <div className="relative flex items-center">
                               <Lock
                                 aria-hidden="true"
@@ -780,15 +791,25 @@ export default function CadastroPage() {
                               <button
                                 type="button"
                                 aria-label={
-                                  showPassword ? "Ocultar senha" : "Mostrar senha"
+                                  showPassword
+                                    ? "Ocultar senha"
+                                    : "Mostrar senha"
                                 }
-                                onClick={() => setShowPassword((prev) => !prev)}
+                                onClick={() =>
+                                  setShowPassword((prev) => !prev)
+                                }
                                 className="absolute right-2.5 inline-flex h-7 w-7 items-center justify-center rounded-la-xs text-la-text-secondary hover:text-la-gold-light"
                               >
                                 {showPassword ? (
-                                  <EyeOff aria-hidden="true" className="h-4 w-4" />
+                                  <EyeOff
+                                    aria-hidden="true"
+                                    className="h-4 w-4"
+                                  />
                                 ) : (
-                                  <Eye aria-hidden="true" className="h-4 w-4" />
+                                  <Eye
+                                    aria-hidden="true"
+                                    className="h-4 w-4"
+                                  />
                                 )}
                               </button>
                             </div>
@@ -809,7 +830,9 @@ export default function CadastroPage() {
                               <input
                                 id="reg-confirmPassword"
                                 name="confirmPassword"
-                                type={showConfirmPassword ? "text" : "password"}
+                                type={
+                                  showConfirmPassword ? "text" : "password"
+                                }
                                 autoComplete="new-password"
                                 placeholder="Repita a senha"
                                 value={credentials.confirmPassword}
@@ -825,15 +848,25 @@ export default function CadastroPage() {
                               <button
                                 type="button"
                                 aria-label={
-                                  showConfirmPassword ? "Ocultar confirmação" : "Mostrar confirmação"
+                                  showConfirmPassword
+                                    ? "Ocultar confirmação"
+                                    : "Mostrar confirmação"
                                 }
-                                onClick={() => setShowConfirmPassword((prev) => !prev)}
+                                onClick={() =>
+                                  setShowConfirmPassword((prev) => !prev)
+                                }
                                 className="absolute right-2.5 inline-flex h-7 w-7 items-center justify-center rounded-la-xs text-la-text-secondary hover:text-la-gold-light"
                               >
                                 {showConfirmPassword ? (
-                                  <EyeOff aria-hidden="true" className="h-4 w-4" />
+                                  <EyeOff
+                                    aria-hidden="true"
+                                    className="h-4 w-4"
+                                  />
                                 ) : (
-                                  <Eye aria-hidden="true" className="h-4 w-4" />
+                                  <Eye
+                                    aria-hidden="true"
+                                    className="h-4 w-4"
+                                  />
                                 )}
                               </button>
                             </div>
@@ -847,7 +880,8 @@ export default function CadastroPage() {
                               className="flex w-2/3 gap-1.5"
                             >
                               {[1, 2, 3, 4].map((level) => {
-                                const isFilled = passwordStrengthScore >= level;
+                                const isFilled =
+                                  passwordStrengthScore >= level;
                                 return (
                                   <div
                                     key={level}
@@ -868,16 +902,43 @@ export default function CadastroPage() {
                             </span>
                           </div>
                           <div className="mt-1 grid grid-cols-2 gap-1 font-la-mono text-[0.625rem]">
-                            <span className={passwordChecks.minLength ? "text-la-gold-light" : "text-la-text-muted"}>
-                              {passwordChecks.minLength ? "✓" : "•"} 8+ caracteres
+                            <span
+                              className={
+                                passwordChecks.minLength
+                                  ? "text-la-gold-light"
+                                  : "text-la-text-muted"
+                              }
+                            >
+                              {passwordChecks.minLength ? "✓" : "•"} 8+
+                              caracteres
                             </span>
-                            <span className={passwordChecks.hasUpper ? "text-la-gold-light" : "text-la-text-muted"}>
-                              {passwordChecks.hasUpper ? "✓" : "•"} 1 letra maiúscula
+                            <span
+                              className={
+                                passwordChecks.hasUpper
+                                  ? "text-la-gold-light"
+                                  : "text-la-text-muted"
+                              }
+                            >
+                              {passwordChecks.hasUpper ? "✓" : "•"} 1 letra
+                              maiúscula
                             </span>
-                            <span className={passwordChecks.hasLower ? "text-la-gold-light" : "text-la-text-muted"}>
-                              {passwordChecks.hasLower ? "✓" : "•"} 1 letra minúscula
+                            <span
+                              className={
+                                passwordChecks.hasLower
+                                  ? "text-la-gold-light"
+                                  : "text-la-text-muted"
+                              }
+                            >
+                              {passwordChecks.hasLower ? "✓" : "•"} 1 letra
+                              minúscula
                             </span>
-                            <span className={passwordChecks.hasNumber ? "text-la-gold-light" : "text-la-text-muted"}>
+                            <span
+                              className={
+                                passwordChecks.hasNumber
+                                  ? "text-la-gold-light"
+                                  : "text-la-text-muted"
+                              }
+                            >
                               {passwordChecks.hasNumber ? "✓" : "•"} 1 número
                             </span>
                           </div>
@@ -942,29 +1003,34 @@ export default function CadastroPage() {
                           type="submit"
                           className="mt-2 inline-flex min-h-[3rem] w-full items-center justify-center gap-2 rounded-la-md bg-la-gold px-6 py-3 font-la-sans text-[0.9375rem] font-semibold text-la-text-inverse shadow-[var(--la-elevation-gold)] transition-colors hover:bg-la-gold-light focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-la-gold-light"
                         >
-                          <span>Avançar para o 1º Projeto Editorial</span>
+                          <span>Avançar para Perfil de Atuação</span>
                           <ArrowRight aria-hidden="true" className="h-4 w-4" />
                         </button>
                       </form>
                     </motion.div>
                   ) : null}
 
+                  {/* PASSO 2: APENAS PERFIL DE OPERAÇÃO, WHATSAPP, NICHO E SEGMENTO PRINCIPAL (PONTO 01) */}
                   {currentStep === 2 ? (
                     <motion.div
                       key="register-step-2"
                       initial={
-                        shouldReduceMotion ? { opacity: 1 } : { opacity: 0, x: 14 }
+                        shouldReduceMotion
+                          ? { opacity: 1 }
+                          : { opacity: 0, x: 14 }
                       }
                       animate={{ opacity: 1, x: 0 }}
                       exit={
-                        shouldReduceMotion ? { opacity: 0 } : { opacity: 0, x: -14 }
+                        shouldReduceMotion
+                          ? { opacity: 0 }
+                          : { opacity: 0, x: -14 }
                       }
                       transition={{ duration: 0.22 }}
                       className="flex flex-col"
                     >
                       <div className="flex items-center justify-between gap-2">
                         <h2 className="text-balance font-la-sans text-[1.5rem] font-semibold leading-[1.18] text-la-text-primary sm:text-[1.6875rem]">
-                          Configure seu 1º Projeto Editorial
+                          Perfil de Operação e Atuação
                         </h2>
                         <button
                           type="button"
@@ -977,9 +1043,10 @@ export default function CadastroPage() {
                       </div>
 
                       <p className="mt-1.5 w-full text-justify [text-align-last:left] hyphens-auto font-la-sans text-[0.8125rem] leading-[1.58] text-la-text-secondary">
-                        Essas informações alimentam a semente da sua Base
-                        Estratégica e personalizam a plataforma para o momento
-                        real da sua operação.
+                        Informe seu perfil operacional, contato e segmento de
+                        atuação principal. Seus Projetos Editoriais serão
+                        estruturados diretamente dentro da plataforma após a
+                        confirmação.
                       </p>
 
                       <form
@@ -987,21 +1054,28 @@ export default function CadastroPage() {
                         noValidate
                         className="mt-4 flex flex-col gap-3.5"
                       >
+                        {/* 1. Perfil da Operação */}
                         <div className="flex flex-col gap-1.5">
                           <span className="font-la-mono text-[0.6875rem] font-semibold uppercase tracking-[0.08em] text-la-text-secondary">
-                            Qual é o perfil da sua operação?
+                            Qual é o perfil da sua operação? *
                           </span>
                           <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
                             {OPERATION_PROFILES.map((prof) => {
-                              const isSelected = operationProfile === prof.id;
+                              const isSelected =
+                                profileData.operationProfile === prof.id;
                               return (
                                 <button
                                   key={prof.id}
                                   type="button"
                                   aria-pressed={isSelected}
-                                  onClick={() => setOperationProfile(prof.id)}
+                                  onClick={() =>
+                                    setProfileData((prev) => ({
+                                      ...prev,
+                                      operationProfile: prof.id,
+                                    }))
+                                  }
                                   className={clsx(
-                                    "flex flex-col rounded-la-md border px-3 py-2 text-left transition-colors",
+                                    "flex flex-col rounded-la-md border px-3 py-2.5 text-left transition-colors",
                                     isSelected
                                       ? "border-la-gold bg-la-gold-faint text-la-text-primary"
                                       : "border-white/10 bg-black/45 text-la-text-secondary hover:border-white/25"
@@ -1019,97 +1093,49 @@ export default function CadastroPage() {
                           </div>
                         </div>
 
-                        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                          <div className="flex flex-col gap-1.5">
-                            <label
-                              htmlFor="reg-primaryGoal"
-                              className="font-la-mono text-[0.6875rem] font-semibold uppercase tracking-[0.08em] text-la-text-secondary"
-                            >
-                              Foco do Período
-                            </label>
-                            <select
-                              id="reg-primaryGoal"
-                              value={primaryGoal}
-                              onChange={(e) => setPrimaryGoal(e.target.value)}
-                              className="min-h-[2.625rem] w-full rounded-la-md border border-white/12 bg-black/60 px-3 py-2 font-la-sans text-[0.8125rem] text-la-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-la-gold-light"
-                            >
-                              {PRIMARY_GOALS.map((g) => (
-                                <option
-                                  key={g.id}
-                                  value={g.id}
-                                  className="bg-[#0B0E17]"
-                                >
-                                  {g.label}
-                                </option>
-                              ))}
-                            </select>
-                          </div>
-
-                          <div className="flex flex-col gap-1.5">
-                            <label
-                              htmlFor="reg-whatsapp"
-                              className="font-la-mono text-[0.6875rem] font-semibold uppercase tracking-[0.08em] text-la-text-secondary"
-                            >
-                              WhatsApp (Opcional)
-                            </label>
-                            <div className="relative flex items-center">
-                              <Phone
-                                aria-hidden="true"
-                                className="pointer-events-none absolute left-3 h-3.5 w-3.5 text-la-gold/80"
-                              />
-                              <input
-                                id="reg-whatsapp"
-                                type="tel"
-                                placeholder="(11) 99999-9999"
-                                value={whatsappPhone}
-                                onChange={(e) => setWhatsappPhone(e.target.value)}
-                                className="min-h-[2.625rem] w-full rounded-la-md border border-white/12 bg-black/55 py-2 pr-3 pl-9 font-la-sans text-[0.8125rem] text-la-text-primary placeholder:text-white/25 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-la-gold-light"
-                              />
-                            </div>
-                          </div>
-                        </div>
-
+                        {/* 2. WhatsApp */}
                         <div className="flex flex-col gap-1.5">
                           <label
-                            htmlFor="reg-firstProjectName"
+                            htmlFor="reg-whatsapp"
                             className="font-la-mono text-[0.6875rem] font-semibold uppercase tracking-[0.08em] text-la-text-secondary"
                           >
-                            Nome do 1º Projeto Editorial *
+                            WhatsApp de Contato *
                           </label>
                           <div className="relative flex items-center">
-                            <FolderKanban
+                            <Phone
                               aria-hidden="true"
                               className="pointer-events-none absolute left-3.5 h-4 w-4 text-la-gold/80"
                             />
                             <input
-                              id="reg-firstProjectName"
-                              name="firstProjectName"
-                              type="text"
-                              placeholder="Ex.: Operação Principal — Mentoria High-Ticket"
-                              value={onboarding.firstProjectName}
+                              id="reg-whatsapp"
+                              name="whatsapp"
+                              type="tel"
+                              placeholder="(11) 99999-9999"
+                              value={profileData.whatsapp}
                               onChange={handleStep2InputChange}
                               className={clsx(
                                 "min-h-[2.75rem] w-full rounded-la-md border bg-black/55 py-2 pr-4 pl-10 font-la-sans text-[0.875rem] text-la-text-primary placeholder:text-white/25",
                                 "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-la-gold-light",
-                                step2Errors.firstProjectName
+                                step2Errors.whatsapp
                                   ? "border-red-500/70"
                                   : "border-white/12 hover:border-white/25"
                               )}
                             />
                           </div>
-                          {step2Errors.firstProjectName ? (
+                          {step2Errors.whatsapp ? (
                             <p className="font-la-mono text-[0.6875rem] text-red-400">
-                              {step2Errors.firstProjectName}
+                              {step2Errors.whatsapp}
                             </p>
                           ) : null}
                         </div>
 
+                        {/* 3. Nicho Principal */}
                         <div className="flex flex-col gap-1.5">
                           <label
                             htmlFor="reg-niche"
                             className="font-la-mono text-[0.6875rem] font-semibold uppercase tracking-[0.08em] text-la-text-secondary"
                           >
-                            Nicho / Segmento de Atuação *
+                            Nicho Principal *
                           </label>
                           <div className="relative flex items-center">
                             <Briefcase
@@ -1120,8 +1146,8 @@ export default function CadastroPage() {
                               id="reg-niche"
                               name="niche"
                               type="text"
-                              placeholder="Ex.: Consultoria Financeira B2B, Saúde Integrativa, SaaS..."
-                              value={onboarding.niche}
+                              placeholder="Ex.: Finanças, Saúde, Marketing Digital, Direito..."
+                              value={profileData.niche}
                               onChange={handleStep2InputChange}
                               className={clsx(
                                 "min-h-[2.75rem] w-full rounded-la-md border bg-black/55 py-2 pr-4 pl-10 font-la-sans text-[0.875rem] text-la-text-primary placeholder:text-white/25",
@@ -1139,31 +1165,38 @@ export default function CadastroPage() {
                           ) : null}
                         </div>
 
+                        {/* 4. Segmento de Atuação Principal */}
                         <div className="flex flex-col gap-1.5">
                           <label
-                            htmlFor="reg-mainOffer"
+                            htmlFor="reg-mainSegment"
                             className="font-la-mono text-[0.6875rem] font-semibold uppercase tracking-[0.08em] text-la-text-secondary"
                           >
-                            Sua Oferta Principal (O que você vende?) *
+                            Segmento de Atuação Principal *
                           </label>
-                          <textarea
-                            id="reg-mainOffer"
-                            name="mainOffer"
-                            rows={2}
-                            placeholder="Descreva em 1 frase sua oferta principal ou serviço que o conteúdo deve apoiar..."
-                            value={onboarding.mainOffer}
-                            onChange={handleStep2InputChange}
-                            className={clsx(
-                              "w-full rounded-la-md border bg-black/55 px-3.5 py-2 font-la-sans text-[0.875rem] text-la-text-primary placeholder:text-white/25",
-                              "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-la-gold-light",
-                              step2Errors.mainOffer
-                                ? "border-red-500/70"
-                                : "border-white/12 hover:border-white/25"
-                            )}
-                          />
-                          {step2Errors.mainOffer ? (
+                          <div className="relative flex items-center">
+                            <Compass
+                              aria-hidden="true"
+                              className="pointer-events-none absolute left-3.5 h-4 w-4 text-la-gold/80"
+                            />
+                            <input
+                              id="reg-mainSegment"
+                              name="mainSegment"
+                              type="text"
+                              placeholder="Ex.: Consultoria Financeira B2B, Mentoria para Médicos, SaaS..."
+                              value={profileData.mainSegment}
+                              onChange={handleStep2InputChange}
+                              className={clsx(
+                                "min-h-[2.75rem] w-full rounded-la-md border bg-black/55 py-2 pr-4 pl-10 font-la-sans text-[0.875rem] text-la-text-primary placeholder:text-white/25",
+                                "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-la-gold-light",
+                                step2Errors.mainSegment
+                                  ? "border-red-500/70"
+                                  : "border-white/12 hover:border-white/25"
+                              )}
+                            />
+                          </div>
+                          {step2Errors.mainSegment ? (
                             <p className="font-la-mono text-[0.6875rem] text-red-400">
-                              {step2Errors.mainOffer}
+                              {step2Errors.mainSegment}
                             </p>
                           ) : null}
                         </div>
@@ -1179,12 +1212,15 @@ export default function CadastroPage() {
                           {isSubmitting ? (
                             <>
                               <span className="h-4 w-4 animate-spin rounded-full border-2 border-la-text-inverse border-t-transparent" />
-                              <span>Provisionando Projeto Editorial...</span>
+                              <span>Validando perfil...</span>
                             </>
                           ) : (
                             <>
-                              <span>Concluir cadastro e validar acesso</span>
-                              <ArrowRight aria-hidden="true" className="h-4 w-4" />
+                              <span>Concluir dados e confirmar conta</span>
+                              <ArrowRight
+                                aria-hidden="true"
+                                className="h-4 w-4"
+                              />
                             </>
                           )}
                         </button>
@@ -1192,6 +1228,7 @@ export default function CadastroPage() {
                     </motion.div>
                   ) : null}
 
+                  {/* PASSO 3: CONFIRMAÇÃO DE E-MAIL E ENTRADA NA CENTRAL ESTRATÉGICA */}
                   {currentStep === 3 ? (
                     <motion.div
                       key="register-step-3"
@@ -1209,7 +1246,7 @@ export default function CadastroPage() {
                       </div>
 
                       <span className="mt-4 font-la-mono text-[0.6875rem] font-semibold uppercase tracking-[0.08em] text-la-gold-light">
-                        Conta & 1º Projeto Editorial Criados
+                        Cadastro Concluído · Validação de Titularidade
                       </span>
 
                       <h2 className="mt-1 text-balance font-la-sans text-[1.625rem] font-semibold leading-[1.18] text-la-text-primary">
@@ -1221,11 +1258,12 @@ export default function CadastroPage() {
                         <strong className="text-la-gold-light">
                           {credentials.email}
                         </strong>
-                        . Seu ambiente{" "}
+                        . Ao confirmar, você entrará na{" "}
                         <strong className="text-la-text-primary">
-                          &ldquo;{onboarding.firstProjectName}&rdquo;
+                          Central Estratégica
                         </strong>{" "}
-                        já está preparado para iniciar a Base Estratégica.
+                        para estruturar seu primeiro Projeto Editorial dentro da
+                        plataforma.
                       </p>
 
                       <form
@@ -1273,7 +1311,7 @@ export default function CadastroPage() {
                           type="submit"
                           className="inline-flex min-h-[3.125rem] w-full items-center justify-center gap-2 rounded-la-md bg-la-gold px-6 py-3 font-la-sans text-[0.9375rem] font-semibold text-la-text-inverse shadow-[var(--la-elevation-gold)] transition-colors hover:bg-la-gold-light focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-la-gold-light"
                         >
-                          <span>Confirmar e entrar na Base Estratégica</span>
+                          <span>Confirmar e acessar a plataforma</span>
                           <ArrowRight aria-hidden="true" className="h-4 w-4" />
                         </button>
                       </form>
@@ -1296,7 +1334,7 @@ export default function CadastroPage() {
             </div>
           </div>
 
-          {/* COLUNA DIREITA (6 COLS): PALCO 3D/2.5D */}
+          {/* COLUNA DIREITA (6 COLS): PALCO 3D DO PERFIL OPERACIONAL */}
           <div className="hidden lg:col-span-6 lg:block">
             <div
               ref={stageRef}
@@ -1343,7 +1381,10 @@ export default function CadastroPage() {
 
                 <div className="relative z-10 flex items-center justify-between gap-3 border-b border-white/10 pb-4">
                   <div className="flex items-center gap-2.5">
-                    <div aria-hidden="true" className="flex items-center gap-1.5">
+                    <div
+                      aria-hidden="true"
+                      className="flex items-center gap-1.5"
+                    >
                       <span className="h-2 w-2 rounded-la-full bg-white/15" />
                       <span className="h-2 w-2 rounded-la-full bg-white/15" />
                       <span className="h-2 w-2 rounded-la-full bg-la-gold/80" />
@@ -1353,40 +1394,44 @@ export default function CadastroPage() {
                       className="ml-1 h-4 w-4 text-la-gold"
                     />
                     <span className="font-la-mono text-[0.6875rem] font-semibold uppercase tracking-[0.08em] text-la-gold-light">
-                      Blueprint do Projeto Editorial · Etapa 0{currentStep}/03
+                      Credenciamento Operacional · Etapa 0{currentStep}/03
                     </span>
                   </div>
 
                   <span className="rounded-la-full border border-la-border-gold/55 bg-la-gold-faint px-2.5 py-0.5 font-la-mono text-[0.625rem] font-semibold text-la-gold-light">
-                    Setup Guiado
+                    Acesso Blindado
                   </span>
                 </div>
 
                 <div className="relative z-10 mt-5 grid grid-cols-12 items-center gap-5">
                   <div className="col-span-7 flex flex-col gap-2.5">
                     <span className="font-la-mono text-[0.625rem] font-semibold uppercase tracking-[0.08em] text-la-gold-light">
-                      PREVIEW EM TEMPO REAL DA SUA OPERAÇÃO
+                      SÍNTESE DO SEU CREDENCIAMENTO
                     </span>
 
                     <div className="rounded-la-lg border border-la-border-gold/45 bg-black/55 p-3.5">
                       <div className="flex items-center justify-between">
                         <span className="font-la-mono text-[0.5625rem] uppercase text-la-text-muted">
-                          Projeto Editorial
+                          Perfil de Operação
                         </span>
                         <span className="font-la-mono text-[0.5625rem] text-la-gold-light">
-                          {operationProfile.toUpperCase()}
+                          {selectedProfileMeta.label}
                         </span>
                       </div>
                       <p className="mt-1 truncate font-la-sans text-[0.9375rem] font-semibold text-la-text-primary">
-                        {onboarding.firstProjectName.trim() ||
-                          (credentials.fullName.trim()
-                            ? `Projeto Editorial — ${credentials.fullName.trim().split(" ")[0]}`
-                            : "Seu 1º Projeto Editorial")}
+                        {credentials.fullName.trim() || "Titular da Conta"}
                       </p>
                       <p className="mt-1 truncate font-la-mono text-[0.6875rem] text-la-text-secondary">
                         Nicho:{" "}
                         <span className="text-la-gold-light">
-                          {onboarding.niche.trim() || "Em configuração..."}
+                          {profileData.niche.trim() || "Aguardando nicho"}
+                        </span>
+                      </p>
+                      <p className="mt-0.5 truncate font-la-mono text-[0.6875rem] text-la-text-secondary">
+                        Segmento:{" "}
+                        <span className="text-la-text-primary">
+                          {profileData.mainSegment.trim() ||
+                            "Aguardando segmento"}
                         </span>
                       </p>
                     </div>
@@ -1394,18 +1439,18 @@ export default function CadastroPage() {
                     <div className="grid grid-cols-2 gap-2">
                       <div className="rounded-la-md border border-white/10 bg-white/[0.025] p-2.5">
                         <span className="block font-la-mono text-[0.5625rem] uppercase text-la-text-muted">
-                          Titular da Conta
+                          WhatsApp
                         </span>
                         <span className="mt-0.5 block truncate font-la-sans text-[0.75rem] font-semibold text-la-text-primary">
-                          {credentials.fullName.trim() || "Aguardando nome"}
+                          {profileData.whatsapp.trim() || "Não informado"}
                         </span>
                       </div>
                       <div className="rounded-la-md border border-white/10 bg-white/[0.025] p-2.5">
                         <span className="block font-la-mono text-[0.5625rem] uppercase text-la-text-muted">
-                          Próximo Destino
+                          Destino Pós-Cadastro
                         </span>
                         <span className="mt-0.5 block truncate font-la-sans text-[0.75rem] font-semibold text-la-gold-light">
-                          Base Estratégica
+                          Central Estratégica
                         </span>
                       </div>
                     </div>
@@ -1511,11 +1556,17 @@ export default function CadastroPage() {
 
                 <div className="relative z-10 mt-5 grid grid-cols-2 gap-3 border-t border-white/10 pt-4 font-la-mono text-[0.6875rem] text-la-text-secondary">
                   <div className="flex items-center gap-2">
-                    <ShieldCheck aria-hidden="true" className="h-3.5 w-3.5 text-la-gold" />
-                    <span>Contexto 100% isolado por projeto</span>
+                    <ShieldCheck
+                      aria-hidden="true"
+                      className="h-3.5 w-3.5 text-la-gold"
+                    />
+                    <span>Projetos criados dentro da plataforma</span>
                   </div>
                   <div className="flex items-center gap-2">
-                    <Sparkles aria-hidden="true" className="h-3.5 w-3.5 text-la-gold" />
+                    <Sparkles
+                      aria-hidden="true"
+                      className="h-3.5 w-3.5 text-la-gold"
+                    />
                     <span>Aprovação humana em cada etapa</span>
                   </div>
                 </div>
@@ -1526,11 +1577,29 @@ export default function CadastroPage() {
       </main>
 
       <footer className="relative z-20 mx-auto flex w-full max-w-[84rem] flex-col items-center justify-between gap-2 border-t border-white/10 px-5 py-4 text-center font-la-mono text-[0.6875rem] text-la-text-muted sm:flex-row sm:px-8 lg:px-10">
-        <span>© {new Date().getFullYear()} Legion Altaire. Todos os direitos reservados.</span>
+        <span>
+          © {new Date().getFullYear()} Legion Altaire. Todos os direitos
+          reservados.
+        </span>
         <div className="flex flex-wrap items-center justify-center gap-4">
-          <Link href={ROUTES.termosDeUso} className="transition-colors hover:text-la-gold-light">Termos de Uso</Link>
-          <Link href={ROUTES.politicaDePrivacidade} className="transition-colors hover:text-la-gold-light">Política de Privacidade</Link>
-          <Link href={ROUTES.precos} className="transition-colors hover:text-la-gold-light">Planos e Preços</Link>
+          <Link
+            href={ROUTES.termosDeUso}
+            className="transition-colors hover:text-la-gold-light"
+          >
+            Termos de Uso
+          </Link>
+          <Link
+            href={ROUTES.politicaDePrivacidade}
+            className="transition-colors hover:text-la-gold-light"
+          >
+            Política de Privacidade
+          </Link>
+          <Link
+            href={ROUTES.precos}
+            className="transition-colors hover:text-la-gold-light"
+          >
+            Planos e Preços
+          </Link>
         </div>
       </footer>
     </div>
