@@ -3,7 +3,10 @@ import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { registerSchema } from "@/lib/validations/auth";
 import { createAuthToken } from "@/lib/auth/token.service";
-import { findOrCreateBackendUser } from "@/lib/auth/userProvision";
+import {
+  AuthBackendError,
+  registerBackendUser,
+} from "@/lib/auth/userProvision";
 import type { AuthResponse, UserSession } from "@/types/auth";
 
 export async function POST(request: Request) {
@@ -27,12 +30,11 @@ export async function POST(request: Request) {
       );
     }
 
-    // Cria o usuário real no BackEnd NestJS (MongoDB) sem criar projeto editorial nem organização
-    const provisioned = await findOrCreateBackendUser({
+    // Cria o usuário real no BackEnd NestJS (MongoDB) com senha criptografada via bcrypt
+    const provisioned = await registerBackendUser({
       email,
       fullName,
       password,
-      createIfMissing: true,
     });
 
     const token = await createAuthToken({
@@ -40,14 +42,14 @@ export async function POST(request: Request) {
       email: provisioned.email,
       name: provisioned.fullName,
       org: "altaire",
-      role: "owner",
+      role: provisioned.role,
     });
 
     const userSession: UserSession = {
       id: provisioned.id,
       email: provisioned.email,
       fullName: provisioned.fullName,
-      role: "owner",
+      role: provisioned.role,
       tier: "free",
       hasActiveProject: false,
       activeProjectContext: null,
@@ -77,6 +79,12 @@ export async function POST(request: Request) {
 
     return NextResponse.json(responsePayload, { status: 201 });
   } catch (error) {
+    if (error instanceof AuthBackendError) {
+      return NextResponse.json(
+        { success: false, message: error.message },
+        { status: error.statusCode }
+      );
+    }
     console.error("[REGISTER_ERROR]", error);
     return NextResponse.json(
       { success: false, message: "Falha interna no servidor ao criar conta." },

@@ -19,9 +19,19 @@ export class EditorialProjectMongooseRepository implements EditorialProjectRepos
     private readonly projectModel: Model<EditorialProjectDocument>,
   ) {}
 
-  async findAll(orgId: string): Promise<IEditorialProject[]> {
+  async findAll(
+    orgId: string,
+    createdBy?: string,
+  ): Promise<IEditorialProject[]> {
+    const query: Record<string, any> = {
+      orgId,
+      isActive: { $ne: false },
+    };
+    if (createdBy && (Types.ObjectId as any).isValid(createdBy)) {
+      query.createdBy = new (Types.ObjectId as any)(createdBy);
+    }
     const projects = await this.projectModel
-      .find({ orgId, isActive: { $ne: false } })
+      .find(query)
       .sort({ updatedAt: -1 })
       .lean()
       .exec();

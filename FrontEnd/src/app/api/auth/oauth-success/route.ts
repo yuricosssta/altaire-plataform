@@ -1,0 +1,71 @@
+import { NextResponse } from "next/server";
+import { auth } from "@/auth";
+import { createAuthToken } from "@/lib/auth/token.service";
+import {
+  fetchUserEditorialProjects,
+  upsertOAuthBackendUser,
+} from "@/lib/auth/userProvision";
+
+export async function GET(request: Request) {
+  try {
+    const session = await auth();
+
+    if (!session?.user?.email) {
+      return NextResponse.redirect(
+        new URL("/login?error=OAuthSessionMissing", request.url)
+      );
+    }
+
+    const sessionRecord = session as unknown as Record<string, unknown>;
+    let userId = String(sessionRecord.backendUserId || "");
+    let internalToken = String(sessionRecord.internalToken || "");
+    const email = session.user.email;
+    const fullName = session.user.name || email.split("@")[0];
+
+    if (!userId || !internalToken) {
+      const provisioned = await upsertOAuthBackendUser({
+        email,
+        fullName,
+        avatarUrl: session.user.image,
+      });
+      userId = provisioned.id;
+      internalToken = await createAuthToken({
+        sub: provisioned.id,
+        email: provisioned.email,
+        name: provisioned.fullName,
+        org: "altaire",
+        role: provisioned.role,
+      });
+    }
+
+    const userProjects = await fetchUserEditorialProjects(internalToken, userId);
+    const activeProject = userProjects[0] ?? null;
+
+    const redirectPath = activeProject
+      ? `/dashboard/editorial/${activeProject.id}`
+      : "/dashboard/editorial?newProject=true";
+
+    const response = NextResponse.redirect(new URL(redirectPath, request.url));
+    const maxAge = 60 * 60 * 24 * 30; // 30 dias
+
+    for (const cookieName of ["auth_token", "access_token", "la_session_token"]) {
+      response.cookies.set({
+        name: cookieName,
+        value: internalToken,
+        httpOnly: true,
+        secure: process.env.NODE_ENV === "production",
+        sameSite: "lax",
+        maxAge,
+        path: "/",
+      });
+    }
+
+    return response;
+  } catch (error) {
+    console.error("[OAUTH_SUCCESS_CALLBACK_ERROR]", error);
+    return NextResponse.redirect(
+      new URL("/login?error=OAuthCallbackError", request.url)
+    );
+  }
+}
+

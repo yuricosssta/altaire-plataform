@@ -3,6 +3,7 @@
 
 import React, { useState } from "react";
 import Link from "next/link";
+import { useSelector } from "react-redux";
 import {
   LayoutDashboard,
   Users,
@@ -12,12 +13,23 @@ import {
   Archive,
   X
 } from "lucide-react";
-import { OrgSwitcher } from "@/components/dashboard/OrgSwitcher";
 import { usePathname } from "next/navigation";
 import LogoBloco from "../LogoBloco";
+import { selectCurrentOrg } from "@/lib/redux/slices/organizationSlice";
+import { RootState } from "@/lib/redux/store";
 
 export function Sidebar() {
   const [isOpen, setIsOpen] = useState(false);
+  const currentOrg = useSelector(selectCurrentOrg);
+  const authUser = useSelector((state: RootState) => state.auth.user);
+  const profile = useSelector((state: RootState) => state.user?.profile);
+
+  const isManager =
+    currentOrg?.role === "OWNER" ||
+    currentOrg?.role === "ADMIN" ||
+    authUser?.role === "owner" ||
+    authUser?.role === "admin" ||
+    Boolean((profile as Record<string, unknown> | null)?.isAdmin);
 
   const dashboardLinks = [
     { name: "Visão Geral", href: "/dashboard", icon: <Globe className="w-4 h-4" /> },
@@ -25,7 +37,9 @@ export function Sidebar() {
 
   const managementLinks = [
     { name: "Projetos Editoriais", href: "/dashboard/editorial", icon: <LayoutDashboard className="w-4 h-4" /> },
-    { name: "Recursos Humanos", href: "/dashboard/people", icon: <Users className="w-4 h-4" /> },
+    ...(isManager
+      ? [{ name: "Recursos Humanos", href: "/dashboard/people", icon: <Users className="w-4 h-4" /> }]
+      : []),
   ];
 
   const settingsLinks = [
@@ -56,15 +70,6 @@ export function Sidebar() {
         <div className="h-14 flex items-center justify-between px-6 border-b border-border">
           <LogoBloco />
           <button onClick={() => setIsOpen(false)} className="md:hidden p-1 -mr-2 text-muted-foreground hover:text-foreground">
-            <X className="w-5 h-5" />
-          </button>
-        </div>
-        <div className="p-4 border-b border-border flex justify-between items-center">
-          <div className="flex-1">
-            <OrgSwitcher />
-          </div>
-          {/* Botão Fechar (Mobile apenas) */}
-          <button onClick={() => setIsOpen(false)} className="md:hidden p-1 text-muted-foreground hover:text-foreground">
             <X className="w-5 h-5" />
           </button>
         </div>

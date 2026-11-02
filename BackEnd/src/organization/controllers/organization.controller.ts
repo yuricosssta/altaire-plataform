@@ -16,7 +16,7 @@ import { OrganizationService } from '../services/organization.service';
 import { CreateOrganizationDto } from '../dto/create-organization.dto';
 import { AuthGuard } from '../../auth/auth.guard';
 import { ConfigService } from '@nestjs/config';
-import { IUser } from 'src/users/schemas/models/user.interface';
+import { isAltaireOwnerOrAdmin } from '../../shared/utils/org-role.util';
 
 @Controller('organizations')
 @UseGuards(AuthGuard)
@@ -35,18 +35,32 @@ export class OrganizationController {
   @Get('my-orgs')
   getMyOrgs(@Req() req: any) {
     const userId = req.user.sub || req.user.id;
-    return this.orgService.findAllForUser(userId);
+    return this.orgService.findAllForUser(userId, req.user?.email);
   }
 
-  // Busca de membros ---
+  // Busca de membros (Restrito a OWNER e ADMIN) ---
   @Get(':orgId/members')
-  getMembers(@Param('orgId') orgId: string) {
+  getMembers(@Param('orgId') orgId: string, @Req() req: any) {
+    if (!isAltaireOwnerOrAdmin(req.user?.email, req.user?.role)) {
+      throw new ForbiddenException(
+        'Acesso restrito aos gestores (OWNER/ADMIN) da Altaire.',
+      );
+    }
     return this.orgService.findMembersByOrganization(orgId);
   }
 
-  // Adição de membro
+  // Adição de membro (Restrito a OWNER e ADMIN)
   @Post(':orgId/members')
-  addMember(@Param('orgId') orgId: string, @Body() body: any) {
+  addMember(
+    @Param('orgId') orgId: string,
+    @Body() body: any,
+    @Req() req: any,
+  ) {
+    if (!isAltaireOwnerOrAdmin(req.user?.email, req.user?.role)) {
+      throw new ForbiddenException(
+        'Apenas gestores (OWNER/ADMIN) podem adicionar membros.',
+      );
+    }
     return this.orgService.addMemberToOrganization(orgId, body);
   }
 

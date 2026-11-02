@@ -6,7 +6,7 @@ export abstract class UsersRepository {
   abstract getAllUsers(): Promise<IUser[]>;
   abstract searchUser(term: string): Promise<IUser[]>;
   abstract getUser(userId: string): Promise<IUser>;
-  abstract createUser(user: CreateUser): Promise<IUser>;
+  abstract createUser(user: Partial<IUser>): Promise<IUser>;
   abstract deleteUser(userId: string): Promise<IUser | null>;
   abstract findOneByEmail(email: string): Promise<IUser | undefined>;
   abstract updateUser(

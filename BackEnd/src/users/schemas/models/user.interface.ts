@@ -11,6 +11,8 @@ export interface IUser {
   email: string;
   name: string;
   password?: string;
+  googleId?: string;
+  authProvider?: 'local' | 'google';
   isAdmin: boolean;
   rule: UserRule;
   avatarUrl?: string;

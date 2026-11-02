@@ -4,17 +4,13 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useSelector } from 'react-redux';
 import { Folder, Calendar, PenTool, Clock, Loader2 } from 'lucide-react';
 import { ProjectCardDTO } from '@/lib/dto/editorial.schema';
 import { editorialService } from '@/lib/services/editorialService';
 import { NewProjectDialog } from '@/components/editorial/NewProjectDialog';
-import { selectAllOrgs, selectOrgStatus } from '@/lib/redux/slices/organizationSlice';
 
 export default function EditorialDashboardPage() {
   const router = useRouter();
-  const organizations = useSelector(selectAllOrgs);
-  const orgStatus = useSelector(selectOrgStatus);
 
   const [projects, setProjects] = useState<ProjectCardDTO[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -30,12 +26,9 @@ export default function EditorialDashboardPage() {
     }
   }, []);
 
-  // Abre o modal de Novo Projeto automaticamente após a organização existir (evita conflito de foco com CreateOrganizationModal)
+  // Abre o modal de Novo Projeto imediatamente no 1º acesso (organização Altaire já é fixa)
   const canAutoOpenNewProject =
-    !isLoading &&
-    (shouldPromptNewProject || projects.length === 0) &&
-    orgStatus === 'succeeded' &&
-    organizations.length > 0;
+    !isLoading && (shouldPromptNewProject || projects.length === 0);
 
   useEffect(() => {
     let active = true;
