@@ -67,10 +67,13 @@ export async function uploadFileToR2(file: File): Promise<string> {
 
     return fileUrl;
 
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("Erro no serviço central de upload:", error);
 
-    if (error.response && error.response.data && error.response.data.message) {
+    if (
+      axios.isAxiosError<{ message?: string }>(error) &&
+      error.response?.data?.message
+    ) {
       throw new Error(error.response.data.message);
     }
     throw new Error("Falha ao processar o upload do arquivo.");
