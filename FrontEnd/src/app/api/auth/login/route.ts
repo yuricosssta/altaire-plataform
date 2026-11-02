@@ -4,7 +4,8 @@ import { cookies } from "next/headers";
 import { loginSchema } from "@/lib/validations/auth";
 import { createAuthToken } from "@/lib/auth/token.service";
 import {
-  findOrCreateBackendUser,
+  AuthBackendError,
+  authenticateBackendUser,
   fetchUserEditorialProjects,
 } from "@/lib/auth/userProvision";
 import type { AuthResponse, UserSession } from "@/types/auth";
@@ -30,11 +31,10 @@ export async function POST(request: Request) {
       );
     }
 
-    // Busca ou provisiona o usuário real no MongoDB (BackEnd NestJS)
-    const provisioned = await findOrCreateBackendUser({
+    // Autentica o usuário validando a existência e o hash bcrypt da senha no MongoDB (BackEnd NestJS)
+    const provisioned = await authenticateBackendUser({
       email,
       password,
-      createIfMissing: true,
     });
 
     // Gera JWT real HS256 compatível com o AuthGuard do BackEnd e com o BFF
@@ -43,7 +43,7 @@ export async function POST(request: Request) {
       email: provisioned.email,
       name: provisioned.fullName,
       org: "altaire",
-      role: "owner",
+      role: provisioned.role,
     });
 
     // Verifica se o usuário já possui projetos editoriais ativos no BackEnd
@@ -59,7 +59,7 @@ export async function POST(request: Request) {
       id: provisioned.id,
       email: provisioned.email,
       fullName: provisioned.fullName,
-      role: "owner",
+      role: provisioned.role,
       tier: "pro",
       hasActiveProject,
       activeProjectContext: activeProject,
@@ -95,6 +95,12 @@ export async function POST(request: Request) {
 
     return NextResponse.json(responsePayload, { status: 200 });
   } catch (error) {
+    if (error instanceof AuthBackendError) {
+      return NextResponse.json(
+        { success: false, message: error.message },
+        { status: error.statusCode }
+      );
+    }
     console.error("[LOGIN_ERROR]", error);
     return NextResponse.json(
       { success: false, message: "Falha interna no servidor de autenticação." },

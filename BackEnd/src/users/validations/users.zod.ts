@@ -31,5 +31,19 @@ export const updateUserSchema = z.object({
     .optional(),
 });
 
+export const loginUserSchema = z.object({
+  email: z.string().email('E-mail inválido'),
+  password: z.string().min(1, 'A senha é obrigatória'),
+});
+
+export const oauthUserSchema = z.object({
+  email: z.string().email('E-mail inválido'),
+  name: z.string().min(1, 'Nome é obrigatório'),
+  googleId: z.string().optional(),
+  avatarUrl: z.string().optional(),
+});
+
 export type CreateUser = z.infer<typeof createUserSchema>;
 export type UpdateUser = z.infer<typeof updateUserSchema>;
+export type LoginUser = z.infer<typeof loginUserSchema>;
+export type OAuthUser = z.infer<typeof oauthUserSchema>;

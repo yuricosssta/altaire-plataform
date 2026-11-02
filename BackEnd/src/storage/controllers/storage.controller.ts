@@ -15,6 +15,7 @@ import {
 import { StorageService } from '../services/storage.service';
 import { GetPresignedUrlDto } from '../dto/get-presigned-url.dto';
 import { AuthGuard } from '../../auth/auth.guard';
+import { isAltaireOwnerOrAdmin } from '../../shared/utils/org-role.util';
 
 @Controller('storage')
 @UseGuards(AuthGuard)
@@ -73,36 +74,46 @@ export class StorageController {
     );
   }
 
-  // LISTAR ARQUIVOS DA EMPRESA
+  // LISTAR ARQUIVOS (Isolado por usuário para MEMBER; global/gestão para OWNER/ADMIN)
   @Get('assets')
-  async getAssets(@Headers('x-org-id') orgId: string) {
+  async getAssets(@Headers('x-org-id') orgId: string, @Req() req: any) {
     if (!orgId)
       throw new BadRequestException(
         'Contexto da organização (x-org-id) é obrigatório.',
       );
 
-    return this.storageService.getOrganizationAssets(orgId);
+    const userId = req.user?.sub || req.user?.id;
+    const isManager = isAltaireOwnerOrAdmin(req.user?.email, req.user?.role);
+
+    return this.storageService.getOrganizationAssets(
+      orgId,
+      isManager ? undefined : userId,
+    );
   }
 
-  // EXCLUIR ARQUIVO
+  // EXCLUIR ARQUIVO (Dono do arquivo ou OWNER/ADMIN)
   @Delete('assets/:id')
   async deleteAsset(
     @Param('id') assetId: string,
     @Headers('x-org-id') orgId: string,
-    @Headers('x-org-role') role: string, // Pega o cargo do cabeçalho
+    @Headers('x-org-role') role: string,
+    @Req() req: any,
   ) {
     if (!orgId)
       throw new BadRequestException(
         'Contexto da organização (x-org-id) é obrigatório.',
       );
 
-    // Trava de Segurança Backend: Só dono e admin podem deletar arquivos em nuvem
-    if (role !== 'ADMIN' && role !== 'OWNER') {
-      throw new ForbiddenException(
-        'Apenas administradores podem excluir arquivos do acervo.',
-      );
-    }
+    const userId = req.user?.sub || req.user?.id;
+    const isManager =
+      isAltaireOwnerOrAdmin(req.user?.email, req.user?.role) ||
+      role === 'ADMIN' ||
+      role === 'OWNER';
 
-    return this.storageService.deleteAsset(orgId, assetId);
+    return this.storageService.deleteAsset(
+      orgId,
+      assetId,
+      isManager ? undefined : userId,
+    );
   }
 }

@@ -1,4 +1,8 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import {
+  ForbiddenException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { EditorialProjectRepository } from '../repositories/editorial-project.repository';
 import {
   ICreateEditorialProject,
@@ -9,14 +13,26 @@ import {
 export class EditorialProjectService {
   constructor(private readonly projectRepository: EditorialProjectRepository) {}
 
-  async findAll(orgId: string) {
+  async findAll(orgId: string, createdBy?: string) {
+    if (createdBy) {
+      return this.projectRepository.findAll(orgId, createdBy);
+    }
     return this.projectRepository.findAll(orgId);
   }
 
-  async findById(id: string) {
+  async findById(id: string, userId?: string) {
     const project = await this.projectRepository.findById(id);
     if (!project)
       throw new NotFoundException('Projeto editorial não encontrado.');
+    if (
+      userId &&
+      project.createdBy &&
+      String(project.createdBy) !== String(userId)
+    ) {
+      throw new ForbiddenException(
+        'Acesso negado: este projeto pertence a outro usuário.',
+      );
+    }
     return project;
   }
 

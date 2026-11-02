@@ -5,7 +5,10 @@ import {
 } from '../schemas/models/editorial-project.interface';
 
 export abstract class EditorialProjectRepository {
-  abstract findAll(orgId: string): Promise<IEditorialProject[]>;
+  abstract findAll(
+    orgId: string,
+    createdBy?: string,
+  ): Promise<IEditorialProject[]>;
   abstract findById(id: string): Promise<IEditorialProject | null>;
   abstract create(data: ICreateEditorialProject): Promise<IEditorialProject>;
   abstract update(

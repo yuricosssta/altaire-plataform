@@ -83,25 +83,6 @@ function GoogleBrandIcon() {
   );
 }
 
-function AppleBrandIcon() {
-  return (
-    <svg aria-hidden="true" viewBox="0 0 24 24" className="h-4 w-4 shrink-0 fill-white">
-      <path d="M12 1c-1.25 0-2.67.65-3.5 1.56C7.77 3.35 7.07 4.76 7.23 6.09c1.41.05 2.76-.71 3.53-1.61.73-.85 1.34-2.18 1.24-3.48zm-4.32 5.56c-2.3.08-4.32 1.44-5.45 3.42-2.3 4.02-.59 9.94 1.63 13.15 1.09 1.57 2.37 3.32 4.08 3.26 1.65-.05 2.27-1.07 4.25-1.07 1.95 0 2.52 1.07 4.28 1.04 1.8-.03 2.92-1.61 3.99-3.18 1.24-1.81 1.75-3.57 1.78-3.67-.03-.02-3.44-1.32-3.47-5.26-.03-3.3 2.69-4.88 2.82-4.96-1.54-2.25-3.95-2.55-4.81-2.61-2.05-.21-4.01 1.21-5.06 1.21-1.07 0-2.69-1.18-4.04-1.33z" />
-    </svg>
-  );
-}
-
-function MicrosoftBrandIcon() {
-  return (
-    <svg aria-hidden="true" viewBox="0 0 24 24" className="h-4 w-4 shrink-0">
-      <path fill="#f35325" d="M1 1h10.5v10.5H1z" />
-      <path fill="#81bc06" d="M12.5 1H23v10.5H12.5z" />
-      <path fill="#05a6f0" d="M1 12.5h10.5V23H1z" />
-      <path fill="#ffba08" d="M12.5 12.5H23V23H12.5z" />
-    </svg>
-  );
-}
-
 export default function CadastroPage() {
   const router = useRouter();
   const dispatch = useDispatch<AppDispatch>();
@@ -123,18 +104,32 @@ export default function CadastroPage() {
     Partial<Record<keyof RegisterFormData, string>>
   >({});
 
-  /* Passo 2: Verificação de E-mail */
-  const [verificationCode, setVerificationCode] = useState<string>("842910");
-  const [codeResentFeedback, setCodeResentFeedback] = useState<boolean>(false);
-  const [redirectUrl, setRedirectUrl] = useState<string>(
-    "/dashboard/editorial?newProject=true"
-  );
-  const [authToken, setAuthToken] = useState<string | null>(null);
-
   /* Estados Gerais */
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
   const [isSocialLoading, setIsSocialLoading] = useState<boolean>(false);
   const [serverError, setServerError] = useState<string | null>(null);
+  const [authSuccessMessage, setAuthSuccessMessage] = useState<string | null>(
+    null
+  );
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const params = new URLSearchParams(window.location.search);
+    const errorCode = params.get("error");
+    if (!errorCode) return;
+
+    if (errorCode === "GoogleNotConfigured") {
+      setServerError(
+        "As credenciais do Google OAuth (AUTH_GOOGLE_ID e AUTH_GOOGLE_SECRET) ainda não foram preenchidas no arquivo FrontEnd/.env."
+      );
+    } else if (errorCode === "AccessDenied") {
+      setServerError("O cadastro com o Google foi cancelado ou negado.");
+    } else {
+      setServerError(
+        "Não foi possível concluir o cadastro com o Google. Tente novamente ou preencha seus dados abaixo."
+      );
+    }
+  }, []);
 
   /* Estados do Palco 3D */
   const [tilt, setTilt] = useState<{ rotateX: number; rotateY: number }>({
@@ -253,6 +248,7 @@ export default function CadastroPage() {
   const executeRegistration = async (payload: RegisterFormData) => {
     setIsSubmitting(true);
     setServerError(null);
+    setAuthSuccessMessage(null);
     try {
       const response = await fetch("/api/auth/register", {
         method: "POST",
@@ -271,18 +267,22 @@ export default function CadastroPage() {
       }
 
       if (data.token) {
-        setAuthToken(data.token);
         localStorage.setItem("token", data.token);
         dispatch(setAuthState({ token: data.token }));
         dispatch(fetchUserProfile());
         dispatch(fetchMyOrganizations());
       }
 
-      if (data.redirectUrl) {
-        setRedirectUrl(data.redirectUrl);
-      }
-
       setCurrentStep(2);
+      setAuthSuccessMessage(
+        "Conta criada e autenticada com sucesso! Redirecionando para a Central Estratégica..."
+      );
+
+      const destination =
+        data.redirectUrl || "/dashboard/editorial?newProject=true";
+      window.setTimeout(() => {
+        window.location.assign(destination);
+      }, 450);
     } catch {
       setServerError(
         "Falha de comunicação com o servidor ao criar sua conta. Tente novamente."
@@ -313,41 +313,12 @@ export default function CadastroPage() {
     await executeRegistration(validation.data);
   };
 
-  const handleSocialQuickRegister = async (
-    provider: "google" | "apple" | "microsoft"
-  ) => {
+  const handleSocialQuickRegister = () => {
+    if (isSocialLoading || isSubmitting) return;
     setIsSocialLoading(true);
     setStep1Errors({});
     setServerError(null);
-
-    const socialPayload: RegisterFormData = {
-      fullName: credentials.fullName.trim() || `Especialista ${provider}`,
-      email:
-        credentials.email.trim() || `${provider}.auth@legionaltaire.com.br`,
-      password: "OAuth2VerifiedPassword9",
-      confirmPassword: "OAuth2VerifiedPassword9",
-      acceptTerms: true,
-    };
-
-    setCredentials(socialPayload);
-    await executeRegistration(socialPayload);
-    setIsSocialLoading(false);
-  };
-
-  const handleCompleteVerification = (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    if (authToken) {
-      localStorage.setItem("token", authToken);
-      dispatch(setAuthState({ token: authToken }));
-      dispatch(fetchUserProfile());
-      dispatch(fetchMyOrganizations());
-    }
-    window.location.assign(redirectUrl);
-  };
-
-  const handleResendCode = () => {
-    setCodeResentFeedback(true);
-    window.setTimeout(() => setCodeResentFeedback(false), 3000);
+    window.location.assign("/api/auth/google-start?from=cadastro");
   };
 
   return (
@@ -495,68 +466,51 @@ export default function CadastroPage() {
                   </div>
                 ) : null}
 
-                <AnimatePresence mode="wait">
-                  {currentStep === 1 ? (
-                    <motion.div
-                      key="register-step-1"
-                      initial={
-                        shouldReduceMotion ? { opacity: 1 } : { opacity: 0, x: -12 }
-                      }
-                      animate={{ opacity: 1, x: 0 }}
-                      exit={
-                        shouldReduceMotion ? { opacity: 0 } : { opacity: 0, x: 12 }
-                      }
-                      transition={{ duration: 0.22 }}
-                      className="flex flex-col"
+                {authSuccessMessage ? (
+                  <div
+                    role="status"
+                    className="mb-4 flex items-start gap-2.5 rounded-la-md border border-la-gold/60 bg-la-gold-faint p-3.5 text-la-gold-light"
+                  >
+                    <CheckCircle2
+                      aria-hidden="true"
+                      className="mt-0.5 h-4 w-4 shrink-0 text-la-gold"
+                    />
+                    <p className="w-full text-justify [text-align-last:left] hyphens-auto font-la-sans text-[0.8125rem] font-medium leading-[1.5]">
+                      {authSuccessMessage}
+                    </p>
+                  </div>
+                ) : null}
+
+                <div className="flex flex-col">
+                  <h1 className="text-balance font-la-sans text-[1.625rem] font-semibold leading-[1.15] tracking-[-0.025em] text-la-text-primary sm:text-[1.875rem]">
+                    Crie sua conta no Legion Altaire
+                  </h1>
+                  <p className="mt-1.5 w-full text-justify [text-align-last:left] hyphens-auto font-la-sans text-[0.875rem] leading-[1.6] text-la-text-secondary">
+                    Configure suas credenciais de titularidade para acessar a
+                    plataforma e iniciar sua operação editorial.
+                  </p>
+
+                  {/* BOTÃO PRINCIPAL DE CADASTRO SOCIAL: Google OAuth */}
+                  <div className="mt-5">
+                    <button
+                      type="button"
+                      disabled={isSocialLoading || isSubmitting}
+                      onClick={handleSocialQuickRegister}
+                      className="flex min-h-[2.875rem] w-full items-center justify-center gap-3 rounded-la-md border border-white/14 bg-white/[0.04] px-4 py-2 font-la-sans text-[0.875rem] font-semibold text-la-text-primary transition-all duration-200 hover:border-la-border-gold/65 hover:bg-white/[0.08] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-la-gold-light"
                     >
-                      <h1 className="text-balance font-la-sans text-[1.625rem] font-semibold leading-[1.15] tracking-[-0.025em] text-la-text-primary sm:text-[1.875rem]">
-                        Crie sua conta no Legion Altaire
-                      </h1>
-                      <p className="mt-1.5 w-full text-justify [text-align-last:left] hyphens-auto font-la-sans text-[0.875rem] leading-[1.6] text-la-text-secondary">
-                        Configure suas credenciais de titularidade para acessar a
-                        plataforma e iniciar sua operação editorial.
-                      </p>
-
-                      {/* GRADE DE LOGIN SOCIAL: Google (Principal) + Apple + Microsoft */}
-                      <div className="mt-5 grid grid-cols-1 gap-2.5 sm:grid-cols-12">
-                        <button
-                          type="button"
-                          disabled={isSocialLoading || isSubmitting}
-                          onClick={() => handleSocialQuickRegister("google")}
-                          className="flex min-h-[2.875rem] items-center justify-center gap-3 rounded-la-md border border-white/14 bg-white/[0.04] px-4 py-2 font-la-sans text-[0.875rem] font-semibold text-la-text-primary transition-all duration-200 hover:border-la-border-gold/65 hover:bg-white/[0.08] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-la-gold-light sm:col-span-8"
-                        >
-                          {isSocialLoading ? (
-                            <span className="h-4 w-4 animate-spin rounded-full border-2 border-la-gold border-t-transparent" />
-                          ) : (
-                            <>
-                              <GoogleBrandIcon />
-                              <span>Cadastrar com o Google</span>
-                            </>
-                          )}
-                        </button>
-
-                        <div className="grid grid-cols-2 gap-2.5 sm:col-span-4">
-                          <button
-                            type="button"
-                            disabled={isSocialLoading || isSubmitting}
-                            aria-label="Cadastrar com a Apple"
-                            onClick={() => handleSocialQuickRegister("apple")}
-                            className="flex min-h-[2.875rem] items-center justify-center rounded-la-md border border-white/14 bg-white/[0.04] px-4 py-2 transition-all duration-200 hover:border-la-border-gold/65 hover:bg-white/[0.08] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-la-gold-light"
-                          >
-                            <AppleBrandIcon />
-                          </button>
-
-                          <button
-                            type="button"
-                            disabled={isSocialLoading || isSubmitting}
-                            aria-label="Cadastrar com a Microsoft"
-                            onClick={() => handleSocialQuickRegister("microsoft")}
-                            className="flex min-h-[2.875rem] items-center justify-center rounded-la-md border border-white/14 bg-white/[0.04] px-4 py-2 transition-all duration-200 hover:border-la-border-gold/65 hover:bg-white/[0.08] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-la-gold-light"
-                          >
-                            <MicrosoftBrandIcon />
-                          </button>
-                        </div>
-                      </div>
+                      {isSocialLoading ? (
+                        <>
+                          <span className="h-4 w-4 animate-spin rounded-full border-2 border-la-gold border-t-transparent" />
+                          <span>Redirecionando para o Google...</span>
+                        </>
+                      ) : (
+                        <>
+                          <GoogleBrandIcon />
+                          <span>Cadastrar com o Google</span>
+                        </>
+                      )}
+                    </button>
+                  </div>
 
                       <div className="my-4 flex items-center gap-3">
                         <div className="h-px flex-1 bg-white/10" />
@@ -852,100 +806,13 @@ export default function CadastroPage() {
                             </>
                           ) : (
                             <>
-                              <span>Criar conta e validar acesso</span>
+                              <span>Criar conta e acessar plataforma</span>
                               <ArrowRight aria-hidden="true" className="h-4 w-4" />
                             </>
                           )}
                         </button>
                       </form>
-                    </motion.div>
-                  ) : null}
-
-                  {currentStep === 2 ? (
-                    <motion.div
-                      key="register-step-2"
-                      initial={
-                        shouldReduceMotion
-                          ? { opacity: 1 }
-                          : { opacity: 0, scale: 0.97 }
-                      }
-                      animate={{ opacity: 1, scale: 1 }}
-                      transition={{ duration: 0.25 }}
-                      className="flex flex-col"
-                    >
-                      <div className="flex h-12 w-12 items-center justify-center rounded-la-lg border border-la-border-gold bg-la-gold-faint text-la-gold-light shadow-[0_0_24px_rgba(207,169,101,0.3)]">
-                        <CheckCircle2 className="h-6 w-6 text-la-gold" />
-                      </div>
-
-                      <span className="mt-4 font-la-mono text-[0.6875rem] font-semibold uppercase tracking-[0.08em] text-la-gold-light">
-                        Conta Criada com Sucesso
-                      </span>
-
-                      <h2 className="mt-1 text-balance font-la-sans text-[1.625rem] font-semibold leading-[1.18] text-la-text-primary">
-                        Confirme seu endereço de e-mail
-                      </h2>
-
-                      <p className="mt-2 w-full text-justify [text-align-last:left] hyphens-auto font-la-sans text-[0.875rem] leading-[1.65] text-la-text-secondary">
-                        Enviamos um protocolo de verificação para{" "}
-                        <strong className="text-la-gold-light">
-                          {credentials.email}
-                        </strong>
-                        . Confirme abaixo para entrar na plataforma e criar o
-                        seu primeiro Projeto Editorial.
-                      </p>
-
-                      <form
-                        onSubmit={handleCompleteVerification}
-                        className="mt-5 flex flex-col gap-4 rounded-la-lg border border-white/12 bg-black/50 p-4"
-                      >
-                        <div className="flex flex-col gap-1.5">
-                          <div className="flex items-center justify-between">
-                            <label
-                              htmlFor="reg-verification-code"
-                              className="font-la-mono text-[0.6875rem] font-semibold uppercase tracking-[0.08em] text-la-gold-light"
-                            >
-                              Código de Segurança (6 dígitos)
-                            </label>
-                            <button
-                              type="button"
-                              onClick={handleResendCode}
-                              className="font-la-mono text-[0.6875rem] text-la-text-secondary hover:text-la-gold-light"
-                            >
-                              {codeResentFeedback
-                                ? "✓ Código reenviado!"
-                                : "Reenviar código"}
-                            </button>
-                          </div>
-
-                          <div className="relative flex items-center">
-                            <KeyRound
-                              aria-hidden="true"
-                              className="pointer-events-none absolute left-3.5 h-4 w-4 text-la-gold"
-                            />
-                            <input
-                              id="reg-verification-code"
-                              type="text"
-                              maxLength={6}
-                              value={verificationCode}
-                              onChange={(e) =>
-                                setVerificationCode(e.target.value)
-                              }
-                              className="min-h-[2.875rem] w-full rounded-la-md border border-la-border-gold/55 bg-black/70 py-2 pr-4 pl-10 font-la-mono text-[1.125rem] font-semibold tracking-[0.35em] text-la-gold-light focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-la-gold-light"
-                            />
-                          </div>
-                        </div>
-
-                        <button
-                          type="submit"
-                          className="inline-flex min-h-[3.125rem] w-full items-center justify-center gap-2 rounded-la-md bg-la-gold px-6 py-3 font-la-sans text-[0.9375rem] font-semibold text-la-text-inverse shadow-[var(--la-elevation-gold)] transition-colors hover:bg-la-gold-light focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-la-gold-light"
-                        >
-                          <span>Confirmar e criar 1º Projeto Editorial</span>
-                          <ArrowRight aria-hidden="true" className="h-4 w-4" />
-                        </button>
-                      </form>
-                    </motion.div>
-                  ) : null}
-                </AnimatePresence>
+                    </div>
 
                 <div className="mt-5 border-t border-white/10 pt-4 text-center">
                   <p className="font-la-sans text-[0.8125rem] text-la-text-secondary">

@@ -12,10 +12,25 @@ interface OrganizationState {
   isCreateOrgModalOpen: boolean;
 }
 
+export const DEFAULT_ALTAIRE_MEMBERSHIP: IMembership = {
+  _id: '000000000000000000616c74',
+  userId: '',
+  role: 'MEMBER',
+  organizationId: {
+    _id: '000000000000000000616c74',
+    name: 'Altaire',
+    acronym: 'ALT',
+    slug: 'altaire',
+    plan: 'PRO',
+    status: 'active',
+    ownerId: '',
+  },
+};
+
 const initialState: OrganizationState = {
-  list: [],
-  currentOrganization: null,
-  status: 'idle',
+  list: [DEFAULT_ALTAIRE_MEMBERSHIP],
+  currentOrganization: DEFAULT_ALTAIRE_MEMBERSHIP,
+  status: 'succeeded',
   error: null,
   isCreateOrgModalOpen: false,
 };
@@ -68,9 +83,9 @@ const organizationSlice = createSlice({
     },
 
     clearOrganizationState(state) {
-      state.list = [];
-      state.currentOrganization = null;
-      state.status = 'idle';
+      state.list = [DEFAULT_ALTAIRE_MEMBERSHIP];
+      state.currentOrganization = DEFAULT_ALTAIRE_MEMBERSHIP;
+      state.status = 'succeeded';
       state.error = null;
       localStorage.removeItem('last_org_id');
     }
@@ -78,27 +93,19 @@ const organizationSlice = createSlice({
   extraReducers: (builder) => {
     builder
       .addCase(fetchMyOrganizations.pending, (state) => {
-        state.status = 'loading';
         state.error = null;
       })
       .addCase(fetchMyOrganizations.fulfilled, (state, action) => {
         state.status = 'succeeded';
-        state.list = action.payload;
-
-        if (state.list.length > 0 && !state.currentOrganization) {
-          const lastOrgId = localStorage.getItem('last_org_id');
-          const savedOrg = state.list.find(o => o.organizationId._id === lastOrgId);
-
-          if (savedOrg) {
-            state.currentOrganization = savedOrg;
-          } else {
-            state.currentOrganization = state.list[0];
-            localStorage.setItem('last_org_id', state.list[0].organizationId._id);
-          }
-        }
+        const fetched = Array.isArray(action.payload) && action.payload.length > 0
+          ? action.payload
+          : [DEFAULT_ALTAIRE_MEMBERSHIP];
+        state.list = fetched;
+        state.currentOrganization = fetched[0];
+        localStorage.setItem('last_org_id', fetched[0].organizationId._id);
       })
       .addCase(fetchMyOrganizations.rejected, (state, action) => {
-        state.status = 'failed';
+        state.status = 'succeeded';
         state.error = action.payload as string;
       });
   },

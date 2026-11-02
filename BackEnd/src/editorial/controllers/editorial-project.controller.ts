@@ -34,13 +34,13 @@ export class EditorialProjectController {
   ) {}
 
   @Get()
-  async findAll() {
-    return this.projectService.findAll('altaire');
+  async findAll(@GetUser('sub') userId: string) {
+    return this.projectService.findAll('altaire', userId);
   }
 
   @Get(':id')
-  async findById(@Param('id') id: string) {
-    return this.projectService.findById(id);
+  async findById(@Param('id') id: string, @GetUser('sub') userId: string) {
+    return this.projectService.findById(id, userId);
   }
 
   @Post()

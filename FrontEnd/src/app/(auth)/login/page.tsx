@@ -115,33 +115,10 @@ function GoogleBrandIcon() {
   );
 }
 
-function AppleBrandIcon() {
-  return (
-    <svg
-      aria-hidden="true"
-      viewBox="0 0 24 24"
-      className="h-4 w-4 shrink-0 fill-white"
-    >
-      <path d="M12 1c-1.25 0-2.67.65-3.5 1.56C7.77 3.35 7.07 4.76 7.23 6.09c1.41.05 2.76-.71 3.53-1.61.73-.85 1.34-2.18 1.24-3.48zm-4.32 5.56c-2.3.08-4.32 1.44-5.45 3.42-2.3 4.02-.59 9.94 1.63 13.15 1.09 1.57 2.37 3.32 4.08 3.26 1.65-.05 2.27-1.07 4.25-1.07 1.95 0 2.52 1.07 4.28 1.04 1.8-.03 2.92-1.61 3.99-3.18 1.24-1.81 1.75-3.57 1.78-3.67-.03-.02-3.44-1.32-3.47-5.26-.03-3.3 2.69-4.88 2.82-4.96-1.54-2.25-3.95-2.55-4.81-2.61-2.05-.21-4.01 1.21-5.06 1.21-1.07 0-2.69-1.18-4.04-1.33z" />
-    </svg>
-  );
-}
-
-function MicrosoftBrandIcon() {
-  return (
-    <svg aria-hidden="true" viewBox="0 0 24 24" className="h-4 w-4 shrink-0">
-      <path fill="#f35325" d="M1 1h10.5v10.5H1z" />
-      <path fill="#81bc06" d="M12.5 1H23v10.5H12.5z" />
-      <path fill="#05a6f0" d="M1 12.5h10.5V23H1z" />
-      <path fill="#ffba08" d="M12.5 12.5H23V23H12.5z" />
-    </svg>
-  );
-}
-
 /**
  * Página Canônica de Login (`/login`).
  *
- * - Suporte completo de autenticação rápida via Google, Apple e Microsoft + E-mail e Senha.
+ * - Suporte completo de autenticação via Google OAuth (Auth.js v5) + E-mail e Senha (bcrypt).
  * - Desktop (`>= 1024px`): Split-Screen com formulário em vidro fumê à esquerda e
  *   Palco 3D/2.5D do Monólito Editorial à direita.
  * - Mobile/Tablet (`< 1024px`): Card em vidro fumê translúcido (`backdrop-blur-2xl`).
@@ -199,6 +176,25 @@ export default function LoginPage() {
   const stageRef = useRef<HTMLDivElement>(null);
   const formCardRef = useRef<HTMLDivElement>(null);
   const isStageInView = useInView(stageRef, { amount: 0.2 });
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const params = new URLSearchParams(window.location.search);
+    const errorCode = params.get("error");
+    if (!errorCode) return;
+
+    if (errorCode === "GoogleNotConfigured") {
+      setServerError(
+        "As credenciais do Google OAuth (AUTH_GOOGLE_ID e AUTH_GOOGLE_SECRET) ainda não foram preenchidas no arquivo FrontEnd/.env."
+      );
+    } else if (errorCode === "AccessDenied") {
+      setServerError("O acesso com o Google foi cancelado ou negado.");
+    } else {
+      setServerError(
+        "Não foi possível concluir a autenticação com o Google. Tente novamente ou entre com seu e-mail e senha."
+      );
+    }
+  }, []);
 
   useEffect(() => {
     if (shouldReduceMotion || isStagePaused || !isStageInView) {
@@ -343,35 +339,15 @@ export default function LoginPage() {
     }
   };
 
-  const handleSocialSignIn = async (provider: SocialProvider) => {
+  const handleSocialSignIn = () => {
     if (socialLoadingProvider !== null || isSubmitting) {
       return;
     }
 
     setFieldErrors({});
     setServerError(null);
-    setSocialLoadingProvider(provider);
-
-    try {
-      await executeLoginRequest({
-        email:
-          formData.email.trim() || `${provider}.auth@legionaltaire.com.br`,
-        password: "OAuth2VerifiedPassword9",
-        rememberMe: true,
-      });
-    } catch {
-      setServerError(
-        `Não foi possível concluir a autenticação rápida com ${
-          provider === "google"
-            ? "o Google"
-            : provider === "apple"
-              ? "a Apple"
-              : "a Microsoft"
-        }.`
-      );
-    } finally {
-      setSocialLoadingProvider(null);
-    }
+    setSocialLoadingProvider("google");
+    window.location.assign("/api/auth/google-start?from=login");
   };
 
   const isAnyActionBusy = isSubmitting || socialLoadingProvider !== null;
@@ -479,14 +455,14 @@ export default function LoginPage() {
                   Estratégica, Linha Editorial, Calendário, Temas e Roteiros.
                 </p>
 
-                {/* GRADE DE LOGIN SOCIAL TRIPLO: Google (Principal) + Apple + Microsoft */}
-                <div className="mt-6 grid grid-cols-1 gap-2.5 sm:grid-cols-12">
+                {/* BOTÃO PRINCIPAL DE LOGIN SOCIAL: Google OAuth */}
+                <div className="mt-6">
                   <button
                     type="button"
                     disabled={isAnyActionBusy}
-                    onClick={() => handleSocialSignIn("google")}
+                    onClick={handleSocialSignIn}
                     className={clsx(
-                      "flex min-h-[2.875rem] items-center justify-center gap-3 rounded-la-md border border-white/14 bg-white/[0.04] px-4 py-2.5 font-la-sans text-[0.875rem] font-semibold text-la-text-primary transition-all duration-200 sm:col-span-8",
+                      "flex min-h-[2.875rem] w-full items-center justify-center gap-3 rounded-la-md border border-white/14 bg-white/[0.04] px-4 py-2.5 font-la-sans text-[0.875rem] font-semibold text-la-text-primary transition-all duration-200",
                       "hover:border-la-border-gold/65 hover:bg-white/[0.08] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-la-gold-light",
                       isAnyActionBusy && "cursor-not-allowed opacity-70"
                     )}
@@ -494,7 +470,7 @@ export default function LoginPage() {
                     {socialLoadingProvider === "google" ? (
                       <>
                         <span className="h-4 w-4 animate-spin rounded-full border-2 border-la-gold border-t-transparent" />
-                        <span>Conectando...</span>
+                        <span>Redirecionando para o Google...</span>
                       </>
                     ) : (
                       <>
@@ -503,46 +479,6 @@ export default function LoginPage() {
                       </>
                     )}
                   </button>
-
-                  <div className="grid grid-cols-2 gap-2.5 sm:col-span-4">
-                    <button
-                      type="button"
-                      disabled={isAnyActionBusy}
-                      aria-label="Entrar com a Apple"
-                      title="Entrar com a Apple"
-                      onClick={() => handleSocialSignIn("apple")}
-                      className={clsx(
-                        "flex min-h-[2.875rem] items-center justify-center rounded-la-md border border-white/14 bg-white/[0.04] px-3 py-2.5 transition-all duration-200",
-                        "hover:border-la-border-gold/65 hover:bg-white/[0.08] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-la-gold-light",
-                        isAnyActionBusy && "cursor-not-allowed opacity-70"
-                      )}
-                    >
-                      {socialLoadingProvider === "apple" ? (
-                        <span className="h-4 w-4 animate-spin rounded-full border-2 border-la-gold border-t-transparent" />
-                      ) : (
-                        <AppleBrandIcon />
-                      )}
-                    </button>
-
-                    <button
-                      type="button"
-                      disabled={isAnyActionBusy}
-                      aria-label="Entrar com a Microsoft"
-                      title="Entrar com a Microsoft"
-                      onClick={() => handleSocialSignIn("microsoft")}
-                      className={clsx(
-                        "flex min-h-[2.875rem] items-center justify-center rounded-la-md border border-white/14 bg-white/[0.04] px-3 py-2.5 transition-all duration-200",
-                        "hover:border-la-border-gold/65 hover:bg-white/[0.08] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-la-gold-light",
-                        isAnyActionBusy && "cursor-not-allowed opacity-70"
-                      )}
-                    >
-                      {socialLoadingProvider === "microsoft" ? (
-                        <span className="h-4 w-4 animate-spin rounded-full border-2 border-la-gold border-t-transparent" />
-                      ) : (
-                        <MicrosoftBrandIcon />
-                      )}
-                    </button>
-                  </div>
                 </div>
 
                 {/* Divisor Sutil */}
