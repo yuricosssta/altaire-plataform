@@ -8,6 +8,7 @@ import { Folder, Calendar, PenTool, Clock, Loader2 } from 'lucide-react';
 import { ProjectCardDTO } from '@/lib/dto/editorial.schema';
 import { editorialService } from '@/lib/services/editorialService';
 import { NewProjectDialog } from '@/components/editorial/NewProjectDialog';
+import { selectAllOrgs, selectOrgStatus } from '@/lib/redux/slices/organizationSlice';
 
 export default function EditorialDashboardPage() {
   const router = useRouter();
