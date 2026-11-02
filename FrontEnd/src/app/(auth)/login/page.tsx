@@ -12,6 +12,7 @@ import {
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useDispatch } from "react-redux";
+import { signIn } from "next-auth/react";
 import { AnimatePresence, motion, useInView, useReducedMotion } from "motion/react";
 import { AppDispatch } from "@/lib/redux/store";
 import { setAuthState } from "@/lib/redux/slices/authSlice";
@@ -339,7 +340,7 @@ export default function LoginPage() {
     }
   };
 
-  const handleSocialSignIn = () => {
+  const handleSocialSignIn = async () => {
     if (socialLoadingProvider !== null || isSubmitting) {
       return;
     }
@@ -347,7 +348,30 @@ export default function LoginPage() {
     setFieldErrors({});
     setServerError(null);
     setSocialLoadingProvider("google");
-    window.location.assign("/api/auth/google-start?from=login");
+
+    try {
+      const checkRes = await fetch("/api/auth/google-start", {
+        cache: "no-store",
+      });
+      const checkData = (await checkRes.json().catch(() => ({}))) as {
+        configured?: boolean;
+      };
+
+      if (!checkData.configured) {
+        setServerError(
+          "As credenciais do Google OAuth (AUTH_GOOGLE_ID e AUTH_GOOGLE_SECRET) ainda não estão configuradas nas variáveis de ambiente."
+        );
+        setSocialLoadingProvider(null);
+        return;
+      }
+
+      await signIn("google", { redirectTo: "/api/auth/oauth-success" });
+    } catch {
+      setServerError(
+        "Não foi possível iniciar a autenticação com o Google. Tente novamente."
+      );
+      setSocialLoadingProvider(null);
+    }
   };
 
   const isAnyActionBusy = isSubmitting || socialLoadingProvider !== null;
