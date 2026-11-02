@@ -13,6 +13,7 @@ import {
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useDispatch } from "react-redux";
+import { signIn } from "next-auth/react";
 import { AnimatePresence, motion, useInView, useReducedMotion } from "motion/react";
 import {
   AlertCircle,
@@ -314,12 +315,35 @@ export default function CadastroPage() {
     await executeRegistration(validation.data);
   };
 
-  const handleSocialQuickRegister = () => {
+  const handleSocialQuickRegister = async () => {
     if (isSocialLoading || isSubmitting) return;
     setIsSocialLoading(true);
     setStep1Errors({});
     setServerError(null);
-    window.location.assign("/api/auth/google-start?from=cadastro");
+
+    try {
+      const checkRes = await fetch("/api/auth/google-start", {
+        cache: "no-store",
+      });
+      const checkData = (await checkRes.json().catch(() => ({}))) as {
+        configured?: boolean;
+      };
+
+      if (!checkData.configured) {
+        setServerError(
+          "As credenciais do Google OAuth (AUTH_GOOGLE_ID e AUTH_GOOGLE_SECRET) ainda não estão configuradas nas variáveis de ambiente."
+        );
+        setIsSocialLoading(false);
+        return;
+      }
+
+      await signIn("google", { redirectTo: "/api/auth/oauth-success" });
+    } catch {
+      setServerError(
+        "Não foi possível iniciar o cadastro com o Google. Tente novamente."
+      );
+      setIsSocialLoading(false);
+    }
   };
 
   return (
