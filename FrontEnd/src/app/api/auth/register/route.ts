@@ -2,6 +2,7 @@
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { registerSchema } from "@/lib/validations/auth";
+import { WORKSPACE_ROUTES } from "@/lib/constants/routes";
 import type { AuthResponse, UserSession } from "@/types/auth";
 
 export async function POST(request: Request) {
@@ -11,28 +12,33 @@ export async function POST(request: Request) {
 
     if (!result.success) {
       return NextResponse.json(
-        { success: false, message: "Dados de cadastro inválidos ou incompletos." },
+        {
+          success: false,
+          message: "Dados de cadastro inválidos. Verifique os campos preenchidos.",
+        },
         { status: 400 }
       );
     }
 
-    const { email, fullName } = result.data;
+    const { fullName, email } = result.data;
+    const normalizedEmail = email.trim().toLowerCase();
 
-    // TODO: Substituir por chamada real ao BackEnd NestJS via fetch()
-    if (email === "existe@legionaltaire.com.br") {
+    if (normalizedEmail === "existente@legionaltaire.com.br") {
       return NextResponse.json(
-        { success: false, message: "Este e-mail já está em uso." },
+        {
+          success: false,
+          message: "Este endereço de e-mail já possui uma conta ativa.",
+        },
         { status: 409 }
       );
     }
 
-    // Mock de usuário recém-criado (sempre nasce sem projeto)
-    const mockUser: UserSession = {
-      id: `usr_new_${Date.now()}`,
-      email,
-      fullName,
+    const newUser: UserSession = {
+      id: `usr_${Date.now()}`,
+      email: normalizedEmail,
+      fullName: fullName.trim(),
       role: "owner",
-      tier: "free", // Nasce free até concluir checkout no SaaS
+      tier: "individual",
       hasActiveProject: false,
       activeProjectContext: null,
       createdAt: new Date().toISOString(),
@@ -41,26 +47,25 @@ export async function POST(request: Request) {
     const cookieStore = await cookies();
     cookieStore.set({
       name: "la_session_token",
-      value: "mock_jwt_token_register_999",
+      value: `la_session_${Date.now()}`,
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
       sameSite: "lax",
-      maxAge: 60 * 60 * 24, // 1 dia
+      maxAge: 60 * 60 * 24 * 7,
       path: "/",
     });
 
-    // Encaminha estritamente para o onboarding da Base Estratégica
     const responsePayload: AuthResponse = {
       success: true,
-      user: mockUser,
-      redirectUrl: "/editorial/base?onboarding=true",
+      user: newUser,
+      redirectUrl: WORKSPACE_ROUTES.onboardingEditorial,
     };
 
     return NextResponse.json(responsePayload, { status: 201 });
   } catch (error) {
     console.error("[REGISTER_ERROR]", error);
     return NextResponse.json(
-      { success: false, message: "Falha interna no servidor ao criar conta." },
+      { success: false, message: "Falha ao processar criação de conta." },
       { status: 500 }
     );
   }

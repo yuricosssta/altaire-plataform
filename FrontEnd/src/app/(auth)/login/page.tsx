@@ -31,7 +31,7 @@ import {
 } from "lucide-react";
 import { clsx } from "clsx";
 import LogoBloco from "@/components/LogoBloco";
-import { ROUTES } from "@/lib/constants/routes";
+import { ROUTES, sanitizeReturnTo } from "@/lib/constants/routes";
 import { loginSchema, type LoginFormData } from "@/lib/validations/auth";
 import type { AuthResponse } from "@/types/auth";
 
@@ -288,7 +288,7 @@ export default function LoginPage() {
       return;
     }
 
-    const destination = data.redirectUrl || "/editorial/base";
+    const destination = sanitizeReturnTo(data.redirectUrl, ROUTES.centralEstrategica);
     setAuthSuccessMessage(
       data.user?.hasActiveProject
         ? "Sessão autenticada. Carregando seu Projeto Editorial ativo..."

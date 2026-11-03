@@ -1,1496 +1,2937 @@
 // FrontEnd/src/components/editorial/workspace/CalendarioEditorialModule.tsx
 "use client";
 
-import { useMemo, useState, type FormEvent } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+  type FormEvent,
+} from "react";
 import { AnimatePresence, motion } from "motion/react";
 import {
   AlertTriangle,
+  Archive,
   ArrowLeft,
   ArrowRight,
-  Calendar,
+  Calendar as CalendarIcon,
   Check,
   CheckCircle2,
+  ChevronLeft,
+  ChevronRight,
   Clock,
+  Columns,
   Compass,
   Copy,
   Edit3,
+  ExternalLink,
+  Eye,
   FileText,
-  Filter,
+  Flame,
+  Gift,
   Layers,
   LayoutGrid,
   Lightbulb,
-  List,
+  Link2,
+  MessageSquare,
+  Play,
   Plus,
+  Radio,
+  RefreshCw,
+  Sliders,
   Sparkles,
   Target,
+  Trash2,
   Video,
   X,
 } from "lucide-react";
 import { clsx } from "clsx";
 
-export type CalendarLifecycleStatus =
-  | "active"
-  | "draft"
-  | "upcoming"
-  | "expired"
-  | "review_recommended"
-  | "archived";
+/* ========================================================================== */
+/* CONTRATOS E TIPAGENS ESTRITAS DA FUNÇÃO 01 — PARTE 2 (CALENDÁRIO)          */
+/* ========================================================================== */
 
-export type CalendarSlotStatus =
-  | "without_theme"
-  | "theme_assigned"
-  | "script_draft"
-  | "script_approved"
-  | "in_production"
-  | "published"
-  | "missing_thumbnail";
-
-export type RetinaCategory =
-  | "Relacionamento"
-  | "Engajamento"
-  | "Transformação"
-  | "Interação"
-  | "Níveis de Consciência"
-  | "Autoridade";
-
-export type ContentFormatLabel =
-  | "Vídeo Curto (Reel)"
-  | "Carrossel"
-  | "Post Estático"
-  | "Vídeo Longo (YouTube)"
-  | "Live Semanal"
-  | "Sequência de Stories";
-
-export type CalendarSlotItem = {
-  readonly id: string;
-  readonly weekNumber: 1 | 2 | 3 | 4;
-  readonly dayOfWeek:
-    | "Segunda"
-    | "Terça"
-    | "Quarta"
-    | "Quinta"
-    | "Sexta"
-    | "Sábado"
-    | "Domingo";
-  readonly dateLabel: string;
-  readonly time: string;
-  readonly format: ContentFormatLabel;
-  readonly platform: "Instagram" | "YouTube" | "TikTok" | "Multiplataforma";
-  readonly retinaType: RetinaCategory;
-  readonly pillar: string;
-  readonly themeTitle: string | null;
-  readonly status: CalendarSlotStatus;
-  readonly storiesBlock?: "Manhã" | "Almoço" | "Tarde" | "Noite / Q&A";
-  readonly notes?: string;
-  readonly eligibleForComplementaryMaterial?: boolean;
-};
-
-export type CalendarAIReviewSuggestion = {
-  readonly id: string;
-  readonly category: "Equilíbrio RETINA" | "Capacidade Real" | "Lacuna de Funil" | "Ativo de Conversão";
-  readonly title: string;
-  readonly reason: string;
-  readonly impact: string;
-  readonly applied: boolean;
-};
-
-export type EditorialCalendarCycle = {
-  readonly id: string;
-  readonly name: string;
-  readonly status: CalendarLifecycleStatus;
-  readonly durationLabel: string;
-  readonly periodStart: string;
-  readonly periodEnd: string;
-  readonly objective: string;
-  readonly phaseLabel: string;
-  readonly linkedLineVersionName: string;
-  readonly capacityConfig: {
-    readonly shortVideosPerWeek: number;
-    readonly carouselsPerWeek: number;
-    readonly staticPostsPerWeek: number;
-    readonly longVideosPerWeek: number;
-    readonly livesPerWeek: number;
-    readonly storiesBlocksPerDay: number;
-  };
-  readonly updatedAt: string;
-  readonly slots: readonly CalendarSlotItem[];
-  readonly aiSuggestions: readonly CalendarAIReviewSuggestion[];
-};
-
-export type CalendarioEditorialModuleProps = {
+export interface CalendarioEditorialModuleProps {
   readonly projectId?: string;
   readonly projectName?: string;
+  readonly projectNiche?: string;
+  readonly projectSubniche?: string;
+  readonly projectObjective?: string;
   readonly niche?: string;
   readonly subniche?: string;
   readonly currentObjective?: string;
   readonly currentPhase?: string;
   readonly hasActiveLine?: boolean;
   readonly activeLineName?: string;
+  readonly initialView?: "calendar" | "list" | "setup" | "review";
+  readonly onGoToLineTab?: () => void;
   readonly onRequestGoToLineEditorial?: () => void;
-  readonly onRequestGoToThemes?: (slotId?: string) => void;
+  readonly onGoToThemesTab?: () => void;
+  readonly onRequestGoToThemes?: () => void;
+  readonly onGoToScriptsTab?: (slotId?: string, themeTitle?: string) => void;
   readonly onRequestGoToScripts?: (slotId?: string, themeTitle?: string) => void;
+}
+
+export type CalendarRecordStatus =
+  | "active"
+  | "draft"
+  | "upcoming"
+  | "review_recommended"
+  | "expired"
+  | "archived";
+
+export type SlotContentFormat =
+  | "reel_curto"
+  | "video_longo"
+  | "carrossel"
+  | "post_estatico"
+  | "live_semanal"
+  | "sequencia_stories";
+
+export type RetinaTypeKey =
+  | "Relacionamento"
+  | "Engajamento"
+  | "Transformacao"
+  | "Interacao"
+  | "NiveisDeConsciencia"
+  | "Autoridade";
+
+export type SlotExecutionStatus =
+  | "planned"
+  | "in_production"
+  | "script_ready"
+  | "recorded"
+  | "published";
+
+export type CalendarSubViewMode = "month" | "week" | "kanban";
+
+export interface DailyStoryBlockItem {
+  readonly period: "Manhã" | "Almoço" | "Tarde" | "Noite";
+  readonly suggestedTime: string;
+  readonly storiesCount: number;
+  readonly retinaFocus: RetinaTypeKey;
+  readonly narrativeDirection: string;
+  readonly hasQAndABox: boolean;
+}
+
+export interface CalendarSlotItem {
+  readonly id: string;
+  readonly dateISO: string;
+  readonly dayNumber: number;
+  readonly monthShort: string;
+  readonly weekNumber: 1 | 2 | 3 | 4;
+  readonly dayOfWeekIndex: 0 | 1 | 2 | 3 | 4 | 5 | 6;
+  readonly dayOfWeekLabel: string;
+  readonly provisionalTitle: string;
+  readonly format: SlotContentFormat;
+  readonly retinaType: RetinaTypeKey;
+  readonly platforms: readonly string[];
+  readonly suggestedTime: string;
+  readonly strategicObjective: string;
+  readonly secondaryObjective: string;
+  readonly editorialLineName: string;
+  readonly editorialPillar: string;
+  readonly mainTheme: string;
+  readonly aiSuggestedThemes: readonly string[];
+  readonly icpPainDesireOrObjection: string;
+  readonly icpAwarenessLevel:
+    | "Inconsciente"
+    | "Consciente do Problema"
+    | "Consciente da Solução"
+    | "Consciente do Produto"
+    | "Totalmente Consciente";
+  readonly referenceLink: string;
+  readonly executionNotes: string;
+  readonly status: SlotExecutionStatus;
+  readonly eligibleForComplementaryMaterial: boolean;
+  readonly complementaryMaterialType: string;
+  readonly storySequencesBreakdown?: readonly DailyStoryBlockItem[];
+}
+
+export interface EditorialCalendarRecord {
+  readonly id: string;
+  readonly name: string;
+  readonly status: CalendarRecordStatus;
+  readonly periodLabel: string;
+  readonly periodStart: string;
+  readonly periodEnd: string;
+  readonly mainObjective: string;
+  readonly linkedLineName: string;
+  readonly platforms: readonly string[];
+  readonly weeklyCapacity: {
+    readonly reels: number;
+    readonly longVideos: number;
+    readonly carousels: number;
+    readonly staticPosts: number;
+    readonly lives: number;
+    readonly dailyStorySequences: number;
+    readonly storiesPerSequence: number;
+  };
+  readonly updatedAt: string;
+  readonly reviewSuggestions: readonly {
+    readonly id: string;
+    readonly title: string;
+    readonly reason: string;
+    readonly actionLabel: string;
+    readonly applied: boolean;
+  }[];
+  readonly slots: readonly CalendarSlotItem[];
+}
+
+/* ========================================================================== */
+/* METADADOS VISUAIS DE FORMATOS, CORES RETINA E STATUS DE EXECUÇÃO           */
+/* ========================================================================== */
+
+export const FORMAT_META: Record<
+  SlotContentFormat,
+  {
+    readonly label: string;
+    readonly shortLabel: string;
+    readonly icon: typeof Video;
+    readonly badgeClass: string;
+  }
+> = {
+  reel_curto: {
+    label: "Reel / Vídeo Curto",
+    shortLabel: "Reel",
+    icon: Play,
+    badgeClass: "border-la-border-gold/55 bg-la-gold-faint text-la-gold-light",
+  },
+  video_longo: {
+    label: "Vídeo Longo (YouTube)",
+    shortLabel: "Vídeo Longo",
+    icon: Video,
+    badgeClass: "border-sky-400/45 bg-sky-500/15 text-sky-200",
+  },
+  carrossel: {
+    label: "Carrossel 4:5",
+    shortLabel: "Carrossel",
+    icon: Columns,
+    badgeClass: "border-purple-400/45 bg-purple-500/15 text-purple-200",
+  },
+  post_estatico: {
+    label: "Post Estático",
+    shortLabel: "Estático",
+    icon: LayoutGrid,
+    badgeClass: "border-white/20 bg-white/[0.07] text-la-text-primary",
+  },
+  live_semanal: {
+    label: "Live Semanal",
+    shortLabel: "Live",
+    icon: Radio,
+    badgeClass: "border-rose-400/50 bg-rose-500/15 text-rose-200",
+  },
+  sequencia_stories: {
+    label: "Sequências Diárias de Stories",
+    shortLabel: "Stories (3-4 seq)",
+    icon: MessageSquare,
+    badgeClass: "border-emerald-400/45 bg-emerald-500/15 text-emerald-200",
+  },
 };
 
-const DAYS_OF_WEEK: readonly CalendarSlotItem["dayOfWeek"][] = [
-  "Segunda",
-  "Terça",
-  "Quarta",
-  "Quinta",
-  "Sexta",
-  "Sábado",
-  "Domingo",
+export const RETINA_META: Record<
+  RetinaTypeKey,
+  {
+    readonly code: string;
+    readonly label: string;
+    readonly purpose: string;
+    readonly badgeClass: string;
+    readonly dotClass: string;
+    readonly borderAccentClass: string;
+  }
+> = {
+  Relacionamento: {
+    code: "R",
+    label: "Relacionamento",
+    purpose: "Conexão humana, visão de mundo, bastidores e rotina real.",
+    badgeClass: "border-emerald-400/50 bg-emerald-500/15 text-emerald-200",
+    dotClass: "bg-emerald-400",
+    borderAccentClass: "border-l-emerald-400",
+  },
+  Engajamento: {
+    code: "E",
+    label: "Engajamento",
+    purpose: "Atração de audiência qualificada, compartilhamento e alcance.",
+    badgeClass: "border-sky-400/50 bg-sky-500/15 text-sky-200",
+    dotClass: "bg-sky-400",
+    borderAccentClass: "border-l-sky-400",
+  },
+  Transformacao: {
+    code: "T",
+    label: "Transformação",
+    purpose: "Ensino prático aplicável, salvamentos e vitória rápida para o ICP.",
+    badgeClass: "border-la-gold bg-la-gold/20 text-la-gold-light",
+    dotClass: "bg-la-gold",
+    borderAccentClass: "border-l-la-gold",
+  },
+  Interacao: {
+    code: "I",
+    label: "Interação",
+    purpose: "Diálogo ativo, enquetes diagnósticas, caixinhas Q&A e direct.",
+    badgeClass: "border-purple-400/50 bg-purple-500/15 text-purple-200",
+    dotClass: "bg-purple-400",
+    borderAccentClass: "border-l-purple-400",
+  },
+  NiveisDeConsciencia: {
+    code: "N",
+    label: "Níveis de Consciência",
+    purpose: "Quebra de objeções, mudança de crença e preparação para compra.",
+    badgeClass: "border-amber-400/55 bg-amber-500/15 text-amber-200",
+    dotClass: "bg-amber-400",
+    borderAccentClass: "border-l-amber-400",
+  },
+  Autoridade: {
+    code: "A",
+    label: "Autoridade",
+    purpose: "Prova técnica, método proprietário (MUV), estudos de caso e tese.",
+    badgeClass: "border-rose-400/55 bg-rose-500/15 text-rose-200",
+    dotClass: "bg-rose-400",
+    borderAccentClass: "border-l-rose-400",
+  },
+};
+
+export const SLOT_STATUS_META: Record<
+  SlotExecutionStatus,
+  {
+    readonly label: string;
+    readonly badgeClass: string;
+  }
+> = {
+  planned: {
+    label: "Planejado",
+    badgeClass: "border-white/15 bg-white/[0.05] text-la-text-secondary",
+  },
+  in_production: {
+    label: "Em Produção",
+    badgeClass: "border-amber-400/50 bg-amber-500/15 text-amber-200",
+  },
+  script_ready: {
+    label: "Roteiro Pronto",
+    badgeClass: "border-sky-400/50 bg-sky-500/15 text-sky-200",
+  },
+  recorded: {
+    label: "Gravado",
+    badgeClass: "border-purple-400/50 bg-purple-500/15 text-purple-200",
+  },
+  published: {
+    label: "Publicado",
+    badgeClass: "border-emerald-400/50 bg-emerald-500/15 text-emerald-200",
+  },
+};
+
+const WEEKDAY_HEADERS: readonly {
+  readonly index: 0 | 1 | 2 | 3 | 4 | 5 | 6;
+  readonly short: string;
+  readonly full: string;
+}[] = [
+  { index: 0, short: "SEG", full: "Segunda-feira" },
+  { index: 1, short: "TER", full: "Terça-feira" },
+  { index: 2, short: "QUA", full: "Quarta-feira" },
+  { index: 3, short: "QUI", full: "Quinta-feira" },
+  { index: 4, short: "SEX", full: "Sexta-feira" },
+  { index: 5, short: "SÁB", full: "Sábado" },
+  { index: 6, short: "DOM", full: "Domingo" },
 ];
 
-const RETINA_BADGE_STYLES: Record<RetinaCategory, string> = {
-  Transformação:
-    "border-la-gold/60 bg-la-gold/15 text-la-gold-light",
-  "Níveis de Consciência":
-    "border-sky-400/45 bg-sky-500/15 text-sky-200",
-  Autoridade:
-    "border-purple-400/45 bg-purple-500/15 text-purple-200",
-  Relacionamento:
-    "border-emerald-400/45 bg-emerald-500/15 text-emerald-200",
-  Engajamento:
-    "border-amber-400/45 bg-amber-500/15 text-amber-200",
-  Interação:
-    "border-rose-400/45 bg-rose-500/15 text-rose-200",
-};
+const AVAILABLE_PILLARS: readonly string[] = [
+  "01. Visão de Mundo & Quebra de Mitos do Mercado",
+  "02. Diagnóstico dos Erros Invisíveis do ICP",
+  "03. Mecanismo Único da Oferta (MUV em Ação)",
+  "04. Educação Prática & Transformação Aplicável",
+  "05. Bastidores da Execução & Provas Reais",
+  "06. Superação de Objeções & Condução para Oferta",
+];
 
-function resolveSlotStatusMeta(status: CalendarSlotStatus): {
-  readonly label: string;
-  readonly className: string;
-  readonly ctaLabel: string;
-} {
-  switch (status) {
-    case "without_theme":
-      return {
-        label: "Sem tema",
-        className: "border-amber-400/50 bg-amber-500/15 text-amber-200",
-        ctaLabel: "Vincular Tema",
-      };
-    case "theme_assigned":
-      return {
-        label: "Tema definido • Sem roteiro",
-        className:
-          "border-la-border-gold/60 bg-la-gold-faint text-la-gold-light",
-        ctaLabel: "Criar Roteiro",
-      };
-    case "script_draft":
-      return {
-        label: "Roteiro em rascunho",
-        className: "border-white/20 bg-white/[0.06] text-la-text-primary",
-        ctaLabel: "Continuar Roteiro",
-      };
-    case "script_approved":
-      return {
-        label: "Roteiro pronto",
-        className: "border-la-gold bg-la-gold/20 text-la-gold-light",
-        ctaLabel: "Abrir Roteiro",
-      };
-    case "in_production":
-      return {
-        label: "Em produção",
-        className: "border-sky-400/50 bg-sky-500/15 text-sky-200",
-        ctaLabel: "Ver Briefing",
-      };
-    case "published":
-      return {
-        label: "Publicado",
-        className: "border-emerald-500/45 bg-emerald-950/50 text-emerald-300",
-        ctaLabel: "Ver Publicação",
-      };
-    case "missing_thumbnail":
-      return {
-        label: "Falta título e capa",
-        className: "border-rose-400/50 bg-rose-500/15 text-rose-200",
-        ctaLabel: "Criar Capa",
-      };
-  }
-}
+const AVAILABLE_PLATFORMS: readonly string[] = [
+  "Instagram",
+  "YouTube",
+  "TikTok",
+  "LinkedIn",
+];
 
-function buildInitialCalendars(
-  objective: string,
-  phase: string,
+const PERIOD_OBJECTIVES: readonly string[] = [
+  "Apoiar um lançamento ou campanha de vendas",
+  "Aquecer audiência para abertura de carrinho",
+  "Reforçar autoridade e domínio técnico",
+  "Aumentar audiência qualificada (Topo/Meio)",
+  "Aumentar relacionamento e retenção da base",
+  "Melhorar engajamento e conversas no Direct",
+];
+
+/* ========================================================================== */
+/* GERADOR DE GRADE MENSAL COMPLETA (28 DIAS REAIS — 4 SEMANAS CANÔNICAS)     */
+/* ========================================================================== */
+
+function generateCanonicalMonthSlots(
+  niche: string,
+  subniche: string,
   lineName: string
-): readonly EditorialCalendarCycle[] {
-  return [
-    {
-      id: "cal-cycle-active-01",
-      name: "Contagem Regressiva — Lançamento Semente",
-      status: "active",
-      durationLabel: "4 semanas de aquecimento",
-      periodStart: "09/08/2026",
-      periodEnd: "05/09/2026",
-      objective,
-      phaseLabel: phase,
-      linkedLineVersionName: lineName,
-      capacityConfig: {
-        shortVideosPerWeek: 4,
-        carouselsPerWeek: 2,
-        staticPostsPerWeek: 2,
-        longVideosPerWeek: 1,
-        livesPerWeek: 1,
-        storiesBlocksPerDay: 4,
-      },
-      updatedAt: "Hoje, 09:40",
-      slots: [
-        {
-          id: "slot-w2-mon-1",
-          weekNumber: 2,
-          dayOfWeek: "Segunda",
-          dateLabel: "17/08",
-          time: "08h30",
-          format: "Sequência de Stories",
-          platform: "Instagram",
-          retinaType: "Relacionamento",
-          pillar: "04. Aplicação Prática & Bastidores Reais",
-          themeTitle:
-            "Bastidor da Semana 2: Como separamos ofertas para não confundir a audiência",
-          status: "script_approved",
-          storiesBlock: "Manhã",
-        },
-        {
-          id: "slot-w2-mon-2",
-          weekNumber: 2,
-          dayOfWeek: "Segunda",
-          dateLabel: "17/08",
-          time: "16h00",
-          format: "Vídeo Curto (Reel)",
-          platform: "Instagram",
-          retinaType: "Transformação",
-          pillar: "02. Diagnóstico de Erros Invisíveis do ICP",
-          themeTitle:
-            "O erro invisível que bloqueia sua previsibilidade comercial",
-          status: "script_approved",
-        },
-        {
-          id: "slot-w2-tue-1",
-          weekNumber: 2,
-          dayOfWeek: "Terça",
-          dateLabel: "18/08",
-          time: "11h00",
-          format: "Carrossel",
-          platform: "Instagram",
-          retinaType: "Níveis de Consciência",
-          pillar: "03. Mecanismo Único da Oferta (MUV)",
-          themeTitle:
-            "5 sinais de uma oferta fraca que afasta compradores qualificados",
-          status: "script_draft",
-          eligibleForComplementaryMaterial: true,
-        },
-        {
-          id: "slot-w2-tue-2",
-          weekNumber: 2,
-          dayOfWeek: "Terça",
-          dateLabel: "18/08",
-          time: "19h30",
-          format: "Sequência de Stories",
-          platform: "Instagram",
-          retinaType: "Interação",
-          pillar: "05. Superação de Objeções Prioritárias",
-          themeTitle:
-            "Q&A Noturno: Quebra da objeção 'Não tenho tempo para produzir'",
-          status: "theme_assigned",
-          storiesBlock: "Noite / Q&A",
-        },
-        {
-          id: "slot-w2-wed-1",
-          weekNumber: 2,
-          dayOfWeek: "Quarta",
-          dateLabel: "19/08",
-          time: "12h00",
-          format: "Post Estático",
-          platform: "Instagram",
-          retinaType: "Autoridade",
-          pillar: "01. Visão de Mundo & Quebra de Mitos",
-          themeTitle:
-            "Mapa Visual: A diferença entre postar por frequência e operar por contexto",
-          status: "in_production",
-        },
-        {
-          id: "slot-w2-wed-2",
-          weekNumber: 2,
-          dayOfWeek: "Quarta",
-          dateLabel: "19/08",
-          time: "19h00",
-          format: "Vídeo Longo (YouTube)",
-          platform: "YouTube",
-          retinaType: "Autoridade",
-          pillar: "03. Mecanismo Único da Oferta (MUV)",
-          themeTitle:
-            "Arquitetura Completa de Operação Editorial Orientada por Contexto",
-          status: "script_approved",
-          eligibleForComplementaryMaterial: true,
-        },
-        {
-          id: "slot-w2-thu-1",
-          weekNumber: 2,
-          dayOfWeek: "Quinta",
-          dateLabel: "20/08",
-          time: "16h00",
-          format: "Vídeo Curto (Reel)",
-          platform: "Instagram",
-          retinaType: "Transformação",
-          pillar: "01. Visão de Mundo & Quebra de Mitos",
-          themeTitle:
-            "Por que repetir comandos soltos na IA destrói a voz da sua marca",
-          status: "theme_assigned",
-        },
-        {
-          id: "slot-w2-thu-2",
-          weekNumber: 2,
-          dayOfWeek: "Quinta",
-          dateLabel: "20/08",
-          time: "18h30",
-          format: "Carrossel",
-          platform: "Instagram",
-          retinaType: "Níveis de Consciência",
-          pillar: "05. Superação de Objeções Prioritárias",
-          themeTitle: null,
-          status: "without_theme",
-        },
-        {
-          id: "slot-w2-fri-1",
-          weekNumber: 2,
-          dayOfWeek: "Sexta",
-          dateLabel: "21/08",
-          time: "11h30",
-          format: "Vídeo Curto (Reel)",
-          platform: "Instagram",
-          retinaType: "Engajamento",
-          pillar: "02. Diagnóstico de Erros Invisíveis do ICP",
-          themeTitle: null,
-          status: "without_theme",
-        },
-        {
-          id: "slot-w2-fri-2",
-          weekNumber: 2,
-          dayOfWeek: "Sexta",
-          dateLabel: "21/08",
-          time: "20h00",
-          format: "Live Semanal",
-          platform: "Multiplataforma",
-          retinaType: "Autoridade",
-          pillar: "06. Provas, Estudos de Caso & Chamada Direta",
-          themeTitle:
-            "Live Semanal #04: Como validar sua oferta no orgânico sem improviso",
-          status: "missing_thumbnail",
-          eligibleForComplementaryMaterial: true,
-        },
-        {
-          id: "slot-w2-sat-1",
-          weekNumber: 2,
-          dayOfWeek: "Sábado",
-          dateLabel: "22/08",
-          time: "14h00",
-          format: "Vídeo Curto (Reel)",
-          platform: "Instagram",
-          retinaType: "Transformação",
-          pillar: "04. Aplicação Prática & Bastidores Reais",
-          themeTitle: null,
-          status: "without_theme",
-        },
-        {
-          id: "slot-w2-sun-1",
-          weekNumber: 2,
-          dayOfWeek: "Domingo",
-          dateLabel: "23/08",
-          time: "18h00",
-          format: "Post Estático",
-          platform: "Instagram",
-          retinaType: "Relacionamento",
-          pillar: "01. Visão de Mundo & Quebra de Mitos",
-          themeTitle: null,
-          status: "without_theme",
-        },
-      ],
-      aiSuggestions: [
-        {
-          id: "rev-sug-01",
-          category: "Equilíbrio RETINA",
-          title:
-            "Aumentar peso de 'Níveis de Consciência' nos slots de Quinta e Sábado",
-          reason:
-            "O projeto está na Semana 2 de Aquecimento para Conversão, mas há 2 slots abertos sem tema na reta final da semana.",
-          impact:
-            "Prepara o comprador para entender por que o Mecanismo Único (MUV) resolve a dor melhor que soluções comuns.",
-          applied: false,
-        },
-        {
-          id: "rev-sug-02",
-          category: "Ativo de Conversão",
-          title:
-            "Ativar Material Complementar (Checklist PDF) no Carrossel de Terça-feira",
-          reason:
-            "O slot '5 sinais de uma oferta fraca' foi qualificado pelas regras estratégicas para captação de leads qualificados.",
-          impact:
-            "Aumenta a retenção e gera lista aquecida antes da Live Semanal de Sexta-feira.",
-          applied: false,
-        },
-        {
-          id: "rev-sug-03",
-          category: "Lacuna de Funil",
-          title:
-            "Conectar chamada da Live de Sexta nos blocos de Stories de Quinta à Noite",
-          reason:
-            "A Live Semanal das 20h00 ainda está sem sequência preparatória de antecipação no dia anterior.",
-          impact:
-            "Eleva a comparecimento ao vivo e coleta perguntas reais do público para o roteiro da Live.",
-          applied: false,
-        },
-      ],
-    },
-    {
-      id: "cal-cycle-expired-00",
-      name: "Ciclo Base — Construção de Posicionamento",
-      status: "expired",
-      durationLabel: "4 semanas concluídas",
-      periodStart: "12/07/2026",
-      periodEnd: "08/08/2026",
-      objective: "Autoridade e Posicionamento",
-      phaseLabel: "Pré-aquecimento",
-      linkedLineVersionName: lineName,
-      capacityConfig: {
-        shortVideosPerWeek: 3,
-        carouselsPerWeek: 2,
-        staticPostsPerWeek: 1,
-        longVideosPerWeek: 1,
-        livesPerWeek: 1,
-        storiesBlocksPerDay: 3,
-      },
-      updatedAt: "Encerrado em 08/08/2026",
-      slots: [],
-      aiSuggestions: [],
-    },
-  ];
-}
+): CalendarSlotItem[] {
+  const slots: CalendarSlotItem[] = [];
 
-export function CalendarioEditorialModule({
-  projectName = "Produto X — Lançamento Semente",
-  niche = "Finanças",
-  subniche = "Algorithmic Trading",
-  currentObjective = "Conversão",
-  currentPhase = "Aquecimento — Semana 2 de 4",
-  hasActiveLine = true,
-  activeLineName = "Linha v1 — Lançamento Semente",
-  onRequestGoToLineEditorial,
-  onRequestGoToThemes,
-  onRequestGoToScripts,
-}: CalendarioEditorialModuleProps) {
-  const [calendars, setCalendars] = useState<readonly EditorialCalendarCycle[]>(
-    () => buildInitialCalendars(currentObjective, currentPhase, activeLineName)
-  );
+  for (let dayOffset = 0; dayOffset < 28; dayOffset++) {
+    const dayNumber = 2 + dayOffset;
+    const dateISO = `2026-11-${String(dayNumber).padStart(2, "0")}`;
+    const weekNumber = (Math.floor(dayOffset / 7) + 1) as 1 | 2 | 3 | 4;
+    const dayOfWeekIndex = (dayOffset % 7) as 0 | 1 | 2 | 3 | 4 | 5 | 6;
+    const dayOfWeekLabel = WEEKDAY_HEADERS[dayOfWeekIndex].full;
 
-  /* Controle se o usuário está na Lista de Calendários ou dentro de um Calendário Aberto */
-  const [openedCalendarId, setOpenedCalendarId] = useState<string | null>(
-    "cal-cycle-active-01"
-  );
-  const [activeViewMode, setActiveViewMode] = useState<
-    "weekly_grid" | "tactical_list" | "stories_matrix" | "ai_reviews"
-  >("weekly_grid");
-  const [selectedWeek, setSelectedWeek] = useState<1 | 2 | 3 | 4>(2);
-  const [formatFilter, setFormatFilter] = useState<string>("all");
+    // Segunda: Reel de Engajamento + Carrossel de Transformação
+    if (dayOfWeekIndex === 0) {
+      slots.push({
+        id: `slot-w${weekNumber}-d${dayNumber}-1`,
+        dateISO,
+        dayNumber,
+        monthShort: "Nov",
+        weekNumber,
+        dayOfWeekIndex,
+        dayOfWeekLabel,
+        provisionalTitle: `Mito #${weekNumber} que trava resultados em ${subniche || niche}`,
+        format: "reel_curto",
+        retinaType: "Engajamento",
+        platforms: ["Instagram", "TikTok"],
+        suggestedTime: "12:00",
+        strategicObjective: "Atrair audiência qualificada quebrando uma crença comum",
+        secondaryObjective: "Gerar compartilhamentos e novos seguidores no perfil",
+        editorialLineName: lineName,
+        editorialPillar: AVAILABLE_PILLARS[0],
+        mainTheme:
+          weekNumber <= 2
+            ? `Por que repetir o padrão tradicional de ${niche} drena sua margem`
+            : "",
+        aiSuggestedThemes: [
+          `Por que repetir o padrão tradicional de ${niche} drena sua margem`,
+          `O erro invisível que 90% cometem ao iniciar em ${subniche}`,
+          `A verdade que ninguém fala sobre velocidade vs. direção em ${niche}`,
+        ],
+        icpPainDesireOrObjection:
+          "Mito de que volume bruto sem direção estratégica gera resultado consistente.",
+        icpAwarenessLevel: "Consciente do Problema",
+        referenceLink: "https://instagram.com/p/exemplo-reel-contraste",
+        executionNotes:
+          "Abrir nos primeiros 3 segundos com afirmação contraintuitiva. Ritmo dinâmico e CTA final para ler a legenda.",
+        status: weekNumber === 1 ? "published" : weekNumber === 2 ? "script_ready" : "planned",
+        eligibleForComplementaryMaterial: false,
+        complementaryMaterialType: "Nenhum",
+      });
 
-  /* Drawer / Modal de Inspeção e Edição de um Slot Específico */
-  const [inspectingSlotId, setInspectingSlotId] = useState<string | null>(null);
-  const [slotThemeDraft, setSlotThemeDraft] = useState<string>("");
-
-  /* Modal "+ Novo Calendário" Calibrado por Capacidade Real */
-  const [isNewCalendarModalOpen, setIsNewCalendarModalOpen] =
-    useState<boolean>(false);
-  const [newCalName, setNewCalName] = useState<string>("");
-  const [newCalDuration, setNewCalDuration] = useState<string>(
-    "4 semanas planejadas"
-  );
-  const [newCalStart, setNewCalStart] = useState<string>("06/09/2026");
-  const [newCalEnd, setNewCalEnd] = useState<string>("03/10/2026");
-  const [newCalObjective, setNewCalObjective] =
-    useState<string>(currentObjective);
-  const [capShortVideos, setCapShortVideos] = useState<number>(4);
-  const [capCarousels, setCapCarousels] = useState<number>(2);
-  const [capStaticPosts, setCapStaticPosts] = useState<number>(2);
-  const [capLongVideos, setCapLongVideos] = useState<number>(1);
-  const [capLives, setCapLives] = useState<number>(1);
-  const [capStoriesBlocks, setCapStoriesBlocks] = useState<number>(4);
-
-  /* Modal "+ Novo Slot" dentro do Calendário Aberto */
-  const [isAddSlotModalOpen, setIsAddSlotModalOpen] = useState<boolean>(false);
-  const [newSlotDay, setNewSlotDay] =
-    useState<CalendarSlotItem["dayOfWeek"]>("Quinta");
-  const [newSlotTime, setNewSlotTime] = useState<string>("16h00");
-  const [newSlotFormat, setNewSlotFormat] = useState<ContentFormatLabel>(
-    "Vídeo Curto (Reel)"
-  );
-  const [newSlotRetina, setNewSlotRetina] =
-    useState<RetinaCategory>("Transformação");
-  const [newSlotPillar, setNewSlotPillar] = useState<string>(
-    "03. Mecanismo Único da Oferta (MUV)"
-  );
-  const [newSlotTheme, setNewSlotTheme] = useState<string>("");
-
-  const activeCalendar = useMemo(
-    () => calendars.find((c) => c.id === openedCalendarId) ?? null,
-    [calendars, openedCalendarId]
-  );
-
-  const inspectingSlot = useMemo(() => {
-    if (!activeCalendar || !inspectingSlotId) return null;
-    return (
-      activeCalendar.slots.find((s) => s.id === inspectingSlotId) ?? null
-    );
-  }, [activeCalendar, inspectingSlotId]);
-
-  /* Métricas derivadas em tempo real do Calendário Aberto */
-  const calendarMetrics = useMemo(() => {
-    if (!activeCalendar) {
-      return {
-        totalSlots: 0,
-        withoutTheme: 0,
-        withThemeNoScript: 0,
-        scriptReady: 0,
-        pendingReviews: 0,
-      };
+      slots.push({
+        id: `slot-w${weekNumber}-d${dayNumber}-2`,
+        dateISO,
+        dayNumber,
+        monthShort: "Nov",
+        weekNumber,
+        dayOfWeekIndex,
+        dayOfWeekLabel,
+        provisionalTitle: `Passo a passo estrutural: Matriz de decisão em ${subniche}`,
+        format: "carrossel",
+        retinaType: "Transformacao",
+        platforms: ["Instagram", "LinkedIn"],
+        suggestedTime: "19:00",
+        strategicObjective: "Gerar salvamentos qualificados e provar competência técnica",
+        secondaryObjective: "Educar o comprador sobre o método proprietário (MUV)",
+        editorialLineName: lineName,
+        editorialPillar: AVAILABLE_PILLARS[3],
+        mainTheme:
+          weekNumber === 1
+            ? `Como diagnosticar gargalos operacionais em ${subniche} em 15 minutos`
+            : "",
+        aiSuggestedThemes: [
+          `Como diagnosticar gargalos operacionais em ${subniche} em 15 minutos`,
+          `Os 5 critérios técnicos para validar uma decisão em ${niche}`,
+          `Guia visual: do improviso ao controle previsível em 4 etapas`,
+        ],
+        icpPainDesireOrObjection:
+          "Desejo de ter um método prático e aplicável que caiba na rotina real.",
+        icpAwarenessLevel: "Consciente da Solução",
+        referenceLink: "https://instagram.com/p/exemplo-carrossel-transformacao",
+        executionNotes:
+          "Carrossel de 8 a 10 lâminas (4:5). Lâmina 1 com promessa clara, lâminas 2-8 com framework prático, lâmina final com CTA de salvamento e material complementar.",
+        status: weekNumber === 1 ? "published" : "in_production",
+        eligibleForComplementaryMaterial: true,
+        complementaryMaterialType: "Checklist / Diagnóstico PDF Prático",
+      });
     }
 
-    const slots = activeCalendar.slots;
-    return {
-      totalSlots: slots.length,
-      withoutTheme: slots.filter((s) => s.status === "without_theme").length,
-      withThemeNoScript: slots.filter(
-        (s) => s.status === "theme_assigned" || s.status === "script_draft"
-      ).length,
-      scriptReady: slots.filter(
-        (s) =>
-          s.status === "script_approved" ||
-          s.status === "in_production" ||
-          s.status === "published"
-      ).length,
-      pendingReviews: activeCalendar.aiSuggestions.filter((a) => !a.applied)
-        .length,
-    };
-  }, [activeCalendar]);
+    // Terça: Reel de Transformação + Post Estático de Interação
+    if (dayOfWeekIndex === 1) {
+      slots.push({
+        id: `slot-w${weekNumber}-d${dayNumber}-1`,
+        dateISO,
+        dayNumber,
+        monthShort: "Nov",
+        weekNumber,
+        dayOfWeekIndex,
+        dayOfWeekLabel,
+        provisionalTitle: `Ajuste imediato para destravar sua operação de ${subniche}`,
+        format: "reel_curto",
+        retinaType: "Transformacao",
+        platforms: ["Instagram", "TikTok"],
+        suggestedTime: "12:30",
+        strategicObjective: "Entregar vitória rápida acionável para o ICP",
+        secondaryObjective: "Aumentar taxa de salvamento e autoridade prática",
+        editorialLineName: lineName,
+        editorialPillar: AVAILABLE_PILLARS[3],
+        mainTheme: `3 ajustes práticos em ${subniche} que reduzem o retrabalho pela metade`,
+        aiSuggestedThemes: [
+          `3 ajustes práticos em ${subniche} que reduzem o retrabalho pela metade`,
+          `Como corrigir a falha número 1 de execução em ${niche}`,
+          `O protocolo de 10 minutos para validar sua estratégia semanal`,
+        ],
+        icpPainDesireOrObjection:
+          "Dor da falta de tempo operacional e excesso de tarefas sem retorno.",
+        icpAwarenessLevel: "Consciente da Solução",
+        referenceLink: "",
+        executionNotes: "Gravar em ambiente de trabalho real mostrando tela ou quadro branco.",
+        status: weekNumber === 1 ? "recorded" : "planned",
+        eligibleForComplementaryMaterial: false,
+        complementaryMaterialType: "Nenhum",
+      });
 
-  /* SEÇÃO 6.3.4: Estado de Orientação quando não há Linha Editorial Ativa */
-  if (!hasActiveLine) {
-    return (
-      <section className="rounded-la-xl border border-amber-400/40 bg-[#080B12]/95 p-8 text-center shadow-[var(--la-elevation-2)]">
-        <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-la-xl border border-la-gold/60 bg-la-gold-faint text-la-gold">
-          <Compass className="h-7 w-7" />
-        </div>
-        <span className="mt-4 block font-la-mono text-[0.6875rem] font-semibold uppercase tracking-[0.1em] text-la-gold-light">
-          DEPENDÊNCIA METODOLÓGICA · FUNÇÃO 01
-        </span>
-        <h2 className="mt-2 font-la-sans text-[1.5rem] font-semibold text-la-text-primary">
-          Antes de planejar, defina sua Linha Editorial.
-        </h2>
-        <p className="mx-auto mt-2 max-w-[42rem] font-la-sans text-[0.9375rem] leading-[1.65] text-la-text-secondary">
-          O calendário deve ser criado apenas a partir de uma Linha Editorial
-          ativa, pois sem ela a IA terá menos contexto para definir formatos,
-          frequência, objetivos, distribuição RETINA e prioridades do período.
-        </p>
-        <div className="mt-6">
-          <button
-            type="button"
-            onClick={onRequestGoToLineEditorial}
-            className="inline-flex min-h-[2.875rem] items-center gap-2 rounded-la-md bg-la-gold px-6 py-2.5 font-la-sans text-[0.875rem] font-semibold text-la-text-inverse shadow-[var(--la-elevation-gold)] hover:bg-la-gold-light"
-          >
-            <span>Criar Linha Editorial</span>
-            <ArrowRight className="h-4 w-4" />
-          </button>
-        </div>
-      </section>
-    );
+      slots.push({
+        id: `slot-w${weekNumber}-d${dayNumber}-2`,
+        dateISO,
+        dayNumber,
+        monthShort: "Nov",
+        weekNumber,
+        dayOfWeekIndex,
+        dayOfWeekLabel,
+        provisionalTitle: `Enquete de Diagnóstico: Qual é o seu maior gargalo hoje?`,
+        format: "post_estatico",
+        retinaType: "Interacao",
+        platforms: ["Instagram"],
+        suggestedTime: "18:30",
+        strategicObjective: "Gerar comentários qualificados e mapear objeções no Direct",
+        secondaryObjective: "Identificar leads prontos para abordagem consultiva",
+        editorialLineName: lineName,
+        editorialPillar: AVAILABLE_PILLARS[1],
+        mainTheme: `Diagnóstico comparativo: Operador Amador vs. Estrategista em ${niche}`,
+        aiSuggestedThemes: [
+          `Diagnóstico comparativo: Operador Amador vs. Estrategista em ${niche}`,
+          `Qual dessas 3 travas mais impede seu avanço hoje? Comente o número`,
+          `Matriz comparativa: Improviso Diário vs. Sistema Editorial`,
+        ],
+        icpPainDesireOrObjection:
+          "Dúvida sobre em qual estágio o próprio negócio está travado.",
+        icpAwarenessLevel: "Consciente do Problema",
+        referenceLink: "",
+        executionNotes: "Arte estática em alto contraste Dark/Gold com chamada direta para comentar.",
+        status: "planned",
+        eligibleForComplementaryMaterial: false,
+        complementaryMaterialType: "Nenhum",
+      });
+    }
+
+    // Quarta: Vídeo Longo de Transformação + Carrossel de Autoridade
+    if (dayOfWeekIndex === 2) {
+      slots.push({
+        id: `slot-w${weekNumber}-d${dayNumber}-1`,
+        dateISO,
+        dayNumber,
+        monthShort: "Nov",
+        weekNumber,
+        dayOfWeekIndex,
+        dayOfWeekLabel,
+        provisionalTitle: `Aula Profunda #${weekNumber}: A Engenharia Completa do Método em ${subniche}`,
+        format: "video_longo",
+        retinaType: "Transformacao",
+        platforms: ["YouTube"],
+        suggestedTime: "17:00",
+        strategicObjective: "Aprofundar nível de consciência e demonstrar domínio técnico absoluto",
+        secondaryObjective: "Gerar leads altamente qualificados para a oferta principal",
+        editorialLineName: lineName,
+        editorialPillar: AVAILABLE_PILLARS[2],
+        mainTheme: `Como estruturar o Mecanismo Único de ${subniche} do zero até a conversão`,
+        aiSuggestedThemes: [
+          `Como estruturar o Mecanismo Único de ${subniche} do zero até a conversão`,
+          `Masterclass: Por que métodos comuns falham em ${niche} e como blindar sua operação`,
+          `Análise completa de caso real: Da estagnação à previsibilidade em 30 dias`,
+        ],
+        icpPainDesireOrObjection:
+          "Objeção: 'Meu subnicho é técnico demais, preciso ver profundidade real antes de confiar.'",
+        icpAwarenessLevel: "Consciente da Solução",
+        referenceLink: "https://youtube.com/watch?v=exemplo-aula-magna",
+        executionNotes:
+          "Vídeo de 14 a 20 minutos estruturado em: Gancho de retenção (0-45s), Problema Estrutural, Mecanismo Único (3 pilares), Aplicação Prática e CTA para material complementar / aplicação.",
+        status: weekNumber === 1 ? "script_ready" : "planned",
+        eligibleForComplementaryMaterial: true,
+        complementaryMaterialType: "Planilha Executiva / Mapa Mental da Aula",
+      });
+
+      slots.push({
+        id: `slot-w${weekNumber}-d${dayNumber}-2`,
+        dateISO,
+        dayNumber,
+        monthShort: "Nov",
+        weekNumber,
+        dayOfWeekIndex,
+        dayOfWeekLabel,
+        provisionalTitle: `Estudo de Caso & Bastidor Técnico: Decisões sob pressão`,
+        format: "carrossel",
+        retinaType: "Autoridade",
+        platforms: ["Instagram", "LinkedIn"],
+        suggestedTime: "20:00",
+        strategicObjective: "Reforçar autoridade incontestável com prova lógica e técnica",
+        secondaryObjective: "Apoiar o vídeo longo publicado no YouTube",
+        editorialLineName: lineName,
+        editorialPillar: AVAILABLE_PILLARS[4],
+        mainTheme: `Análise de bastidor: Os 4 indicadores que definem o sucesso em ${subniche}`,
+        aiSuggestedThemes: [
+          `Análise de bastidor: Os 4 indicadores que definem o sucesso em ${subniche}`,
+          `O que aprendemos analisando dezenas de operações reais de ${niche}`,
+          `Raio-X Técnico: Como tomamos decisões estratégicas sem depender de sorte`,
+        ],
+        icpPainDesireOrObjection:
+          "Desejo de aprender com quem realmente executa no campo de batalha.",
+        icpAwarenessLevel: "Consciente do Produto",
+        referenceLink: "",
+        executionNotes: "Conectar o último slide ao vídeo longo do YouTube.",
+        status: "planned",
+        eligibleForComplementaryMaterial: false,
+        complementaryMaterialType: "Nenhum",
+      });
+    }
+
+    // Quinta: Reel de Nível de Consciência + Post Estático de Relacionamento
+    if (dayOfWeekIndex === 3) {
+      slots.push({
+        id: `slot-w${weekNumber}-d${dayNumber}-1`,
+        dateISO,
+        dayNumber,
+        monthShort: "Nov",
+        weekNumber,
+        dayOfWeekIndex,
+        dayOfWeekLabel,
+        provisionalTitle: `Quebra de Objeção Crítica: O custo invisível de adiar sua estrutura`,
+        format: "reel_curto",
+        retinaType: "NiveisDeConsciencia",
+        platforms: ["Instagram", "TikTok"],
+        suggestedTime: "12:00",
+        strategicObjective: "Quebrar objeção de tempo/rotina e preparar para a oferta",
+        secondaryObjective: "Levar o lead de Consciente da Solução para Consciente do Produto",
+        editorialLineName: lineName,
+        editorialPillar: AVAILABLE_PILLARS[5],
+        mainTheme:
+          weekNumber <= 2
+            ? `"Não tenho tempo para estruturar ${subniche}" — Como resolver isso em 1 hora por semana`
+            : "",
+        aiSuggestedThemes: [
+          `"Não tenho tempo para estruturar ${subniche}" — Como resolver isso em 1 hora por semana`,
+          `Por que esperar o "momento ideal" custa caro demais em ${niche}`,
+          `A diferença entre gastar energia no improviso e investir em um sistema`,
+        ],
+        icpPainDesireOrObjection:
+          "Objeção: 'Minha rotina é corrida demais, não vou dar conta de aplicar.'",
+        icpAwarenessLevel: "Consciente do Produto",
+        referenceLink: "",
+        executionNotes: "Tom direto, firme e empático. Mostrar que a falta de tempo é consequência da falta de método.",
+        status: "planned",
+        eligibleForComplementaryMaterial: false,
+        complementaryMaterialType: "Nenhum",
+      });
+
+      slots.push({
+        id: `slot-w${weekNumber}-d${dayNumber}-2`,
+        dateISO,
+        dayNumber,
+        monthShort: "Nov",
+        weekNumber,
+        dayOfWeekIndex,
+        dayOfWeekLabel,
+        provisionalTitle: `Visão de Mundo & Princípios: O que não negociamos na nossa operação`,
+        format: "post_estatico",
+        retinaType: "Relacionamento",
+        platforms: ["Instagram"],
+        suggestedTime: "19:30",
+        strategicObjective: "Gerar identificação profunda por valores e visão de mundo",
+        secondaryObjective: "Afastar curiosos que buscam atalhos rasos",
+        editorialLineName: lineName,
+        editorialPillar: AVAILABLE_PILLARS[0],
+        mainTheme: `Por que recusamos atalhos superficiais em ${niche} e priorizamos fundação sólida`,
+        aiSuggestedThemes: [
+          `Por que recusamos atalhos superficiais em ${niche} e priorizamos fundação sólida`,
+          `3 princípios inegociáveis para quem constrói autoridade de longo prazo`,
+          `Carta aberta para profissionais que cansaram do teatro digital`,
+        ],
+        icpPainDesireOrObjection:
+          "Desejo de pertencer a um grupo de alto nível com valores sérios.",
+        icpAwarenessLevel: "Consciente da Solução",
+        referenceLink: "",
+        executionNotes: "Fotografia autoral ou tipografia editorial limpa.",
+        status: "planned",
+        eligibleForComplementaryMaterial: false,
+        complementaryMaterialType: "Nenhum",
+      });
+    }
+
+    // Sexta: Live Semanal + Carrossel de Autoridade
+    if (dayOfWeekIndex === 4) {
+      slots.push({
+        id: `slot-w${weekNumber}-d${dayNumber}-1`,
+        dateISO,
+        dayNumber,
+        monthShort: "Nov",
+        weekNumber,
+        dayOfWeekIndex,
+        dayOfWeekLabel,
+        provisionalTitle: `Live Semanal #${weekNumber}: Consultoria Ao Vivo & Quebra de Travas`,
+        format: "live_semanal",
+        retinaType: "Autoridade",
+        platforms: ["Instagram", "YouTube"],
+        suggestedTime: "20:00",
+        strategicObjective: "Interagir ao vivo, demonstrar repertório e conduzir para a oferta",
+        secondaryObjective: "Responder objeções reais da audiência em tempo real",
+        editorialLineName: lineName,
+        editorialPillar: AVAILABLE_PILLARS[5],
+        mainTheme: `Análise Ao Vivo: Destravando o planejamento de ${subniche} para o próximo mês`,
+        aiSuggestedThemes: [
+          `Análise Ao Vivo: Destravando o planejamento de ${subniche} para o próximo mês`,
+          `Live de Aquecimento: Os 3 pilares da oferta e como aplicar no seu caso`,
+          `Perguntas & Respostas Estratégicas: Diagnóstico de operações ao vivo`,
+        ],
+        icpPainDesireOrObjection:
+          "Objeção: 'Será que esse método funciona especificamente para o meu modelo?'",
+        icpAwarenessLevel: "Totalmente Consciente",
+        referenceLink: "",
+        executionNotes: "Duração prevista: 45 a 60 min. Abrir com tese central de 15 min e abrir para 3 análises ao vivo + pitch consultivo.",
+        status: "planned",
+        eligibleForComplementaryMaterial: true,
+        complementaryMaterialType: "Resumo Executivo da Live + Diagnóstico",
+      });
+
+      slots.push({
+        id: `slot-w${weekNumber}-d${dayNumber}-2`,
+        dateISO,
+        dayNumber,
+        monthShort: "Nov",
+        weekNumber,
+        dayOfWeekIndex,
+        dayOfWeekLabel,
+        provisionalTitle: `Síntese Executiva da Semana: O que separa o plano da execução`,
+        format: "carrossel",
+        retinaType: "Autoridade",
+        platforms: ["Instagram", "LinkedIn"],
+        suggestedTime: "13:00",
+        strategicObjective: "Consolidar a tese da semana e convidar para a Live das 20h",
+        secondaryObjective: "Gerar salvamentos e lembretes para a transmissão ao vivo",
+        editorialLineName: lineName,
+        editorialPillar: AVAILABLE_PILLARS[2],
+        mainTheme: `O mapa mental completo para dominar ${subniche} sem improviso`,
+        aiSuggestedThemes: [
+          `O mapa mental completo para dominar ${subniche} sem improviso`,
+          `5 lições práticas dos bastidores desta semana em ${niche}`,
+          `Prepare-se para a Live de hoje às 20h: Os pontos que vamos destrinchar`,
+        ],
+        icpPainDesireOrObjection:
+          "Desejo de ter clareza visual de todo o sistema antes de dar o próximo passo.",
+        icpAwarenessLevel: "Consciente do Produto",
+        referenceLink: "",
+        executionNotes: "Último slide com chamada direta para ativar o lembrete da Live das 20h.",
+        status: "planned",
+        eligibleForComplementaryMaterial: false,
+        complementaryMaterialType: "Nenhum",
+      });
+    }
+
+    // Sábado: Reel de Relacionamento
+    if (dayOfWeekIndex === 5) {
+      slots.push({
+        id: `slot-w${weekNumber}-d${dayNumber}-1`,
+        dateISO,
+        dayNumber,
+        monthShort: "Nov",
+        weekNumber,
+        dayOfWeekIndex,
+        dayOfWeekLabel,
+        provisionalTitle: `Bastidores Reais & Visão de Longo Prazo em ${niche}`,
+        format: "reel_curto",
+        retinaType: "Relacionamento",
+        platforms: ["Instagram"],
+        suggestedTime: "11:30",
+        strategicObjective: "Humanizar o especialista e gerar conexão com o estilo de vida/trabalho",
+        secondaryObjective: "Manter proximidade no fim de semana sem perder posicionamento",
+        editorialLineName: lineName,
+        editorialPillar: AVAILABLE_PILLARS[4],
+        mainTheme: `O que acontece nos bastidores de uma operação de ${subniche} organizada`,
+        aiSuggestedThemes: [
+          `O que acontece nos bastidores de uma operação de ${subniche} organizada`,
+          `Reflexão de sábado: O verdadeiro preço da falta de direção estratégica`,
+          `Como reviso meus indicadores da semana em 20 minutos`,
+        ],
+        icpPainDesireOrObjection:
+          "Desejo de ter paz mental e controle sobre o negócio sem trabalhar 16h/dia no caos.",
+        icpAwarenessLevel: "Consciente do Problema",
+        referenceLink: "",
+        executionNotes: "Formato mais conversacional e próximo.",
+        status: "planned",
+        eligibleForComplementaryMaterial: false,
+        complementaryMaterialType: "Nenhum",
+      });
+    }
+
+    // Sequências Diárias de Stories (Seg a Dom)
+    const dailyStoriesCount =
+      dayOfWeekIndex === 2 || dayOfWeekIndex === 4 ? 4 : 3;
+
+    slots.push({
+      id: `slot-w${weekNumber}-d${dayNumber}-stories`,
+      dateISO,
+      dayNumber,
+      monthShort: "Nov",
+      weekNumber,
+      dayOfWeekIndex,
+      dayOfWeekLabel,
+      provisionalTitle: `${dailyStoriesCount} Sequências de Stories do Dia (${dailyStoriesCount * 5} stories)`,
+      format: "sequencia_stories",
+      retinaType:
+        dayOfWeekIndex === 4
+          ? "NiveisDeConsciencia"
+          : dayOfWeekIndex === 6
+            ? "Relacionamento"
+            : "Interacao",
+      platforms: ["Instagram"],
+      suggestedTime: "08:30 • 12:30 • 16:30 • 20:30",
+      strategicObjective:
+        dayOfWeekIndex === 6
+          ? "Rotina, conexão genuína, abertura de caixinha e antecipação da nova semana"
+          : "Sustentar narrativa fracionada ao longo do dia (Manhã, Almoço, Tarde e Noite)",
+      secondaryObjective: "Gerar respostas no Direct, enquetes qualificadoras e retenção diária",
+      editorialLineName: lineName,
+      editorialPillar: AVAILABLE_PILLARS[dayOfWeekIndex % AVAILABLE_PILLARS.length],
+      mainTheme: `Narrativa Diária de Stories — ${dayOfWeekLabel} (Semana ${weekNumber})`,
+      aiSuggestedThemes: [
+        `Sequência de Diagnóstico + Bastidor Real + Caixinha de Dúvidas em ${subniche}`,
+        `Estudo de Caso Fracionado em 4 Blocos + Enquete de Qualificação`,
+        `Quebra de Objeção do Dia + Prova Social + Chamada para Direct`,
+      ],
+      icpPainDesireOrObjection:
+        "Manter o comprador aquecido diariamente combinando relacionamento, prova e interação.",
+      icpAwarenessLevel: "Consciente da Solução",
+      referenceLink: "",
+      executionNotes:
+        "Seguir o modelo canônico: 3 a 4 sequências no dia, com 4 a 5 stories encadeados em cada sequência.",
+      status: weekNumber === 1 && dayOfWeekIndex <= 2 ? "published" : "planned",
+      eligibleForComplementaryMaterial: false,
+      complementaryMaterialType: "Nenhum",
+      storySequencesBreakdown: [
+        {
+          period: "Manhã",
+          suggestedTime: "08:30",
+          storiesCount: 5,
+          retinaFocus: "Relacionamento",
+          narrativeDirection:
+            "Abertura do dia com ritual de trabalho, visão de mundo e contextualização do tema central (5 stories).",
+          hasQAndABox: false,
+        },
+        {
+          period: "Almoço",
+          suggestedTime: "12:30",
+          storiesCount: 4,
+          retinaFocus: "Transformacao",
+          narrativeDirection:
+            "Bastidor técnico de execução + micro-lição prática aplicável com enquete diagnóstica (4 stories).",
+          hasQAndABox: false,
+        },
+        {
+          period: "Tarde",
+          suggestedTime: "16:30",
+          storiesCount: 5,
+          retinaFocus: "Autoridade",
+          narrativeDirection:
+            "Prova real, análise de caso ou resposta aprofundada de caixinha conectada ao MUV (5 stories).",
+          hasQAndABox: true,
+        },
+        {
+          period: "Noite",
+          suggestedTime: "20:30",
+          storiesCount: 4,
+          retinaFocus: "NiveisDeConsciencia",
+          narrativeDirection:
+            "Fechamento reflexivo, quebra de objeção silenciosa e convite para interação/Direct (4 stories).",
+          hasQAndABox: true,
+        },
+      ],
+    });
   }
 
-  const handleCreateCalendarSubmit = (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    const created: EditorialCalendarCycle = {
+  return slots;
+}
+
+/* ========================================================================== */
+/* COMPONENTE PRINCIPAL: CalendarioEditorialModule                            */
+/* ========================================================================== */
+
+export function CalendarioEditorialModule(props: CalendarioEditorialModuleProps) {
+  const resolvedProjectId = props.projectId || "proj-default";
+  const projectName = props.projectName || "Produto X — Lançamento Semente";
+  const resolvedNiche =
+    props.projectNiche || props.niche || "Finanças & Investimentos";
+  const resolvedSubniche =
+    props.projectSubniche || props.subniche || "Algorithmic Trading";
+  const resolvedObjective =
+    props.projectObjective || props.currentObjective || "Conversão";
+  const resolvedPhase =
+    props.currentPhase || "Aquecimento — Semana 2 de 4";
+  const hasActiveLine = props.hasActiveLine ?? true;
+  const activeLineName =
+    props.activeLineName || "Linha Editorial v1 — Base Estratégica";
+
+  const handleTriggerGoToLine = useCallback(() => {
+    if (props.onGoToLineTab) {
+      props.onGoToLineTab();
+    } else if (props.onRequestGoToLineEditorial) {
+      props.onRequestGoToLineEditorial();
+    }
+  }, [props.onGoToLineTab, props.onRequestGoToLineEditorial]);
+
+  const handleTriggerGoToThemes = useCallback(() => {
+    if (props.onGoToThemesTab) {
+      props.onGoToThemesTab();
+    } else if (props.onRequestGoToThemes) {
+      props.onRequestGoToThemes();
+    }
+  }, [props.onGoToThemesTab, props.onRequestGoToThemes]);
+
+  const handleTriggerGoToScripts = useCallback(
+    (slotId?: string, themeTitle?: string) => {
+      if (props.onGoToScriptsTab) {
+        props.onGoToScriptsTab(slotId, themeTitle);
+      } else if (props.onRequestGoToScripts) {
+        props.onRequestGoToScripts(slotId, themeTitle);
+      }
+    },
+    [props.onGoToScriptsTab, props.onRequestGoToScripts]
+  );
+
+  const storageKey = `la-calendario-editorial-v2-${resolvedProjectId}`;
+  const sharedSlotsKey = `la-shared-calendar-slots-${resolvedProjectId}`;
+
+  /* Estado dos Calendários do Projeto */
+  const [calendars, setCalendars] = useState<readonly EditorialCalendarRecord[]>(
+    () => [
+      {
+        id: "cal-nov-2026",
+        name: `Calendário Editorial — ${resolvedPhase}`,
+        status: "active",
+        periodLabel: "4 semanas planejadas (28 dias)",
+        periodStart: "02/11/2026",
+        periodEnd: "29/11/2026",
+        mainObjective: `Apoiar ${resolvedObjective.toLowerCase()} e consolidar autoridade`,
+        linkedLineName: activeLineName,
+        platforms: ["Instagram", "YouTube", "TikTok", "LinkedIn"],
+        weeklyCapacity: {
+          reels: 4,
+          longVideos: 1,
+          carousels: 3,
+          staticPosts: 2,
+          lives: 1,
+          dailyStorySequences: 4,
+          storiesPerSequence: 5,
+        },
+        updatedAt: "Sincronizado hoje",
+        reviewSuggestions: [
+          {
+            id: "rev-1",
+            title: "Aumentar conteúdos de Transformação nas terças e quartas",
+            reason:
+              "Conteúdos práticos de Transformação estão gerando o maior volume de salvamentos qualificados do ciclo.",
+            actionLabel: "Aplicar reforço de Transformação",
+            applied: false,
+          },
+          {
+            id: "rev-2",
+            title: "Elevar peso de Níveis de Consciência e Autoridade na Semana 3 e 4",
+            reason:
+              "Com a aproximação do momento de conversão, é recomendável intensificar a quebra de objeções.",
+            actionLabel: "Equilibrar Semanas 3 e 4",
+            applied: false,
+          },
+          {
+            id: "rev-3",
+            title: "Preencher os slots restantes que ainda estão sem tema principal",
+            reason:
+              "Existem slots na primeira e segunda semana com espaço aberto para vincular temas da Biblioteca Estratégica.",
+            actionLabel: "Vincular Temas Recomendados",
+            applied: false,
+          },
+        ],
+        slots: generateCanonicalMonthSlots(
+          resolvedNiche,
+          resolvedSubniche,
+          activeLineName
+        ),
+      },
+    ]
+  );
+
+  const [selectedCalendarId, setSelectedCalendarId] =
+    useState<string>("cal-nov-2026");
+
+  /* Controle de Telas da Subfunção */
+  const [viewMode, setViewMode] = useState<
+    "calendar" | "list" | "setup" | "review"
+  >(props.initialView || "calendar");
+
+  /* Modo de visualização do Calendário */
+  const [calendarSubView, setCalendarSubView] =
+    useState<CalendarSubViewMode>("month");
+
+  /* Filtros da Grade do Calendário */
+  const [selectedWeekFilter, setSelectedWeekFilter] = useState<
+    "all" | 1 | 2 | 3 | 4
+  >("all");
+  const [activeWeekInWeeklyView, setActiveWeekInWeeklyView] = useState<
+    1 | 2 | 3 | 4
+  >(1);
+  const [formatFilter, setFormatFilter] = useState<"all" | SlotContentFormat>(
+    "all"
+  );
+  const [retinaFilter, setRetinaFilter] = useState<"all" | RetinaTypeKey>("all");
+  const [showDailyStoriesInGrid, setShowDailyStoriesInGrid] =
+    useState<boolean>(true);
+
+  /* Estado do Drawer 360° do Slot */
+  const [selectedSlotId, setSelectedSlotId] = useState<string | null>(null);
+
+  /* Modal de Criar Novo Slot */
+  const [addingSlotForDate, setAddingSlotForDate] = useState<{
+    readonly dateISO: string;
+    readonly dayNumber: number;
+    readonly weekNumber: 1 | 2 | 3 | 4;
+    readonly dayOfWeekIndex: 0 | 1 | 2 | 3 | 4 | 5 | 6;
+    readonly dayOfWeekLabel: string;
+  } | null>(null);
+  const [newSlotTitle, setNewSlotTitle] = useState<string>("");
+  const [newSlotFormat, setNewSlotFormat] =
+    useState<SlotContentFormat>("reel_curto");
+  const [newSlotRetina, setNewSlotRetina] =
+    useState<RetinaTypeKey>("Transformacao");
+  const [newSlotTime, setNewSlotTime] = useState<string>("18:00");
+
+  /* Criação de Novo Calendário */
+  const [newCalName, setNewCalName] = useState<string>("");
+  const [newCalPeriodLabel, setNewCalPeriodLabel] = useState<string>(
+    "4 semanas de aquecimento (1 mês)"
+  );
+  const [newCalStart, setNewCalStart] = useState<string>("01/12/2026");
+  const [newCalEnd, setNewCalEnd] = useState<string>("28/12/2026");
+  const [newCalObjective, setNewCalObjective] = useState<string>(
+    PERIOD_OBJECTIVES[0]
+  );
+
+  const [autosaveStatus, setAutosaveStatus] = useState<"saved" | "saving">(
+    "saved"
+  );
+
+  /* Carrega do localStorage */
+  useEffect(() => {
+    try {
+      const saved = window.localStorage.getItem(storageKey);
+      if (saved) {
+        const parsed = JSON.parse(saved) as EditorialCalendarRecord[];
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          setCalendars(parsed);
+          setSelectedCalendarId(parsed[0]?.id || "cal-nov-2026");
+        }
+      }
+    } catch {
+      /* Ignora erro de storage */
+    }
+  }, [storageKey]);
+
+  const persistCalendars = useCallback(
+    (nextCalendars: readonly EditorialCalendarRecord[]) => {
+      setAutosaveStatus("saving");
+      setCalendars(nextCalendars);
+      try {
+        window.localStorage.setItem(storageKey, JSON.stringify(nextCalendars));
+        const activeCal = nextCalendars[0];
+        if (activeCal) {
+          window.localStorage.setItem(
+            sharedSlotsKey,
+            JSON.stringify(activeCal.slots)
+          );
+        }
+        setTimeout(() => setAutosaveStatus("saved"), 240);
+      } catch {
+        setAutosaveStatus("saved");
+      }
+    },
+    [storageKey, sharedSlotsKey]
+  );
+
+  const currentCalendar = useMemo(() => {
+    const fallback: EditorialCalendarRecord = calendars[0] ?? {
+      id: "cal-fallback",
+      name: `Calendário Editorial — ${resolvedPhase}`,
+      status: "active",
+      periodLabel: "4 semanas planejadas",
+      periodStart: "02/11/2026",
+      periodEnd: "29/11/2026",
+      mainObjective: resolvedObjective,
+      linkedLineName: activeLineName,
+      platforms: ["Instagram", "YouTube"],
+      weeklyCapacity: {
+        reels: 4,
+        longVideos: 1,
+        carousels: 2,
+        staticPosts: 2,
+        lives: 1,
+        dailyStorySequences: 4,
+        storiesPerSequence: 5,
+      },
+      updatedAt: "Hoje",
+      reviewSuggestions: [],
+      slots: [],
+    };
+    return (
+      calendars.find((c) => c.id === selectedCalendarId) ??
+      calendars.find((c) => c.status === "active") ??
+      fallback
+    );
+  }, [
+    calendars,
+    selectedCalendarId,
+    resolvedPhase,
+    resolvedObjective,
+    activeLineName,
+  ]);
+
+  const updateSlotById = useCallback(
+    (slotId: string, updater: (prev: CalendarSlotItem) => CalendarSlotItem) => {
+      const next = calendars.map((cal) => {
+        if (cal.id !== currentCalendar.id) return cal;
+        return {
+          ...cal,
+          updatedAt: "Salvo automaticamente agora",
+          slots: cal.slots.map((s) => (s.id === slotId ? updater(s) : s)),
+        };
+      });
+      persistCalendars(next);
+    },
+    [calendars, currentCalendar.id, persistCalendars]
+  );
+
+  const selectedSlot = useMemo(() => {
+    if (!selectedSlotId) return null;
+    return (
+      currentCalendar.slots.find((s) => s.id === selectedSlotId) ?? null
+    );
+  }, [currentCalendar.slots, selectedSlotId]);
+
+  const calendarMetrics = useMemo(() => {
+    const allSlots = currentCalendar.slots;
+    const feedSlots = allSlots.filter((s) => s.format !== "sequencia_stories");
+    const storiesDays = allSlots.filter(
+      (s) => s.format === "sequencia_stories"
+    );
+    const withoutTheme = feedSlots.filter((s) => !s.mainTheme.trim()).length;
+    const readyOrPublished = allSlots.filter(
+      (s) =>
+        s.status === "script_ready" ||
+        s.status === "recorded" ||
+        s.status === "published"
+    ).length;
+    const eligibleMaterials = allSlots.filter(
+      (s) => s.eligibleForComplementaryMaterial
+    ).length;
+
+    return {
+      totalSlots: allSlots.length,
+      feedSlotsCount: feedSlots.length,
+      storiesDaysCount: storiesDays.length,
+      withoutTheme,
+      readyOrPublished,
+      eligibleMaterials,
+    };
+  }, [currentCalendar.slots]);
+
+  const calendarDaysMatrix = useMemo(() => {
+    const days: {
+      readonly dayNumber: number;
+      readonly dateISO: string;
+      readonly monthShort: string;
+      readonly weekNumber: 1 | 2 | 3 | 4;
+      readonly dayOfWeekIndex: 0 | 1 | 2 | 3 | 4 | 5 | 6;
+      readonly dayOfWeekLabel: string;
+      readonly isToday: boolean;
+      readonly slots: CalendarSlotItem[];
+    }[] = [];
+
+    for (let offset = 0; offset < 28; offset++) {
+      const dayNumber = 2 + offset;
+      const dateISO = `2026-11-${String(dayNumber).padStart(2, "0")}`;
+      const weekNumber = (Math.floor(offset / 7) + 1) as 1 | 2 | 3 | 4;
+      const dayOfWeekIndex = (offset % 7) as 0 | 1 | 2 | 3 | 4 | 5 | 6;
+      const dayOfWeekLabel = WEEKDAY_HEADERS[dayOfWeekIndex].full;
+
+      const daySlots = currentCalendar.slots.filter((s) => {
+        if (s.dayNumber !== dayNumber) return false;
+        if (!showDailyStoriesInGrid && s.format === "sequencia_stories") {
+          return false;
+        }
+        if (formatFilter !== "all" && s.format !== formatFilter) {
+          return false;
+        }
+        if (retinaFilter !== "all" && s.retinaType !== retinaFilter) {
+          return false;
+        }
+        return true;
+      });
+
+      days.push({
+        dayNumber,
+        dateISO,
+        monthShort: "Nov",
+        weekNumber,
+        dayOfWeekIndex,
+        dayOfWeekLabel,
+        isToday: dayNumber === 9,
+        slots: daySlots,
+      });
+    }
+
+    if (selectedWeekFilter !== "all") {
+      return days.filter((d) => d.weekNumber === selectedWeekFilter);
+    }
+    return days;
+  }, [
+    currentCalendar.slots,
+    selectedWeekFilter,
+    showDailyStoriesInGrid,
+    formatFilter,
+    retinaFilter,
+  ]);
+
+  const handleAddSlotToDay = (e: FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    if (!addingSlotForDate) return;
+
+    const formatMeta = FORMAT_META[newSlotFormat];
+    const newSlot: CalendarSlotItem = {
+      id: `slot-custom-${Date.now()}`,
+      dateISO: addingSlotForDate.dateISO,
+      dayNumber: addingSlotForDate.dayNumber,
+      monthShort: "Nov",
+      weekNumber: addingSlotForDate.weekNumber,
+      dayOfWeekIndex: addingSlotForDate.dayOfWeekIndex,
+      dayOfWeekLabel: addingSlotForDate.dayOfWeekLabel,
+      provisionalTitle:
+        newSlotTitle.trim() ||
+        `${formatMeta.shortLabel} de ${RETINA_META[newSlotRetina].label} — ${addingSlotForDate.dayOfWeekLabel}`,
+      format: newSlotFormat,
+      retinaType: newSlotRetina,
+      platforms:
+        newSlotFormat === "video_longo"
+          ? ["YouTube"]
+          : ["Instagram"],
+      suggestedTime: newSlotTime || "18:00",
+      strategicObjective: RETINA_META[newSlotRetina].purpose,
+      secondaryObjective: ` Apoiar ${currentCalendar.mainObjective}`,
+      editorialLineName: currentCalendar.linkedLineName,
+      editorialPillar: AVAILABLE_PILLARS[0],
+      mainTheme: newSlotTitle.trim(),
+      aiSuggestedThemes: [
+        `Como evitar o erro invisível de ${resolvedSubniche}`,
+        `O método passo a passo para gerar previsibilidade em ${resolvedNiche}`,
+        `Estudo prático: o que diferencia amadores de profissionais em ${resolvedSubniche}`,
+      ],
+      icpPainDesireOrObjection:
+        "Dor ou objeção prioritária mapeada na Base Estratégica do projeto.",
+      icpAwarenessLevel: "Consciente da Solução",
+      referenceLink: "",
+      executionNotes: "Slot adicionado diretamente na grade do calendário.",
+      status: "planned",
+      eligibleForComplementaryMaterial:
+        newSlotFormat === "carrossel" || newSlotFormat === "video_longo",
+      complementaryMaterialType:
+        newSlotFormat === "carrossel" || newSlotFormat === "video_longo"
+          ? "Checklist / Resumo Executivo PDF"
+          : "Nenhum",
+    };
+
+    const next = calendars.map((cal) =>
+      cal.id === currentCalendar.id
+        ? { ...cal, slots: [...cal.slots, newSlot] }
+        : cal
+    );
+    persistCalendars(next);
+    setAddingSlotForDate(null);
+    setNewSlotTitle("");
+    setSelectedSlotId(newSlot.id);
+  };
+
+  const handleDeleteSlot = (slotId: string) => {
+    const next = calendars.map((cal) =>
+      cal.id === currentCalendar.id
+        ? { ...cal, slots: cal.slots.filter((s) => s.id !== slotId) }
+        : cal
+    );
+    persistCalendars(next);
+    if (selectedSlotId === slotId) {
+      setSelectedSlotId(null);
+    }
+  };
+
+  const handleCreateNewCalendar = (e: FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    const created: EditorialCalendarRecord = {
       id: `cal-${Date.now()}`,
       name:
         newCalName.trim() ||
-        `Calendário — ${newCalObjective} (${projectName.split("—")[0]?.trim()})`,
+        `Calendário Editorial — ${newCalPeriodLabel}`,
       status: "active",
-      durationLabel: newCalDuration,
+      periodLabel: newCalPeriodLabel,
       periodStart: newCalStart,
       periodEnd: newCalEnd,
-      objective: newCalObjective,
-      phaseLabel: currentPhase,
-      linkedLineVersionName: activeLineName,
-      capacityConfig: {
-        shortVideosPerWeek: capShortVideos,
-        carouselsPerWeek: capCarousels,
-        staticPostsPerWeek: capStaticPosts,
-        longVideosPerWeek: capLongVideos,
-        livesPerWeek: capLives,
-        storiesBlocksPerDay: capStoriesBlocks,
-      },
+      mainObjective: newCalObjective,
+      linkedLineName: activeLineName,
+      platforms: currentCalendar.platforms,
+      weeklyCapacity: { ...currentCalendar.weeklyCapacity },
       updatedAt: "Criado agora",
-      slots: activeCalendar?.slots ?? [],
-      aiSuggestions: [],
+      reviewSuggestions: currentCalendar.reviewSuggestions,
+      slots: generateCanonicalMonthSlots(
+        resolvedNiche,
+        resolvedSubniche,
+        activeLineName
+      ),
     };
 
-    setCalendars((prev) => [created, ...prev]);
-    setOpenedCalendarId(created.id);
-    setIsNewCalendarModalOpen(false);
+    const next = [
+      created,
+      ...calendars.map((c) =>
+        c.status === "active" ? { ...c, status: "archived" as const } : c
+      ),
+    ];
+    persistCalendars(next);
+    setSelectedCalendarId(created.id);
     setNewCalName("");
+    setViewMode("calendar");
   };
 
-  const handleDuplicateExpiredCalendar = (cal: EditorialCalendarCycle) => {
-    const duplicated: EditorialCalendarCycle = {
+  const handleDuplicateCalendar = (cal: EditorialCalendarRecord) => {
+    const dup: EditorialCalendarRecord = {
       ...cal,
       id: `cal-dup-${Date.now()}`,
-      name: `${cal.name} (Novo Ciclo)`,
+      name: `${cal.name} (Cópia)`,
       status: "draft",
-      periodStart: "06/09/2026",
-      periodEnd: "03/10/2026",
-      updatedAt: "Duplicado para ajuste agora",
-      slots: activeCalendar?.slots ?? [],
+      updatedAt: "Duplicado agora",
+      slots: cal.slots.map((s) => ({ ...s, id: `${s.id}-copy-${Date.now()}` })),
     };
-    setCalendars((prev) => [duplicated, ...prev]);
-    setOpenedCalendarId(duplicated.id);
+    persistCalendars([dup, ...calendars]);
+    setSelectedCalendarId(dup.id);
   };
 
-  const handleAddSlotSubmit = (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    if (!activeCalendar) return;
-
-    const newSlot: CalendarSlotItem = {
-      id: `slot-${Date.now()}`,
-      weekNumber: selectedWeek,
-      dayOfWeek: newSlotDay,
-      dateLabel: "Semana " + selectedWeek,
-      time: newSlotTime,
-      format: newSlotFormat,
-      platform:
-        newSlotFormat === "Vídeo Longo (YouTube)" ? "YouTube" : "Instagram",
-      retinaType: newSlotRetina,
-      pillar: newSlotPillar,
-      themeTitle: newSlotTheme.trim() ? newSlotTheme.trim() : null,
-      status: newSlotTheme.trim() ? "theme_assigned" : "without_theme",
-    };
-
-    setCalendars((prev) =>
-      prev.map((c) =>
-        c.id === activeCalendar.id
-          ? {
-              ...c,
-              slots: [...c.slots, newSlot],
-              updatedAt: "Slot adicionado agora",
-            }
-          : c
-      )
-    );
-    setNewSlotTheme("");
-    setIsAddSlotModalOpen(false);
-  };
-
-  const handleSaveSlotInspection = (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    if (!activeCalendar || !inspectingSlot) return;
-
-    const trimmed = slotThemeDraft.trim();
-    setCalendars((prev) =>
-      prev.map((c) =>
-        c.id === activeCalendar.id
-          ? {
-              ...c,
-              slots: c.slots.map((s) =>
-                s.id === inspectingSlot.id
-                  ? {
-                      ...s,
-                      themeTitle: trimmed || null,
-                      status:
-                        trimmed && s.status === "without_theme"
-                          ? "theme_assigned"
-                          : !trimmed
-                            ? "without_theme"
-                            : s.status,
-                    }
+  const handleApplyReviewSuggestion = (suggestionId: string) => {
+    const next = calendars.map((cal) => {
+      if (cal.id !== currentCalendar.id) return cal;
+      return {
+        ...cal,
+        reviewSuggestions: cal.reviewSuggestions.map((r) =>
+          r.id === suggestionId ? { ...r, applied: true } : r
+        ),
+        slots:
+          suggestionId === "rev-3"
+            ? cal.slots.map((s) =>
+                !s.mainTheme.trim() && s.aiSuggestedThemes[0]
+                  ? { ...s, mainTheme: s.aiSuggestedThemes[0] }
                   : s
-              ),
-              updatedAt: "Slot atualizado agora",
-            }
-          : c
-      )
-    );
-    setInspectingSlotId(null);
-  };
-
-  const handleApplyAISuggestion = (suggestionId: string) => {
-    if (!activeCalendar) return;
-    setCalendars((prev) =>
-      prev.map((c) =>
-        c.id === activeCalendar.id
-          ? {
-              ...c,
-              aiSuggestions: c.aiSuggestions.map((sug) =>
-                sug.id === suggestionId ? { ...sug, applied: true } : sug
-              ),
-              updatedAt: "Ajuste da IA aplicado agora",
-            }
-          : c
-      )
-    );
+              )
+            : cal.slots,
+      };
+    });
+    persistCalendars(next);
   };
 
   return (
     <div className="flex flex-col gap-6">
-      {/* CABEÇALHO DO MÓDULO DE CALENDÁRIO EDITORIAL (Seção 6.3.1) */}
-      <section className="rounded-la-xl border border-white/10 bg-[#080B12]/95 p-6 shadow-[var(--la-elevation-2)] sm:p-7">
-        <div className="flex flex-col justify-between gap-4 border-b border-white/10 pb-5 lg:flex-row lg:items-center">
-          <div className="flex items-start gap-3.5">
-            <span className="mt-0.5 inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-la-xl border border-la-border-gold/55 bg-la-gold-faint text-la-gold">
-              <Calendar className="h-5 w-5" />
-            </span>
+      {/* =================================================================== */}
+      {/* AVISO SE NÃO HOUVER LINHA EDITORIAL ATIVA                           */}
+      {/* =================================================================== */}
+      {!hasActiveLine ? (
+        <section className="flex flex-col justify-between gap-4 rounded-la-xl border border-amber-400/50 bg-amber-950/25 p-5 sm:flex-row sm:items-center">
+          <div className="flex items-start gap-3">
+            <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-amber-400" />
             <div>
-              <div className="flex flex-wrap items-center gap-2">
-                <span className="font-la-mono text-[0.625rem] font-semibold uppercase tracking-[0.08em] text-la-gold-light">
-                  FUNÇÃO 01 · PARTE 2 — AGENDA EXECUTÁVEL
-                </span>
-                <span className="rounded-la-full border border-emerald-500/40 bg-emerald-950/35 px-2.5 py-0.5 font-la-mono text-[0.5625rem] font-semibold text-emerald-300">
-                  Linha Ativa: {activeLineName}
-                </span>
-              </div>
-              <h2 className="mt-1 font-la-sans text-[1.5rem] font-semibold text-la-text-primary">
-                Calendários Editoriais
-              </h2>
-              <p className="mt-0.5 font-la-sans text-[0.875rem] text-la-text-secondary">
-                Transforme sua Linha Editorial em uma agenda realista de
-                conteúdos, formatos, frequência e prioridades.
+              <h3 className="font-la-sans text-[1rem] font-semibold text-la-text-primary">
+                Antes de planejar, defina sua Linha Editorial.
+              </h3>
+              <p className="mt-0.5 font-la-sans text-[0.8125rem] text-la-text-secondary">
+                O calendário deve ser sustentado por uma Linha Editorial ativa
+                para que a IA distribua formatos, frequência, objetivos e
+                matriz RETINA com precisão estratégica.
               </p>
             </div>
           </div>
 
+          <button
+            type="button"
+            onClick={handleTriggerGoToLine}
+            className="shrink-0 rounded-la-md bg-la-gold px-4 py-2 font-la-sans text-[0.8125rem] font-semibold text-la-text-inverse"
+          >
+            Ir para Linha Editorial
+          </button>
+        </section>
+      ) : null}
+
+      {/* =================================================================== */}
+      {/* CABEÇALHO SUPERIOR DO CALENDÁRIO EDITORIAL                          */}
+      {/* =================================================================== */}
+      <section className="relative overflow-hidden rounded-la-xl border border-white/10 bg-[#080B12]/95 p-6 shadow-[var(--la-elevation-2)]">
+        <div
+          aria-hidden="true"
+          className="pointer-events-none absolute inset-x-10 top-0 h-px bg-[image:var(--la-gradient-border-gold-top)]"
+        />
+
+        <div className="flex flex-col justify-between gap-4 border-b border-white/10 pb-5 lg:flex-row lg:items-center">
+          <div>
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="inline-flex items-center gap-1.5 rounded-la-full border border-la-border-gold/55 bg-la-gold-faint px-3 py-0.5 font-la-mono text-[0.625rem] font-semibold uppercase tracking-[0.08em] text-la-gold-light">
+                <CalendarIcon className="h-3.5 w-3.5 text-la-gold" />
+                <span>FUNÇÃO 01 · PARTE 2 — CALENDÁRIO EDITORIAL EXECUTÁVEL</span>
+              </span>
+
+              <span className="inline-flex items-center gap-1.5 rounded-la-full border border-white/10 bg-black/50 px-2.5 py-0.5 font-la-mono text-[0.625rem] text-la-text-secondary">
+                <CheckCircle2 className="h-3 w-3 text-emerald-400" />
+                <span>
+                  {autosaveStatus === "saving"
+                    ? "Sincronizando agenda..."
+                    : `${currentCalendar.periodStart} → ${currentCalendar.periodEnd}`}
+                </span>
+              </span>
+            </div>
+
+            <h2 className="mt-2 font-la-sans text-[1.5rem] font-semibold text-la-text-primary sm:text-[1.75rem]">
+              {currentCalendar.name}
+            </h2>
+            <p className="mt-1 font-la-sans text-[0.875rem] text-la-text-secondary">
+              Linha associada:{" "}
+              <strong className="text-la-gold-light">
+                {currentCalendar.linkedLineName}
+              </strong>{" "}
+              • Objetivo:{" "}
+              <strong className="text-la-text-primary">
+                {currentCalendar.mainObjective}
+              </strong>
+            </p>
+          </div>
+
           <div className="flex flex-wrap items-center gap-2.5">
-            {openedCalendarId ? (
-              <button
-                type="button"
-                onClick={() => setOpenedCalendarId(null)}
-                className="inline-flex min-h-[2.5rem] items-center gap-2 rounded-la-md border border-white/12 bg-white/[0.03] px-3.5 py-2 font-la-mono text-[0.75rem] text-la-text-secondary transition-colors hover:border-la-border-gold/60 hover:text-la-gold-light"
-              >
-                <ArrowLeft className="h-3.5 w-3.5 text-la-gold" />
-                <span>Ver todos os períodos ({calendars.length})</span>
-              </button>
-            ) : null}
+            <button
+              type="button"
+              onClick={handleTriggerGoToThemes}
+              className="inline-flex min-h-[2.5rem] items-center gap-2 rounded-la-md border border-la-border-gold/60 bg-la-gold-faint px-4 py-2 font-la-sans text-[0.8125rem] font-semibold text-la-gold-light transition-colors hover:bg-la-gold hover:text-la-text-inverse"
+            >
+              <Lightbulb className="h-4 w-4" />
+              <span>
+                Integrar Temas ({calendarMetrics.withoutTheme} sem tema)
+              </span>
+            </button>
 
             <button
               type="button"
-              onClick={() => setIsNewCalendarModalOpen(true)}
-              className="inline-flex min-h-[2.5rem] items-center gap-2 rounded-la-md bg-la-gold px-4 py-2 font-la-sans text-[0.8125rem] font-semibold text-la-text-inverse shadow-[var(--la-elevation-gold)] transition-colors hover:bg-la-gold-light"
+              onClick={() => setViewMode("setup")}
+              className="inline-flex min-h-[2.5rem] items-center gap-2 rounded-la-md bg-la-gold px-4 py-2 font-la-sans text-[0.8125rem] font-semibold text-la-text-inverse shadow-[var(--la-elevation-gold)] hover:bg-la-gold-light"
             >
               <Plus className="h-4 w-4 stroke-[2.5]" />
-              <span>Novo Calendário</span>
+              <span>+ Novo Calendário / Capacidade</span>
             </button>
           </div>
         </div>
 
-        {/* =================================================================
-            VISÃO A: LISTA DE PERÍODOS / CALENDÁRIOS DO PROJETO (Seção 6.3.2)
-           ================================================================= */}
-        {!activeCalendar ? (
-          <div className="mt-6 flex flex-col gap-4">
-            {calendars.map((cal) => {
-              const isExpired = cal.status === "expired";
-              const pendingReviews = cal.aiSuggestions.filter(
-                (s) => !s.applied
-              ).length;
-
+        {/* Navegação entre os 4 Ambientes */}
+        <div className="mt-4 flex flex-col justify-between gap-3 xl:flex-row xl:items-center">
+          <div className="flex flex-wrap items-center gap-1.5 rounded-la-lg border border-white/10 bg-black/55 p-1.5">
+            {[
+              {
+                id: "calendar" as const,
+                label: "1. Grade do Calendário Real",
+                icon: CalendarIcon,
+              },
+              {
+                id: "setup" as const,
+                label: "2. Período & Capacidade Real",
+                icon: Sliders,
+              },
+              {
+                id: "review" as const,
+                label: `3. Revisão Mensal IA (${currentCalendar.reviewSuggestions.filter((r) => !r.applied).length})`,
+                icon: Sparkles,
+              },
+              {
+                id: "list" as const,
+                label: `4. Histórico de Calendários (${calendars.length})`,
+                icon: Layers,
+              },
+            ].map((tab) => {
+              const Icon = tab.icon;
+              const active = viewMode === tab.id;
               return (
-                <article
-                  key={cal.id}
+                <button
+                  key={tab.id}
+                  type="button"
+                  onClick={() => setViewMode(tab.id)}
                   className={clsx(
-                    "flex flex-col gap-4 rounded-la-xl border p-5 transition-all",
-                    cal.status === "active"
-                      ? "border-la-gold/65 bg-[#0C101B]/95 shadow-[0_16px_36px_rgba(0,0,0,0.65)]"
-                      : "border-white/10 bg-black/45 hover:border-white/25"
+                    "inline-flex min-h-[2.25rem] items-center gap-2 rounded-la-md px-3.5 py-1.5 font-la-sans text-[0.8125rem] font-medium transition-all",
+                    active
+                      ? "bg-la-gold font-semibold text-la-text-inverse shadow-[0_0_16px_rgba(207,169,101,0.28)]"
+                      : "text-la-text-secondary hover:bg-white/[0.04] hover:text-la-text-primary"
                   )}
                 >
-                  <div className="flex flex-col justify-between gap-4 lg:flex-row lg:items-center">
-                    <div className="flex items-start gap-3.5">
-                      <span className="mt-0.5 inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-la-lg border border-la-border-gold/50 bg-la-gold-faint text-la-gold">
-                        <Calendar className="h-5 w-5" />
-                      </span>
-                      <div>
-                        <div className="flex flex-wrap items-center gap-2">
-                          <h3 className="font-la-sans text-[1.125rem] font-semibold text-la-text-primary">
-                            {cal.name}
-                          </h3>
-                          <span
-                            className={clsx(
-                              "rounded-la-full px-2.5 py-0.5 font-la-mono text-[0.5625rem] font-bold uppercase",
-                              cal.status === "active"
-                                ? "bg-la-gold text-la-text-inverse"
-                                : cal.status === "expired"
-                                  ? "border border-white/15 bg-black/60 text-la-text-muted"
-                                  : "border border-la-border-gold/55 bg-la-gold-faint text-la-gold-light"
-                            )}
-                          >
-                            {cal.status === "active"
-                              ? "ATIVO"
-                              : cal.status === "expired"
-                                ? "ENCERRADO"
-                                : "RASCUNHO"}
-                          </span>
-                        </div>
-
-                        <p className="mt-1 font-la-mono text-[0.75rem] text-la-text-secondary">
-                          {cal.durationLabel} • {cal.periodStart} →{" "}
-                          {cal.periodEnd} • Objetivo:{" "}
-                          <strong className="text-la-gold-light">
-                            {cal.objective}
-                          </strong>
-                        </p>
-                      </div>
-                    </div>
-
-                    <div className="flex flex-wrap items-center gap-2.5">
-                      {isExpired ? (
-                        <button
-                          type="button"
-                          onClick={() => handleDuplicateExpiredCalendar(cal)}
-                          className="inline-flex min-h-[2.375rem] items-center gap-1.5 rounded-la-md border border-la-border-gold/60 bg-la-gold-faint px-4 py-1.5 font-la-sans text-[0.8125rem] font-semibold text-la-gold-light hover:bg-la-gold hover:text-la-text-inverse"
-                        >
-                          <Copy className="h-3.5 w-3.5" />
-                          <span>Duplicar e ajustar para próximo ciclo</span>
-                        </button>
-                      ) : (
-                        <button
-                          type="button"
-                          onClick={() => setOpenedCalendarId(cal.id)}
-                          className="inline-flex min-h-[2.375rem] items-center gap-1.5 rounded-la-md bg-la-gold px-4 py-1.5 font-la-sans text-[0.8125rem] font-semibold text-la-text-inverse hover:bg-la-gold-light"
-                        >
-                          <span>Abrir Calendário</span>
-                          <ArrowRight className="h-3.5 w-3.5" />
-                        </button>
-                      )}
-                    </div>
-                  </div>
-
-                  <div className="flex flex-wrap items-center justify-between gap-3 border-t border-white/10 pt-3.5 font-la-mono text-[0.75rem]">
-                    <span className="text-la-text-primary">
-                      {cal.capacityConfig.shortVideosPerWeek} Reels ·{" "}
-                      {cal.capacityConfig.longVideosPerWeek} vídeo longo ·{" "}
-                      {cal.capacityConfig.carouselsPerWeek} carrosséis ·{" "}
-                      {cal.capacityConfig.staticPostsPerWeek} posts estáticos ·{" "}
-                      {cal.capacityConfig.livesPerWeek} live/semana ·{" "}
-                      <strong className="text-la-gold-light">
-                        {cal.capacityConfig.storiesBlocksPerDay} sequências de
-                        stories/dia
-                      </strong>
-                    </span>
-
-                    <div className="flex items-center gap-3">
-                      {pendingReviews > 0 ? (
-                        <span className="inline-flex items-center gap-1 rounded-la-full border border-la-border-gold/55 bg-la-gold-faint px-2.5 py-0.5 text-[0.6875rem] font-semibold text-la-gold-light">
-                          <Sparkles className="h-3 w-3 text-la-gold" />
-                          <span>{pendingReviews} sugestões de revisão</span>
-                        </span>
-                      ) : null}
-                      <span className="text-[0.6875rem] text-la-text-muted">
-                        {cal.updatedAt}
-                      </span>
-                    </div>
-                  </div>
-                </article>
+                  <Icon
+                    className={clsx(
+                      "h-4 w-4",
+                      active ? "text-la-text-inverse" : "text-la-gold"
+                    )}
+                  />
+                  <span>{tab.label}</span>
+                </button>
               );
             })}
           </div>
-        ) : (
-          /* =================================================================
-              VISÃO B: INFRAESTRUTURA VISUAL DO CALENDÁRIO ABERTO
-             ================================================================= */
-          <div className="mt-6 flex flex-col gap-6">
-            {/* 1. Faixa Resumo do Período Ativo + Termômetro de Capacidade e Status dos Slots */}
-            <div className="grid grid-cols-1 gap-4 rounded-la-xl border border-la-border-gold/45 bg-[#0C101B]/95 p-5 lg:grid-cols-12">
-              <div className="flex flex-col justify-between gap-2 lg:col-span-5">
-                <div className="flex flex-wrap items-center gap-2">
-                  <span className="rounded-la-full bg-la-gold px-2.5 py-0.5 font-la-mono text-[0.5625rem] font-bold uppercase text-la-text-inverse">
-                    PERÍODO VIGENTE
-                  </span>
-                  <span className="font-la-mono text-[0.6875rem] text-la-gold-light">
-                    {activeCalendar.periodStart} → {activeCalendar.periodEnd}
-                  </span>
-                </div>
 
-                <h3 className="font-la-sans text-[1.25rem] font-semibold text-la-text-primary">
-                  {activeCalendar.name}
-                </h3>
+          <div className="flex flex-wrap items-center gap-2 font-la-mono text-[0.6875rem] text-la-text-secondary">
+            <span className="rounded-la-xs border border-white/10 bg-black/50 px-2.5 py-1">
+              <strong className="text-la-text-primary">
+                {currentCalendar.weeklyCapacity.reels}
+              </strong>{" "}
+              Reels/sem
+            </span>
+            <span className="rounded-la-xs border border-white/10 bg-black/50 px-2.5 py-1">
+              <strong className="text-la-text-primary">
+                {currentCalendar.weeklyCapacity.carousels}
+              </strong>{" "}
+              Carrosséis/sem
+            </span>
+            <span className="rounded-la-xs border border-white/10 bg-black/50 px-2.5 py-1">
+              <strong className="text-la-text-primary">
+                {currentCalendar.weeklyCapacity.longVideos}
+              </strong>{" "}
+              Vídeo Longo/sem
+            </span>
+            <span className="rounded-la-xs border border-white/10 bg-black/50 px-2.5 py-1">
+              <strong className="text-la-text-primary">
+                {currentCalendar.weeklyCapacity.lives}
+              </strong>{" "}
+              Live/sem
+            </span>
+            <span className="rounded-la-xs border border-emerald-400/35 bg-emerald-500/10 px-2.5 py-1 text-emerald-200">
+              <strong>
+                {currentCalendar.weeklyCapacity.dailyStorySequences} seq
+              </strong>{" "}
+              Stories/dia
+            </span>
+          </div>
+        </div>
+      </section>
 
-                <p className="font-la-mono text-[0.6875rem] text-la-text-secondary">
-                  Sustentado por:{" "}
-                  <strong className="text-la-text-primary">
-                    {activeCalendar.linkedLineVersionName}
-                  </strong>{" "}
-                  • Objetivo:{" "}
-                  <strong className="text-la-gold-light">
-                    {activeCalendar.objective}
-                  </strong>
-                </p>
-              </div>
-
-              {/* Indicadores Operacionais do Calendário (Sem métricas de vaidade) */}
-              <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-4 lg:col-span-7">
-                <div className="rounded-la-lg border border-white/10 bg-black/50 p-3">
-                  <span className="block font-la-mono text-[0.5625rem] uppercase text-la-text-muted">
-                    Slots da Semana
-                  </span>
-                  <span className="mt-1 block font-la-sans text-[1.25rem] font-bold text-la-text-primary">
-                    {calendarMetrics.totalSlots}
-                  </span>
-                  <span className="font-la-mono text-[0.625rem] text-emerald-300">
-                    Dentro da capacidade
-                  </span>
-                </div>
-
-                <div className="rounded-la-lg border border-white/10 bg-black/50 p-3">
-                  <span className="block font-la-mono text-[0.5625rem] uppercase text-la-text-muted">
-                    Slots sem Tema
-                  </span>
-                  <span className="mt-1 block font-la-sans text-[1.25rem] font-bold text-amber-300">
-                    {calendarMetrics.withoutTheme}
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() => onRequestGoToThemes?.()}
-                    className="font-la-mono text-[0.625rem] text-la-gold-light hover:underline"
-                  >
-                    Preencher temas →
-                  </button>
-                </div>
-
-                <div className="rounded-la-lg border border-white/10 bg-black/50 p-3">
-                  <span className="block font-la-mono text-[0.5625rem] uppercase text-la-text-muted">
-                    Prontos p/ Roteiro
-                  </span>
-                  <span className="mt-1 block font-la-sans text-[1.25rem] font-bold text-la-gold-light">
-                    {calendarMetrics.withThemeNoScript}
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() => onRequestGoToScripts?.()}
-                    className="font-la-mono text-[0.625rem] text-la-gold-light hover:underline"
-                  >
-                    Gerar roteiros →
-                  </button>
-                </div>
-
-                <div className="rounded-la-lg border border-white/10 bg-black/50 p-3">
-                  <span className="block font-la-mono text-[0.5625rem] uppercase text-la-text-muted">
-                    Roteiros Prontos
-                  </span>
-                  <span className="mt-1 block font-la-sans text-[1.25rem] font-bold text-emerald-300">
-                    {calendarMetrics.scriptReady}
-                  </span>
-                  <span className="font-la-mono text-[0.625rem] text-la-text-secondary">
-                    Aprovados p/ gravar
-                  </span>
-                </div>
-              </div>
-            </div>
-
-            {/* 2. Barra de Controles da Agenda: Seletor de Semana + Modos de Visualização + "+ Adicionar Slot" */}
-            <div className="flex flex-col justify-between gap-3 rounded-la-xl border border-white/10 bg-black/45 p-3.5 xl:flex-row xl:items-center">
-              {/* Seletor das 4 Semanas do Ciclo */}
-              <div className="flex flex-wrap items-center gap-1.5">
-                {([1, 2, 3, 4] as const).map((wk) => (
-                  <button
-                    key={wk}
-                    type="button"
-                    onClick={() => setSelectedWeek(wk)}
-                    className={clsx(
-                      "rounded-la-md px-3 py-1.5 font-la-mono text-[0.6875rem] font-medium transition-colors",
-                      selectedWeek === wk
-                        ? "bg-la-gold font-semibold text-la-text-inverse"
-                        : "border border-white/8 bg-white/[0.02] text-la-text-secondary hover:text-la-text-primary"
-                    )}
-                  >
-                    Semana 0{wk} {wk === 2 ? "(Atual)" : ""}
-                  </button>
-                ))}
-              </div>
-
-              {/* Alternador de Visão: Grade Semanal | Lista Tática | Matriz de Stories | Revisões IA */}
-              <div className="flex flex-wrap items-center gap-2">
-                <div className="flex flex-wrap items-center gap-1 rounded-la-lg border border-white/10 bg-[#07090F] p-1">
-                  {[
-                    {
-                      id: "weekly_grid" as const,
-                      label: "Grade Semanal",
-                      icon: LayoutGrid,
-                    },
-                    {
-                      id: "tactical_list" as const,
-                      label: "Lista Tática",
-                      icon: List,
-                    },
-                    {
-                      id: "stories_matrix" as const,
-                      label: "4 Blocos de Stories",
-                      icon: Layers,
-                    },
-                    {
-                      id: "ai_reviews" as const,
-                      label: `Revisões IA (${calendarMetrics.pendingReviews})`,
-                      icon: Sparkles,
-                    },
-                  ].map((mode) => {
-                    const ModeIcon = mode.icon;
-                    const active = activeViewMode === mode.id;
-                    return (
-                      <button
-                        key={mode.id}
-                        type="button"
-                        onClick={() => setActiveViewMode(mode.id)}
-                        className={clsx(
-                          "inline-flex items-center gap-1.5 rounded-la-md px-3 py-1.5 font-la-mono text-[0.6875rem] transition-colors",
-                          active
-                            ? "bg-la-gold font-semibold text-la-text-inverse"
-                            : "text-la-text-secondary hover:text-la-text-primary"
-                        )}
-                      >
-                        <ModeIcon className="h-3.5 w-3.5" />
-                        <span>{mode.label}</span>
-                      </button>
-                    );
-                  })}
-                </div>
-
-                <button
-                  type="button"
-                  onClick={() => setIsAddSlotModalOpen(true)}
-                  className="inline-flex min-h-[2.25rem] items-center gap-1.5 rounded-la-md border border-la-border-gold/60 bg-la-gold-faint px-3.5 py-1.5 font-la-sans text-[0.75rem] font-semibold text-la-gold-light hover:bg-la-gold hover:text-la-text-inverse"
-                >
-                  <Plus className="h-3.5 w-3.5" />
-                  <span>Adicionar Slot</span>
-                </button>
-              </div>
-            </div>
-
-            {/* ===============================================================
-                SUB-VISÃO 1: GRADE SEMANAL DE SLOTS (SEGUNDA A DOMINGO)
-               =============================================================== */}
-            {activeViewMode === "weekly_grid" ? (
-              <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-7">
-                {DAYS_OF_WEEK.map((dayName) => {
-                  const daySlots = activeCalendar.slots.filter(
-                    (s) => s.dayOfWeek === dayName
-                  );
-
+      {/* =================================================================== */}
+      {/* AMBIENTE 1: O CALENDÁRIO EDITORIAL REAL                             */}
+      {/* =================================================================== */}
+      {viewMode === "calendar" ? (
+        <div className="flex flex-col gap-5">
+          <section className="flex flex-col gap-4 rounded-la-xl border border-white/10 bg-[#080B12]/95 p-4">
+            <div className="flex flex-col justify-between gap-3 lg:flex-row lg:items-center">
+              <div className="flex flex-wrap items-center gap-1.5 rounded-la-lg border border-white/10 bg-black/60 p-1">
+                {[
+                  {
+                    id: "month" as const,
+                    label: "Calendário Mensal (Com Datas)",
+                    icon: CalendarIcon,
+                  },
+                  {
+                    id: "week" as const,
+                    label: "Visão Semanal Detalhada",
+                    icon: Columns,
+                  },
+                  {
+                    id: "kanban" as const,
+                    label: "Quadro Operacional (Notion / Cards)",
+                    icon: LayoutGrid,
+                  },
+                ].map((mode) => {
+                  const Icon = mode.icon;
+                  const active = calendarSubView === mode.id;
                   return (
-                    <div
-                      key={dayName}
-                      className="flex flex-col justify-between rounded-la-xl border border-white/10 bg-[#0A0E17]/95 p-3.5"
+                    <button
+                      key={mode.id}
+                      type="button"
+                      onClick={() => setCalendarSubView(mode.id)}
+                      className={clsx(
+                        "inline-flex min-h-[2.125rem] items-center gap-2 rounded-la-md px-3 py-1 font-la-sans text-[0.75rem] font-semibold transition-all",
+                        active
+                          ? "bg-la-gold text-la-text-inverse"
+                          : "text-la-text-secondary hover:text-la-text-primary"
+                      )}
                     >
-                      <div>
-                        {/* Cabeçalho do Dia da Semana */}
-                        <div className="flex items-center justify-between border-b border-white/10 pb-2.5">
-                          <span className="font-la-sans text-[0.875rem] font-semibold text-la-text-primary">
-                            {dayName}
-                          </span>
-                          <span className="rounded-la-full border border-white/10 bg-black/50 px-2 py-0.5 font-la-mono text-[0.5625rem] text-la-gold-light">
-                            {daySlots.length} slot(s)
-                          </span>
-                        </div>
-
-                        {/* Cards de Slot do Dia */}
-                        <div className="mt-3 flex flex-col gap-2.5">
-                          {daySlots.map((slot) => {
-                            const statusMeta = resolveSlotStatusMeta(
-                              slot.status
-                            );
-                            const retinaStyle =
-                              RETINA_BADGE_STYLES[slot.retinaType];
-
-                            return (
-                              <div
-                                key={slot.id}
-                                onClick={() => {
-                                  setInspectingSlotId(slot.id);
-                                  setSlotThemeDraft(slot.themeTitle || "");
-                                }}
-                                role="button"
-                                tabIndex={0}
-                                onKeyDown={(e) => {
-                                  if (e.key === "Enter" || e.key === " ") {
-                                    setInspectingSlotId(slot.id);
-                                    setSlotThemeDraft(slot.themeTitle || "");
-                                  }
-                                }}
-                                className={clsx(
-                                  "group flex cursor-pointer flex-col gap-2 rounded-la-lg border p-3 text-left transition-all",
-                                  slot.status === "without_theme"
-                                    ? "border-dashed border-amber-400/50 bg-amber-950/10 hover:border-amber-400"
-                                    : "border-white/12 bg-black/55 hover:border-la-gold/70"
-                                )}
-                              >
-                                <div className="flex items-center justify-between gap-1 font-la-mono text-[0.625rem]">
-                                  <span className="font-semibold text-la-gold-light">
-                                    {slot.time}
-                                  </span>
-                                  <span
-                                    className={clsx(
-                                      "rounded-la-xs border px-1.5 py-0.5 text-[0.5rem] font-semibold uppercase",
-                                      retinaStyle
-                                    )}
-                                  >
-                                    {slot.retinaType}
-                                  </span>
-                                </div>
-
-                                <span className="font-la-mono text-[0.625rem] font-semibold uppercase text-la-text-primary">
-                                  {slot.format}
-                                </span>
-
-                                <p
-                                  className={clsx(
-                                    "line-clamp-3 font-la-sans text-[0.75rem] leading-[1.4]",
-                                    slot.themeTitle
-                                      ? "font-medium text-la-text-primary"
-                                      : "italic text-amber-200/90"
-                                  )}
-                                >
-                                  {slot.themeTitle ||
-                                    "Slot reservado — clique para vincular tema estratégico"}
-                                </p>
-
-                                <div className="mt-1 flex items-center justify-between border-t border-white/8 pt-2">
-                                  <span
-                                    className={clsx(
-                                      "rounded-la-xs border px-1.5 py-0.5 font-la-mono text-[0.5rem] font-semibold",
-                                      statusMeta.className
-                                    )}
-                                  >
-                                    {statusMeta.label}
-                                  </span>
-
-                                  <ArrowRight className="h-3 w-3 text-la-gold opacity-75 transition-transform group-hover:translate-x-0.5 group-hover:opacity-100" />
-                                </div>
-                              </div>
-                            );
-                          })}
-                        </div>
-                      </div>
-
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setNewSlotDay(dayName);
-                          setIsAddSlotModalOpen(true);
-                        }}
-                        className="mt-3 flex w-full items-center justify-center gap-1 rounded-la-md border border-dashed border-white/12 py-1.5 font-la-mono text-[0.625rem] text-la-text-muted transition-colors hover:border-la-border-gold/50 hover:text-la-gold-light"
-                      >
-                        <Plus className="h-3 w-3" />
-                        <span>Slot em {dayName}</span>
-                      </button>
-                    </div>
+                      <Icon className="h-3.5 w-3.5" />
+                      <span>{mode.label}</span>
+                    </button>
                   );
                 })}
               </div>
-            ) : null}
 
-            {/* ===============================================================
-                SUB-VISÃO 2: LISTA TÁTICA DE EXECUÇÃO DOS SLOTS
-               =============================================================== */}
-            {activeViewMode === "tactical_list" ? (
-              <div className="flex flex-col gap-3">
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                  <span className="font-la-mono text-[0.6875rem] uppercase text-la-text-muted">
-                    Filtrar por formato:
-                  </span>
-                  <div className="flex flex-wrap items-center gap-1 rounded-la-md border border-white/10 bg-black/50 p-1">
-                    {[
-                      "all",
-                      "Vídeo Curto (Reel)",
-                      "Carrossel",
-                      "Post Estático",
-                      "Vídeo Longo (YouTube)",
-                      "Live Semanal",
-                      "Sequência de Stories",
-                    ].map((fmt) => (
-                      <button
-                        key={fmt}
-                        type="button"
-                        onClick={() => setFormatFilter(fmt)}
-                        className={clsx(
-                          "rounded-la-xs px-2.5 py-1 font-la-mono text-[0.625rem]",
-                          formatFilter === fmt
-                            ? "bg-la-gold font-semibold text-la-text-inverse"
-                            : "text-la-text-secondary"
-                        )}
-                      >
-                        {fmt === "all" ? "Todos os Formatos" : fmt}
-                      </button>
-                    ))}
-                  </div>
+              <div className="flex flex-wrap items-center gap-1.5">
+                <span className="font-la-mono text-[0.6875rem] uppercase text-la-text-muted">
+                  Período:
+                </span>
+                {(
+                  [
+                    { id: "all", label: "Mês Completo (02 Nov - 29 Nov)" },
+                    { id: 1, label: "Semana 1 (02-08 Nov)" },
+                    { id: 2, label: "Semana 2 (09-15 Nov)" },
+                    { id: 3, label: "Semana 3 (16-22 Nov)" },
+                    { id: 4, label: "Semana 4 (23-29 Nov)" },
+                  ] as const
+                ).map((w) => {
+                  const active =
+                    calendarSubView === "week"
+                      ? activeWeekInWeeklyView === w.id
+                      : selectedWeekFilter === w.id;
+                  return (
+                    <button
+                      key={String(w.id)}
+                      type="button"
+                      onClick={() => {
+                        if (calendarSubView === "week") {
+                          if (w.id !== "all") setActiveWeekInWeeklyView(w.id);
+                        } else {
+                          setSelectedWeekFilter(w.id);
+                        }
+                      }}
+                      className={clsx(
+                        "rounded-la-xs border px-2.5 py-1 font-la-mono text-[0.6875rem] transition-colors",
+                        active
+                          ? "border-la-gold bg-la-gold-faint font-semibold text-la-gold-light"
+                          : "border-white/10 bg-black/45 text-la-text-secondary hover:border-white/25"
+                      )}
+                    >
+                      {w.label}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            <div className="flex flex-col justify-between gap-3 border-t border-white/8 pt-3 lg:flex-row lg:items-center">
+              <div className="flex flex-wrap items-center gap-1.5">
+                <span className="font-la-mono text-[0.625rem] uppercase text-la-text-muted">
+                  Matriz RETINA:
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setRetinaFilter("all")}
+                  className={clsx(
+                    "rounded-la-full border px-2.5 py-0.5 font-la-mono text-[0.625rem]",
+                    retinaFilter === "all"
+                      ? "border-la-gold bg-la-gold text-la-text-inverse font-bold"
+                      : "border-white/12 bg-black/50 text-la-text-secondary"
+                  )}
+                >
+                  Todos (6)
+                </button>
+                {(Object.keys(RETINA_META) as RetinaTypeKey[]).map((rKey) => {
+                  const r = RETINA_META[rKey];
+                  const active = retinaFilter === rKey;
+                  return (
+                    <button
+                      key={rKey}
+                      type="button"
+                      onClick={() =>
+                        setRetinaFilter((prev) =>
+                          prev === rKey ? "all" : rKey
+                        )
+                      }
+                      className={clsx(
+                        "inline-flex items-center gap-1.5 rounded-la-full border px-2.5 py-0.5 font-la-mono text-[0.625rem] transition-all",
+                        active
+                          ? `${r.badgeClass} ring-1 ring-white/40 font-bold`
+                          : "border-white/10 bg-black/40 text-la-text-secondary hover:border-white/25"
+                      )}
+                    >
+                      <span
+                        className={clsx("h-2 w-2 rounded-full", r.dotClass)}
+                      />
+                      <span>
+                        {r.code} · {r.label}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+
+              <div className="flex flex-wrap items-center gap-2">
+                <select
+                  aria-label="Filtrar por formato"
+                  value={formatFilter}
+                  onChange={(e) =>
+                    setFormatFilter(
+                      e.target.value as "all" | SlotContentFormat
+                    )
+                  }
+                  className="rounded-la-md border border-white/12 bg-[#0B0F19] px-3 py-1 font-la-mono text-[0.6875rem] text-la-text-primary focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-la-gold"
+                >
+                  <option value="all">Todos os formatos (6)</option>
+                  <option value="reel_curto">Reels / Vídeos Curtos</option>
+                  <option value="video_longo">Vídeos Longos (YouTube)</option>
+                  <option value="carrossel">Carrosséis 4:5</option>
+                  <option value="post_estatico">Posts Estáticos</option>
+                  <option value="live_semanal">Lives Semanais</option>
+                  <option value="sequencia_stories">
+                    Sequências de Stories
+                  </option>
+                </select>
+
+                <label className="inline-flex cursor-pointer items-center gap-1.5 rounded-la-md border border-white/10 bg-black/50 px-2.5 py-1 font-la-mono text-[0.6875rem] text-la-text-secondary">
+                  <input
+                    type="checkbox"
+                    checked={showDailyStoriesInGrid}
+                    onChange={(e) =>
+                      setShowDailyStoriesInGrid(e.target.checked)
+                    }
+                    className="accent-[#CFA965]"
+                  />
+                  <span>Exibir Bloco Diário de Stories</span>
+                </label>
+              </div>
+            </div>
+          </section>
+
+          {/* SUB-VISÃO 1: GRADE MENSAL REAL */}
+          {calendarSubView === "month" ? (
+            <section className="overflow-x-auto rounded-la-xl border border-white/12 bg-[#070A10] shadow-2xl">
+              <div className="min-w-[68rem]">
+                <div className="grid grid-cols-7 border-b border-white/12 bg-[#0C101B]">
+                  {WEEKDAY_HEADERS.map((wd) => (
+                    <div
+                      key={wd.index}
+                      className="flex items-center justify-between border-r border-white/8 px-3.5 py-3 last:border-r-0"
+                    >
+                      <span className="font-la-mono text-[0.75rem] font-bold tracking-[0.08em] text-la-gold-light">
+                        {wd.short}
+                      </span>
+                      <span className="font-la-sans text-[0.6875rem] text-la-text-muted">
+                        {wd.full.split("-")[0]}
+                      </span>
+                    </div>
+                  ))}
                 </div>
 
-                {activeCalendar.slots
-                  .filter(
-                    (s) => formatFilter === "all" || s.format === formatFilter
-                  )
-                  .map((slot) => {
-                    const statusMeta = resolveSlotStatusMeta(slot.status);
+                <div className="grid grid-cols-7 divide-x divide-y divide-white/10">
+                  {calendarDaysMatrix.map((day) => {
+                    const feedSlots = day.slots.filter(
+                      (s) => s.format !== "sequencia_stories"
+                    );
+                    const storySlot = day.slots.find(
+                      (s) => s.format === "sequencia_stories"
+                    );
+
                     return (
                       <div
-                        key={slot.id}
-                        className="flex flex-col justify-between gap-4 rounded-la-xl border border-white/10 bg-black/50 p-4 sm:flex-row sm:items-center"
+                        key={day.dateISO}
+                        className={clsx(
+                          "flex min-h-[14.5rem] flex-col justify-between p-2.5 transition-colors",
+                          day.isToday
+                            ? "bg-la-gold/[0.06] ring-1 ring-inset ring-la-gold/60"
+                            : "bg-[#080B12]/90 hover:bg-[#0B0F1A]"
+                        )}
                       >
-                        <div className="flex items-start gap-3.5">
-                          <div className="flex h-12 w-20 shrink-0 flex-col items-center justify-center rounded-la-lg border border-la-border-gold/45 bg-la-gold-faint font-la-mono">
-                            <span className="text-[0.625rem] font-semibold uppercase text-la-gold-light">
-                              {slot.dayOfWeek}
-                            </span>
-                            <span className="text-[0.75rem] font-bold text-la-text-primary">
-                              {slot.time}
-                            </span>
-                          </div>
-
-                          <div>
-                            <div className="flex flex-wrap items-center gap-2 font-la-mono text-[0.625rem]">
-                              <span className="rounded-la-xs border border-white/12 bg-white/[0.04] px-2 py-0.5 font-semibold text-la-text-primary">
-                                {slot.format}
-                              </span>
+                        <div>
+                          <div className="flex items-center justify-between border-b border-white/8 pb-2">
+                            <div className="flex items-center gap-1.5">
                               <span
                                 className={clsx(
-                                  "rounded-la-xs border px-2 py-0.5 font-semibold",
-                                  RETINA_BADGE_STYLES[slot.retinaType]
+                                  "inline-flex h-6 min-w-[1.5rem] items-center justify-center rounded-la-xs px-1.5 font-la-mono text-[0.75rem] font-bold",
+                                  day.isToday
+                                    ? "bg-la-gold text-la-text-inverse"
+                                    : "bg-white/[0.07] text-la-text-primary"
                                 )}
                               >
-                                RETINA: {slot.retinaType}
+                                {String(day.dayNumber).padStart(2, "0")}
                               </span>
-                              <span
-                                className={clsx(
-                                  "rounded-la-xs border px-2 py-0.5 font-semibold",
-                                  statusMeta.className
-                                )}
-                              >
-                                {statusMeta.label}
+                              <span className="font-la-mono text-[0.625rem] uppercase text-la-text-muted">
+                                {day.monthShort}
                               </span>
-                              {slot.eligibleForComplementaryMaterial ? (
-                                <span className="rounded-la-xs border border-la-border-gold/55 bg-la-gold-faint px-2 py-0.5 text-la-gold-light">
-                                  ★ Ativo Complementar Elegível
+                              {day.isToday ? (
+                                <span className="rounded-la-full bg-la-gold/25 px-1.5 py-0.2 font-la-mono text-[0.5625rem] font-bold text-la-gold-light">
+                                  HOJE
                                 </span>
                               ) : null}
                             </div>
 
-                            <h4 className="mt-1.5 font-la-sans text-[0.9375rem] font-semibold text-la-text-primary">
-                              {slot.themeTitle ||
-                                "Slot sem tema definido — aguardando alocação na Biblioteca de Temas"}
-                            </h4>
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setAddingSlotForDate({
+                                  dateISO: day.dateISO,
+                                  dayNumber: day.dayNumber,
+                                  weekNumber: day.weekNumber,
+                                  dayOfWeekIndex: day.dayOfWeekIndex,
+                                  dayOfWeekLabel: day.dayOfWeekLabel,
+                                })
+                              }
+                              title={`Adicionar slot em ${day.dayNumber} ${day.monthShort}`}
+                              className="inline-flex h-5 w-5 items-center justify-center rounded-la-xs border border-white/10 bg-black/50 text-la-text-secondary hover:border-la-gold hover:text-la-gold-light"
+                            >
+                              <Plus className="h-3 w-3" />
+                            </button>
+                          </div>
 
-                            <p className="mt-0.5 font-la-mono text-[0.6875rem] text-la-text-secondary">
-                              Pilar: {slot.pillar} • Plataforma: {slot.platform}
-                            </p>
+                          <div className="mt-2 flex flex-col gap-2">
+                            {feedSlots.map((slot) => {
+                              const fmt = FORMAT_META[slot.format];
+                              const ret = RETINA_META[slot.retinaType];
+                              const st = SLOT_STATUS_META[slot.status];
+                              const FormatIcon = fmt.icon;
+                              const hasTheme = Boolean(slot.mainTheme.trim());
+
+                              return (
+                                <button
+                                  key={slot.id}
+                                  type="button"
+                                  onClick={() => setSelectedSlotId(slot.id)}
+                                  className={clsx(
+                                    "group/slot flex w-full flex-col gap-1.5 rounded-la-md border border-white/10 border-l-2 bg-[#0D121F]/95 p-2 text-left transition-all hover:border-la-gold hover:shadow-[0_6px_20px_rgba(0,0,0,0.65)]",
+                                    ret.borderAccentClass,
+                                    selectedSlotId === slot.id &&
+                                      "ring-2 ring-la-gold"
+                                  )}
+                                >
+                                  <div className="flex items-center justify-between gap-1">
+                                    <span className="inline-flex items-center gap-1 font-la-mono text-[0.625rem] font-semibold text-la-text-primary">
+                                      <FormatIcon className="h-3 w-3 text-la-gold" />
+                                      <span>{fmt.shortLabel}</span>
+                                    </span>
+                                    <span className="font-la-mono text-[0.5625rem] text-la-text-muted">
+                                      {slot.suggestedTime}
+                                    </span>
+                                  </div>
+
+                                  <p className="line-clamp-2 font-la-sans text-[0.75rem] font-medium leading-[1.3] text-la-text-primary group-hover/slot:text-la-gold-light">
+                                    {hasTheme
+                                      ? slot.mainTheme
+                                      : slot.provisionalTitle}
+                                  </p>
+
+                                  <div className="flex flex-wrap items-center justify-between gap-1 pt-0.5">
+                                    <span
+                                      className={clsx(
+                                        "rounded-la-full border px-1.5 py-0.2 font-la-mono text-[0.5625rem] font-semibold",
+                                        ret.badgeClass
+                                      )}
+                                    >
+                                      {ret.code} · {ret.label}
+                                    </span>
+
+                                    {!hasTheme ? (
+                                      <span className="rounded-la-xs border border-amber-400/45 bg-amber-500/15 px-1.5 py-0.2 font-la-mono text-[0.5rem] font-semibold text-amber-200">
+                                        Sem tema
+                                      </span>
+                                    ) : (
+                                      <span
+                                        className={clsx(
+                                          "rounded-la-xs border px-1.5 py-0.2 font-la-mono text-[0.5rem]",
+                                          st.badgeClass
+                                        )}
+                                      >
+                                        {st.label}
+                                      </span>
+                                    )}
+                                  </div>
+                                </button>
+                              );
+                            })}
                           </div>
                         </div>
 
-                        <div className="flex shrink-0 items-center gap-2">
+                        {storySlot ? (
                           <button
                             type="button"
-                            onClick={() => {
-                              if (slot.status === "without_theme") {
-                                onRequestGoToThemes?.(slot.id);
-                              } else {
-                                onRequestGoToScripts?.(
-                                  slot.id,
-                                  slot.themeTitle || undefined
-                                );
-                              }
-                            }}
-                            className="inline-flex min-h-[2.25rem] items-center gap-1.5 rounded-la-md bg-la-gold px-3.5 py-1.5 font-la-sans text-[0.75rem] font-semibold text-la-text-inverse hover:bg-la-gold-light"
+                            onClick={() => setSelectedSlotId(storySlot.id)}
+                            className={clsx(
+                              "mt-2 flex w-full items-center justify-between gap-1.5 rounded-la-md border border-emerald-400/35 bg-emerald-950/25 px-2 py-1.5 text-left transition-colors hover:border-emerald-400 hover:bg-emerald-950/45",
+                              selectedSlotId === storySlot.id &&
+                                "ring-2 ring-emerald-400"
+                            )}
                           >
-                            <span>{statusMeta.ctaLabel}</span>
-                            <ArrowRight className="h-3.5 w-3.5" />
+                            <div className="flex min-w-0 items-center gap-1.5">
+                              <MessageSquare className="h-3 w-3 shrink-0 text-emerald-300" />
+                              <span className="truncate font-la-mono text-[0.625rem] font-semibold text-emerald-200">
+                                {storySlot.storySequencesBreakdown?.length || 4}{" "}
+                                seq. Stories
+                              </span>
+                            </div>
+                            <span className="shrink-0 font-la-mono text-[0.5625rem] text-emerald-300/80">
+                              M·A·T·N
+                            </span>
                           </button>
-
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setInspectingSlotId(slot.id);
-                              setSlotThemeDraft(slot.themeTitle || "");
-                            }}
-                            className="rounded-la-md border border-white/12 bg-white/[0.04] px-3 py-1.5 font-la-mono text-[0.6875rem] text-la-text-secondary hover:text-la-text-primary"
-                          >
-                            Editar
-                          </button>
-                        </div>
+                        ) : null}
                       </div>
                     );
                   })}
+                </div>
               </div>
-            ) : null}
+            </section>
+          ) : null}
 
-            {/* ===============================================================
-                SUB-VISÃO 3: MATRIZ DIÁRIA DOS 4 BLOCOS DE STORIES (Seção 5.9.2 e 7.5)
-               =============================================================== */}
-            {activeViewMode === "stories_matrix" ? (
-              <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
-                {[
-                  {
-                    block: "Manhã (08h00)",
-                    retina: "Relacionamento & Visão de Mundo",
-                    objective:
-                      "Contextualizar o dia, abrir bastidor real da operação e ativar primeira micro-interação (enquete binária).",
-                    deliverable: "6 sequências planejadas na semana • 4 prontas",
-                  },
-                  {
-                    block: "Almoço (12h30)",
-                    retina: "Níveis de Consciência & Diagnóstico",
-                    objective:
-                      "Educar sobre o erro invisível do ICP e contrastar o jeito comum com o mecanismo único da oferta.",
-                    deliverable: "5 sequências planejadas na semana • 4 prontas",
-                  },
-                  {
-                    block: "Tarde (16h30)",
-                    retina: "Transformação & Prova Prática",
-                    objective:
-                      "Mostrar estudo de caso, aplicação de cliente ou bastidor técnico que comprova a promessa.",
-                    deliverable: "5 sequências planejadas na semana • 3 prontas",
-                  },
-                  {
-                    block: "Noite / Q&A (20h00)",
-                    retina: "Interação, Quebra de Objeções & CTA",
-                    objective:
-                      "Responder caixinha de perguntas estratégica atacando objeções de compra e conduzindo para link/DM.",
-                    deliverable: "5 sequências planejadas na semana • 3 prontas",
-                  },
-                ].map((stBlock) => (
-                  <div
-                    key={stBlock.block}
-                    className="flex flex-col justify-between rounded-la-xl border border-white/12 bg-black/50 p-5"
-                  >
-                    <div>
-                      <span className="font-la-mono text-[0.625rem] font-semibold uppercase tracking-[0.08em] text-la-gold-light">
-                        BLOCO CRONOLÓGICO DIÁRIO
-                      </span>
-                      <h4 className="mt-1 font-la-sans text-[1.125rem] font-semibold text-la-text-primary">
-                        {stBlock.block}
-                      </h4>
-                      <span className="mt-2 inline-block rounded-la-xs border border-la-border-gold/45 bg-la-gold-faint px-2 py-0.5 font-la-mono text-[0.625rem] text-la-gold-light">
-                        {stBlock.retina}
-                      </span>
-                      <p className="mt-3 w-full text-justify [text-align-last:left] hyphens-auto font-la-sans text-[0.8125rem] leading-[1.58] text-la-text-secondary">
-                        {stBlock.objective}
-                      </p>
-                    </div>
+          {/* SUB-VISÃO 2: VISÃO SEMANAL DETALHADA */}
+          {calendarSubView === "week" ? (
+            <section className="flex flex-col gap-4">
+              <div className="flex items-center justify-between rounded-la-xl border border-white/10 bg-[#0B0F1A] px-5 py-3">
+                <button
+                  type="button"
+                  disabled={activeWeekInWeeklyView === 1}
+                  onClick={() =>
+                    setActiveWeekInWeeklyView(
+                      (prev) => Math.max(1, prev - 1) as 1 | 2 | 3 | 4
+                    )
+                  }
+                  className="inline-flex items-center gap-1.5 rounded-la-md border border-white/12 px-3 py-1.5 font-la-mono text-[0.75rem] text-la-text-secondary disabled:opacity-40"
+                >
+                  <ChevronLeft className="h-4 w-4" />
+                  <span>Semana Anterior</span>
+                </button>
 
-                    <div className="mt-5 border-t border-white/10 pt-3.5">
-                      <span className="block font-la-mono text-[0.6875rem] text-la-text-primary">
-                        {stBlock.deliverable}
-                      </span>
-                      <button
-                        type="button"
-                        onClick={() =>
-                          onRequestGoToScripts?.(
-                            undefined,
-                            `Sequência de Stories — ${stBlock.block}`
-                          )
-                        }
-                        className="mt-2.5 inline-flex w-full items-center justify-center gap-1.5 rounded-la-md border border-la-border-gold/60 bg-la-gold-faint py-2 font-la-sans text-[0.75rem] font-semibold text-la-gold-light hover:bg-la-gold hover:text-la-text-inverse"
-                      >
-                        <span>Gerar sequência deste bloco</span>
-                        <ArrowRight className="h-3.5 w-3.5" />
-                      </button>
-                    </div>
-                  </div>
-                ))}
+                <div className="text-center">
+                  <span className="font-la-mono text-[0.625rem] uppercase tracking-[0.08em] text-la-gold-light">
+                    VISÃO SEMANAL PROFUNDA
+                  </span>
+                  <h3 className="font-la-sans text-[1.125rem] font-semibold text-la-text-primary">
+                    Semana {activeWeekInWeeklyView} de 4 — Novembro 2026
+                  </h3>
+                </div>
+
+                <button
+                  type="button"
+                  disabled={activeWeekInWeeklyView === 4}
+                  onClick={() =>
+                    setActiveWeekInWeeklyView(
+                      (prev) => Math.min(4, prev + 1) as 1 | 2 | 3 | 4
+                    )
+                  }
+                  className="inline-flex items-center gap-1.5 rounded-la-md border border-white/12 px-3 py-1.5 font-la-mono text-[0.75rem] text-la-text-secondary disabled:opacity-40"
+                >
+                  <span>Próxima Semana</span>
+                  <ChevronRight className="h-4 w-4" />
+                </button>
               </div>
-            ) : null}
 
-            {/* ===============================================================
-                SUB-VISÃO 4: SUGESTÕES DE REVISÃO DA IA NO CALENDÁRIO
-               =============================================================== */}
-            {activeViewMode === "ai_reviews" ? (
-              <div className="flex flex-col gap-3.5">
-                {activeCalendar.aiSuggestions.map((sug) => (
-                  <div
-                    key={sug.id}
-                    className={clsx(
-                      "flex flex-col justify-between gap-4 rounded-la-xl border p-5 lg:flex-row lg:items-center",
-                      sug.applied
-                        ? "border-emerald-500/40 bg-emerald-950/15"
-                        : "border-la-border-gold/50 bg-black/50"
-                    )}
-                  >
-                    <div className="max-w-[46rem]">
-                      <div className="flex items-center gap-2">
-                        <span className="rounded-la-xs border border-la-border-gold/55 bg-la-gold-faint px-2 py-0.5 font-la-mono text-[0.5625rem] font-semibold uppercase text-la-gold-light">
-                          {sug.category}
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-7">
+                {currentCalendar.slots
+                  .filter((s) => s.weekNumber === activeWeekInWeeklyView)
+                  .reduce<
+                    {
+                      dayNumber: number;
+                      dayOfWeekLabel: string;
+                      dateISO: string;
+                      slots: CalendarSlotItem[];
+                    }[]
+                  >((acc, slot) => {
+                    const existing = acc.find(
+                      (d) => d.dayNumber === slot.dayNumber
+                    );
+                    if (existing) {
+                      existing.slots.push(slot);
+                    } else {
+                      acc.push({
+                        dayNumber: slot.dayNumber,
+                        dayOfWeekLabel: slot.dayOfWeekLabel,
+                        dateISO: slot.dateISO,
+                        slots: [slot],
+                      });
+                    }
+                    return acc;
+                  }, [])
+                  .map((dayGroup) => (
+                    <div
+                      key={dayGroup.dateISO}
+                      className="flex flex-col gap-3 rounded-la-xl border border-white/10 bg-[#080B12]/95 p-3.5"
+                    >
+                      <div className="border-b border-white/10 pb-2">
+                        <span className="font-la-mono text-[0.6875rem] font-bold uppercase text-la-gold-light">
+                          {dayGroup.dayOfWeekLabel.split("-")[0]}
                         </span>
-                        {sug.applied ? (
-                          <span className="font-la-mono text-[0.625rem] font-semibold text-emerald-300">
-                            ✓ Revisão aplicada ao calendário
-                          </span>
-                        ) : null}
+                        <span className="block font-la-sans text-[0.9375rem] font-semibold text-la-text-primary">
+                          {String(dayGroup.dayNumber).padStart(2, "0")} de
+                          Novembro
+                        </span>
                       </div>
 
-                      <h4 className="mt-2 font-la-sans text-[1rem] font-semibold text-la-text-primary">
-                        {sug.title}
-                      </h4>
-                      <p className="mt-1 font-la-sans text-[0.8125rem] text-la-text-secondary">
-                        <strong className="text-la-text-primary">
-                          Diagnóstico:
-                        </strong>{" "}
-                        {sug.reason}
-                      </p>
-                      <p className="mt-0.5 font-la-sans text-[0.8125rem] text-la-gold-light">
-                        <strong>Impacto esperado:</strong> {sug.impact}
-                      </p>
+                      <div className="flex flex-col gap-2.5">
+                        {dayGroup.slots.map((slot) => {
+                          const fmt = FORMAT_META[slot.format];
+                          const ret = RETINA_META[slot.retinaType];
+                          const FormatIcon = fmt.icon;
+                          return (
+                            <button
+                              key={slot.id}
+                              type="button"
+                              onClick={() => setSelectedSlotId(slot.id)}
+                              className={clsx(
+                                "flex flex-col gap-1.5 rounded-la-lg border border-white/10 border-l-2 bg-[#0C101B] p-3 text-left transition-all hover:border-la-gold",
+                                ret.borderAccentClass
+                              )}
+                            >
+                              <div className="flex items-center justify-between">
+                                <span className="inline-flex items-center gap-1 font-la-mono text-[0.625rem] font-bold text-la-gold-light">
+                                  <FormatIcon className="h-3.5 w-3.5" />
+                                  <span>{fmt.shortLabel}</span>
+                                </span>
+                                <span className="font-la-mono text-[0.5625rem] text-la-text-muted">
+                                  {slot.suggestedTime.split("•")[0]}
+                                </span>
+                              </div>
+
+                              <p className="font-la-sans text-[0.8125rem] font-semibold leading-[1.35] text-la-text-primary">
+                                {slot.mainTheme || slot.provisionalTitle}
+                              </p>
+
+                              <span className="font-la-mono text-[0.625rem] text-la-text-secondary">
+                                Objetivo: {slot.strategicObjective}
+                              </span>
+
+                              <div className="mt-1 flex items-center justify-between border-t border-white/8 pt-1.5">
+                                <span
+                                  className={clsx(
+                                    "rounded-la-full border px-2 py-0.5 font-la-mono text-[0.5625rem]",
+                                    ret.badgeClass
+                                  )}
+                                >
+                                  {ret.label}
+                                </span>
+                                <span className="font-la-mono text-[0.5625rem] text-la-gold-light">
+                                  Abrir 360° →
+                                </span>
+                              </div>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  ))}
+              </div>
+            </section>
+          ) : null}
+
+          {/* SUB-VISÃO 3: QUADRO OPERACIONAL KANBAN */}
+          {calendarSubView === "kanban" ? (
+            <section className="grid grid-cols-1 gap-4 md:grid-cols-3 xl:grid-cols-5">
+              {(
+                [
+                  "planned",
+                  "in_production",
+                  "script_ready",
+                  "recorded",
+                  "published",
+                ] as SlotExecutionStatus[]
+              ).map((stKey) => {
+                const stMeta = SLOT_STATUS_META[stKey];
+                const columnSlots = currentCalendar.slots.filter((s) => {
+                  if (s.status !== stKey) return false;
+                  if (
+                    selectedWeekFilter !== "all" &&
+                    s.weekNumber !== selectedWeekFilter
+                  ) {
+                    return false;
+                  }
+                  if (formatFilter !== "all" && s.format !== formatFilter) {
+                    return false;
+                  }
+                  if (retinaFilter !== "all" && s.retinaType !== retinaFilter) {
+                    return false;
+                  }
+                  return true;
+                });
+
+                return (
+                  <div
+                    key={stKey}
+                    className="flex flex-col gap-3 rounded-la-xl border border-white/10 bg-[#080B12]/95 p-3.5"
+                  >
+                    <div className="flex items-center justify-between border-b border-white/10 pb-2.5">
+                      <span
+                        className={clsx(
+                          "rounded-la-full border px-2.5 py-0.5 font-la-mono text-[0.6875rem] font-semibold",
+                          stMeta.badgeClass
+                        )}
+                      >
+                        {stMeta.label}
+                      </span>
+                      <span className="font-la-mono text-[0.75rem] font-bold text-la-text-muted">
+                        {columnSlots.length}
+                      </span>
                     </div>
 
-                    {!sug.applied ? (
-                      <button
-                        type="button"
-                        onClick={() => handleApplyAISuggestion(sug.id)}
-                        className="inline-flex min-h-[2.5rem] shrink-0 items-center gap-2 rounded-la-md bg-la-gold px-4 py-2 font-la-sans text-[0.8125rem] font-semibold text-la-text-inverse hover:bg-la-gold-light"
-                      >
-                        <Check className="h-4 w-4" />
-                        <span>Aplicar ajuste no calendário</span>
-                      </button>
-                    ) : null}
-                  </div>
-                ))}
-              </div>
-            ) : null}
+                    <div className="flex max-h-[38rem] flex-col gap-2.5 overflow-y-auto pr-1">
+                      {columnSlots.map((slot) => {
+                        const fmt = FORMAT_META[slot.format];
+                        const ret = RETINA_META[slot.retinaType];
+                        const FormatIcon = fmt.icon;
+                        return (
+                          <div
+                            key={slot.id}
+                            onClick={() => setSelectedSlotId(slot.id)}
+                            className="cursor-pointer rounded-la-lg border border-white/10 bg-[#0C101B] p-3 transition-all hover:border-la-gold"
+                          >
+                            <div className="flex items-center justify-between font-la-mono text-[0.625rem] text-la-text-muted">
+                              <span>
+                                {String(slot.dayNumber).padStart(2, "0")}{" "}
+                                {slot.monthShort} ·{" "}
+                                {slot.dayOfWeekLabel.split("-")[0]}
+                              </span>
+                              <span>{slot.suggestedTime.split("•")[0]}</span>
+                            </div>
 
-            {/* 3. FAIXA DE CONTINUIDADE DO CALENDÁRIO PARA TEMAS (Seção 6.5.7) */}
-            <div className="flex flex-col items-start justify-between gap-4 rounded-la-xl border border-la-border-gold/45 bg-la-gold-faint p-5 sm:flex-row sm:items-center">
-              <div>
-                <span className="font-la-mono text-[0.625rem] font-semibold uppercase tracking-[0.08em] text-la-gold-light">
-                  CONTINUIDADE DO MÉTODO · FUNÇÃO 01 → FUNÇÃO 02
-                </span>
-                <p className="mt-1 font-la-sans text-[0.9375rem] font-semibold text-la-text-primary">
-                  Seu calendário possui {calendarMetrics.withoutTheme} slots
-                  aguardando pauta. Gere e conecte temas estratégicos para
-                  preencher cada slot com a dor, desejo, objeção ou objetivo
-                  correto.
-                </p>
+                            <div className="mt-1.5 flex items-center gap-1.5">
+                              <FormatIcon className="h-3.5 w-3.5 text-la-gold" />
+                              <span className="font-la-mono text-[0.6875rem] font-semibold text-la-gold-light">
+                                {fmt.shortLabel}
+                              </span>
+                            </div>
+
+                            <p className="mt-1 font-la-sans text-[0.8125rem] font-semibold text-la-text-primary">
+                              {slot.mainTheme || slot.provisionalTitle}
+                            </p>
+
+                            <p className="mt-1 line-clamp-1 font-la-mono text-[0.625rem] text-la-text-secondary">
+                              {slot.editorialPillar}
+                            </p>
+
+                            <div className="mt-2.5 flex items-center justify-between border-t border-white/8 pt-2">
+                              <span
+                                className={clsx(
+                                  "rounded-la-full border px-2 py-0.5 font-la-mono text-[0.5625rem]",
+                                  ret.badgeClass
+                                )}
+                              >
+                                {ret.label}
+                              </span>
+
+                              {slot.eligibleForComplementaryMaterial ? (
+                                <span className="inline-flex items-center gap-1 font-la-mono text-[0.5625rem] text-la-gold-light">
+                                  <Gift className="h-3 w-3" />
+                                  <span>Ativo Extra</span>
+                                </span>
+                              ) : null}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                );
+              })}
+            </section>
+          ) : null}
+        </div>
+      ) : null}
+
+      {/* =================================================================== */}
+      {/* AMBIENTE 2: CONFIGURAÇÃO DE PERÍODO E CAPACIDADE REAL (TELA 1 E 2)  */}
+      {/* =================================================================== */}
+      {viewMode === "setup" ? (
+        <section className="grid grid-cols-1 gap-6 lg:grid-cols-12">
+          <div className="rounded-la-xl border border-white/10 bg-[#080B12]/95 p-6 lg:col-span-7">
+            <span className="font-la-mono text-[0.625rem] font-semibold uppercase tracking-[0.08em] text-la-gold-light">
+              TELA 1 E 2 DA FUNÇÃO 01 · CAPACIDADE REAL DE PRODUÇÃO
+            </span>
+            <h3 className="mt-1 font-la-sans text-[1.375rem] font-semibold text-la-text-primary">
+              Disponibilidade e Limites Reais da Operação
+            </h3>
+            <p className="mt-1 font-la-sans text-[0.875rem] text-la-text-secondary">
+              O calendário editorial não pode ser construído em fantasia. Ajuste
+              quantas peças de cada formato você realmente consegue sustentar por
+              semana.
+            </p>
+
+            <div className="mt-5 grid grid-cols-1 gap-4 sm:grid-cols-2">
+              {[
+                {
+                  key: "reels" as const,
+                  label: "Quantos Reels por semana",
+                  desc: "Vídeos curtos de Engajamento, Transformação e Consciência",
+                },
+                {
+                  key: "longVideos" as const,
+                  label: "Quantos Vídeos Longos por semana",
+                  desc: "YouTube / Aulas densas de Transformação e Autoridade",
+                },
+                {
+                  key: "carousels" as const,
+                  label: "Quantos Carrosséis por semana",
+                  desc: "Sequências de slides 4:5 para salvamento e método",
+                },
+                {
+                  key: "staticPosts" as const,
+                  label: "Quantos Posts Estáticos por semana",
+                  desc: "Peças de síntese visual, interação e visão de mundo",
+                },
+                {
+                  key: "lives" as const,
+                  label: "Quantas Lives Semanais",
+                  desc: "Transmissões ao vivo de autoridade e quebra de objeções",
+                },
+                {
+                  key: "dailyStorySequences" as const,
+                  label: "Sequências Diárias de Stories (3 a 4/dia)",
+                  desc: "Com 4 a 5 stories encadeados em cada sequência",
+                },
+              ].map((item) => (
+                <div
+                  key={item.key}
+                  className="rounded-la-lg border border-white/10 bg-black/50 p-4"
+                >
+                  <label className="block font-la-sans text-[0.875rem] font-semibold text-la-text-primary">
+                    {item.label}
+                  </label>
+                  <span className="mt-0.5 block font-la-sans text-[0.75rem] text-la-text-secondary">
+                    {item.desc}
+                  </span>
+                  <input
+                    type="number"
+                    min={0}
+                    max={25}
+                    value={currentCalendar.weeklyCapacity[item.key]}
+                    onChange={(e) => {
+                      const val = Math.max(0, Number(e.target.value));
+                      const next = calendars.map((cal) =>
+                        cal.id === currentCalendar.id
+                          ? {
+                              ...cal,
+                              weeklyCapacity: {
+                                ...cal.weeklyCapacity,
+                                [item.key]: val,
+                              },
+                            }
+                          : cal
+                      );
+                      persistCalendars(next);
+                    }}
+                    className="mt-3 min-h-[2.5rem] w-full rounded-la-md border border-white/14 bg-black/70 px-3 font-la-mono text-[1rem] font-bold text-la-gold-light"
+                  />
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="rounded-la-xl border border-la-border-gold/50 bg-[#080B12]/95 p-6 lg:col-span-5">
+            <span className="font-la-mono text-[0.625rem] font-semibold uppercase tracking-[0.08em] text-la-gold-light">
+              NOVO CICLO DE AGENDA
+            </span>
+            <h3 className="mt-1 font-la-sans text-[1.25rem] font-semibold text-la-text-primary">
+              Criar Novo Calendário para Outro Período
+            </h3>
+
+            <form
+              onSubmit={handleCreateNewCalendar}
+              className="mt-4 flex flex-col gap-3.5"
+            >
+              <div className="flex flex-col gap-1">
+                <label className="font-la-mono text-[0.6875rem] uppercase text-la-text-secondary">
+                  Nome do Calendário
+                </label>
+                <input
+                  type="text"
+                  placeholder="Ex.: Calendário Dezembro — Campanha de Conversão"
+                  value={newCalName}
+                  onChange={(e) => setNewCalName(e.target.value)}
+                  className="min-h-[2.625rem] rounded-la-md border border-white/14 bg-black/60 px-3.5 py-2 font-la-sans text-[0.875rem] text-la-text-primary"
+                />
+              </div>
+
+              <div className="flex flex-col gap-1">
+                <label className="font-la-mono text-[0.6875rem] uppercase text-la-text-secondary">
+                  Objetivo Estratégico do Período
+                </label>
+                <select
+                  value={newCalObjective}
+                  onChange={(e) => setNewCalObjective(e.target.value)}
+                  className="min-h-[2.625rem] rounded-la-md border border-white/14 bg-black/60 px-3.5 py-2 font-la-sans text-[0.875rem] text-la-text-primary"
+                >
+                  {PERIOD_OBJECTIVES.map((obj) => (
+                    <option key={obj} value={obj}>
+                      {obj}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div className="flex flex-col gap-1">
+                  <label className="font-la-mono text-[0.6875rem] uppercase text-la-text-secondary">
+                    Início do Período
+                  </label>
+                  <input
+                    type="text"
+                    value={newCalStart}
+                    onChange={(e) => setNewCalStart(e.target.value)}
+                    className="min-h-[2.5rem] rounded-la-md border border-white/14 bg-black/60 px-3 font-la-sans text-[0.8125rem] text-la-text-primary"
+                  />
+                </div>
+                <div className="flex flex-col gap-1">
+                  <label className="font-la-mono text-[0.6875rem] uppercase text-la-text-secondary">
+                    Fim do Período
+                  </label>
+                  <input
+                    type="text"
+                    value={newCalEnd}
+                    onChange={(e) => setNewCalEnd(e.target.value)}
+                    className="min-h-[2.5rem] rounded-la-md border border-white/14 bg-black/60 px-3 font-la-sans text-[0.8125rem] text-la-text-primary"
+                  />
+                </div>
               </div>
 
               <button
-                type="button"
-                onClick={() => onRequestGoToThemes?.()}
-                className="inline-flex min-h-[2.625rem] shrink-0 items-center gap-2 rounded-la-md bg-la-gold px-5 py-2 font-la-sans text-[0.8125rem] font-semibold text-la-text-inverse hover:bg-la-gold-light"
+                type="submit"
+                className="mt-3 inline-flex min-h-[2.75rem] items-center justify-center gap-2 rounded-la-md bg-la-gold px-5 py-2.5 font-la-sans text-[0.875rem] font-semibold text-la-text-inverse shadow-[var(--la-elevation-gold)] hover:bg-la-gold-light"
               >
-                <span>Ir para Temas ({calendarMetrics.withoutTheme} abertos)</span>
-                <ArrowRight className="h-4 w-4" />
+                <Sparkles className="h-4 w-4" />
+                <span>Gerar Grade Completa do Novo Período</span>
               </button>
-            </div>
+            </form>
           </div>
-        )}
-      </section>
+        </section>
+      ) : null}
 
-      {/* =====================================================================
-          MODAL 1: INSPEÇÃO E EDIÇÃO DETALHADA DO SLOT DO CALENDÁRIO
-         ===================================================================== */}
+      {/* =================================================================== */}
+      {/* AMBIENTE 3: REVISÃO MENSAL DA IA (TELA 5 DA FUNÇÃO 01)              */}
+      {/* =================================================================== */}
+      {viewMode === "review" ? (
+        <section className="flex flex-col gap-4 rounded-la-xl border border-white/10 bg-[#080B12]/95 p-6">
+          <div>
+            <span className="font-la-mono text-[0.625rem] font-semibold uppercase tracking-[0.08em] text-la-gold-light">
+              INFRAESTRUTURA VIVA · REVISÃO PERIÓDICA RECOMENDADA PELA IA
+            </span>
+            <h3 className="mt-1 font-la-sans text-[1.375rem] font-semibold text-la-text-primary">
+              Diagnóstico de Equilíbrio e Sugestões de Ajuste da Agenda
+            </h3>
+          </div>
+
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+            {currentCalendar.reviewSuggestions.map((sug) => (
+              <div
+                key={sug.id}
+                className="flex flex-col justify-between rounded-la-xl border border-white/10 bg-[#0B0F1A] p-5"
+              >
+                <div>
+                  <span
+                    className={clsx(
+                      "inline-flex rounded-la-full border px-2.5 py-0.5 font-la-mono text-[0.5625rem] font-bold uppercase",
+                      sug.applied
+                        ? "border-emerald-400/45 bg-emerald-500/15 text-emerald-200"
+                        : "border-la-gold/60 bg-la-gold-faint text-la-gold-light"
+                    )}
+                  >
+                    {sug.applied ? "Ajuste Aplicado" : "Recomendação da IA"}
+                  </span>
+                  <h4 className="mt-3 font-la-sans text-[0.9375rem] font-semibold text-la-text-primary">
+                    {sug.title}
+                  </h4>
+                  <p className="mt-1.5 font-la-sans text-[0.8125rem] leading-[1.55] text-la-text-secondary">
+                    {sug.reason}
+                  </p>
+                </div>
+
+                <button
+                  type="button"
+                  disabled={sug.applied}
+                  onClick={() => handleApplyReviewSuggestion(sug.id)}
+                  className={clsx(
+                    "mt-4 inline-flex min-h-[2.375rem] w-full items-center justify-center gap-1.5 rounded-la-md px-3.5 py-2 font-la-sans text-[0.8125rem] font-semibold transition-all",
+                    sug.applied
+                      ? "border border-emerald-400/30 bg-emerald-500/10 text-emerald-300"
+                      : "bg-la-gold text-la-text-inverse hover:bg-la-gold-light"
+                  )}
+                >
+                  {sug.applied ? (
+                    <>
+                      <Check className="h-4 w-4" />
+                      <span>Aplicado na Grade</span>
+                    </>
+                  ) : (
+                    <>
+                      <Sparkles className="h-4 w-4" />
+                      <span>{sug.actionLabel}</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            ))}
+          </div>
+        </section>
+      ) : null}
+
+      {/* =================================================================== */}
+      {/* AMBIENTE 4: HISTÓRICO E DUPLICAÇÃO DE CALENDÁRIOS (TELA 1 E 5)      */}
+      {/* =================================================================== */}
+      {viewMode === "list" ? (
+        <section className="flex flex-col gap-4">
+          {calendars.map((cal) => (
+            <article
+              key={cal.id}
+              className="flex flex-col justify-between gap-4 rounded-la-xl border border-white/10 bg-[#080B12]/95 p-6 lg:flex-row lg:items-center"
+            >
+              <div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <h3 className="font-la-sans text-[1.1875rem] font-semibold text-la-text-primary">
+                    {cal.name}
+                  </h3>
+                  <span className="rounded-la-full border border-la-gold bg-la-gold px-2.5 py-0.5 font-la-mono text-[0.5625rem] font-bold uppercase text-la-text-inverse">
+                    {cal.status === "active" ? "ATIVO" : "RASCUNHO / HISTÓRICO"}
+                  </span>
+                </div>
+                <p className="mt-1 font-la-mono text-[0.75rem] text-la-text-secondary">
+                  {cal.periodLabel} • {cal.periodStart} → {cal.periodEnd} •{" "}
+                  {cal.slots.length} slots planejados
+                </p>
+                <p className="mt-1 font-la-sans text-[0.8125rem] text-la-gold-light">
+                  Objetivo: {cal.mainObjective}
+                </p>
+              </div>
+
+              <div className="flex flex-wrap items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSelectedCalendarId(cal.id);
+                    setViewMode("calendar");
+                  }}
+                  className="rounded-la-md bg-la-gold px-4 py-2 font-la-sans text-[0.8125rem] font-semibold text-la-text-inverse"
+                >
+                  Abrir Calendário
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleDuplicateCalendar(cal)}
+                  className="inline-flex items-center gap-1.5 rounded-la-md border border-white/12 bg-black/50 px-3.5 py-2 font-la-sans text-[0.8125rem] text-la-text-secondary hover:border-la-gold hover:text-la-gold-light"
+                >
+                  <Copy className="h-3.5 w-3.5" />
+                  <span>Duplicar para Outro Período</span>
+                </button>
+              </div>
+            </article>
+          ))}
+        </section>
+      ) : null}
+
+      {/* =================================================================== */}
+      {/* DRAWER LATERAL 360° DO SLOT (TODAS AS INFORMAÇÕES CANÔNICAS F01)     */}
+      {/* =================================================================== */}
       <AnimatePresence>
-        {inspectingSlot ? (
-          <div className="fixed inset-0 z-[150] flex items-center justify-center p-4">
+        {selectedSlot ? (
+          <div className="fixed inset-0 z-[180] flex justify-end">
             <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              onClick={() => setInspectingSlotId(null)}
+              onClick={() => setSelectedSlotId(null)}
+              className="fixed inset-0 bg-black/75 backdrop-blur-sm"
+            />
+
+            <motion.aside
+              role="dialog"
+              aria-modal="true"
+              aria-label="Detalhes completos do slot do calendário"
+              initial={{ x: "100%" }}
+              animate={{ x: 0 }}
+              exit={{ x: "100%" }}
+              transition={{ type: "spring", damping: 28, stiffness: 260 }}
+              className="relative z-10 flex h-full w-full max-w-[44rem] flex-col justify-between overflow-y-auto border-l border-la-border-gold/55 bg-[#090D16] p-6 shadow-[-24px_0_64px_rgba(0,0,0,0.92)]"
+            >
+              <div>
+                <div className="flex items-start justify-between gap-4 border-b border-white/10 pb-4">
+                  <div>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="rounded-la-full border border-la-border-gold/60 bg-la-gold-faint px-2.5 py-0.5 font-la-mono text-[0.625rem] font-bold uppercase text-la-gold-light">
+                        PAINEL 360° DO SLOT · FUNÇÃO 01
+                      </span>
+                      <span className="font-la-mono text-[0.6875rem] text-la-text-secondary">
+                        {String(selectedSlot.dayNumber).padStart(2, "0")}{" "}
+                        {selectedSlot.monthShort} 2026 •{" "}
+                        {selectedSlot.dayOfWeekLabel} (Semana{" "}
+                        {selectedSlot.weekNumber})
+                      </span>
+                    </div>
+
+                    <h3 className="mt-2 font-la-sans text-[1.25rem] font-semibold text-la-text-primary">
+                      {selectedSlot.mainTheme || selectedSlot.provisionalTitle}
+                    </h3>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => setSelectedSlotId(null)}
+                    className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-la-md border border-white/12 bg-black/50 text-la-text-secondary hover:border-la-gold hover:text-la-text-primary"
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                </div>
+
+                <div className="mt-5 flex flex-col gap-4">
+                  <div className="flex flex-col gap-1">
+                    <label className="font-la-mono text-[0.625rem] font-semibold uppercase tracking-[0.06em] text-la-gold-light">
+                      1. Nome Provisório do Conteúdo
+                    </label>
+                    <input
+                      type="text"
+                      value={selectedSlot.provisionalTitle}
+                      onChange={(e) =>
+                        updateSlotById(selectedSlot.id, (prev) => ({
+                          ...prev,
+                          provisionalTitle: e.target.value,
+                        }))
+                      }
+                      className="min-h-[2.5rem] rounded-la-md border border-white/14 bg-black/60 px-3.5 py-2 font-la-sans text-[0.875rem] text-la-text-primary"
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                    <div className="flex flex-col gap-1">
+                      <label className="font-la-mono text-[0.625rem] font-semibold uppercase text-la-text-secondary">
+                        2. Formato do Conteúdo
+                      </label>
+                      <select
+                        value={selectedSlot.format}
+                        onChange={(e) =>
+                          updateSlotById(selectedSlot.id, (prev) => ({
+                            ...prev,
+                            format: e.target.value as SlotContentFormat,
+                          }))
+                        }
+                        className="min-h-[2.5rem] rounded-la-md border border-white/14 bg-black/60 px-3 font-la-sans text-[0.8125rem] text-la-text-primary"
+                      >
+                        {(Object.keys(FORMAT_META) as SlotContentFormat[]).map(
+                          (fKey) => (
+                            <option key={fKey} value={fKey}>
+                              {FORMAT_META[fKey].label}
+                            </option>
+                          )
+                        )}
+                      </select>
+                    </div>
+
+                    <div className="flex flex-col gap-1">
+                      <label className="font-la-mono text-[0.625rem] font-semibold uppercase text-la-text-secondary">
+                        3. Tipo MATRIZ RETINA
+                      </label>
+                      <select
+                        value={selectedSlot.retinaType}
+                        onChange={(e) =>
+                          updateSlotById(selectedSlot.id, (prev) => ({
+                            ...prev,
+                            retinaType: e.target.value as RetinaTypeKey,
+                          }))
+                        }
+                        className="min-h-[2.5rem] rounded-la-md border border-white/14 bg-black/60 px-3 font-la-sans text-[0.8125rem] text-la-text-primary"
+                      >
+                        {(Object.keys(RETINA_META) as RetinaTypeKey[]).map(
+                          (rKey) => (
+                            <option key={rKey} value={rKey}>
+                              {RETINA_META[rKey].code} ·{" "}
+                              {RETINA_META[rKey].label}
+                            </option>
+                          )
+                        )}
+                      </select>
+                    </div>
+
+                    <div className="flex flex-col gap-1">
+                      <label className="font-la-mono text-[0.625rem] font-semibold uppercase text-la-text-secondary">
+                        4. Horário Sugerido
+                      </label>
+                      <input
+                        type="text"
+                        value={selectedSlot.suggestedTime}
+                        onChange={(e) =>
+                          updateSlotById(selectedSlot.id, (prev) => ({
+                            ...prev,
+                            suggestedTime: e.target.value,
+                          }))
+                        }
+                        className="min-h-[2.5rem] rounded-la-md border border-white/14 bg-black/60 px-3 font-la-mono text-[0.8125rem] text-la-gold-light"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                    <div className="flex flex-col gap-1">
+                      <label className="font-la-mono text-[0.625rem] font-semibold uppercase text-la-text-secondary">
+                        5. Status de Execução do Slot
+                      </label>
+                      <select
+                        value={selectedSlot.status}
+                        onChange={(e) =>
+                          updateSlotById(selectedSlot.id, (prev) => ({
+                            ...prev,
+                            status: e.target.value as SlotExecutionStatus,
+                          }))
+                        }
+                        className="min-h-[2.5rem] rounded-la-md border border-white/14 bg-black/60 px-3 font-la-sans text-[0.8125rem] text-la-text-primary"
+                      >
+                        {(
+                          Object.keys(
+                            SLOT_STATUS_META
+                          ) as SlotExecutionStatus[]
+                        ).map((stKey) => (
+                          <option key={stKey} value={stKey}>
+                            {SLOT_STATUS_META[stKey].label}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div className="flex flex-col gap-1">
+                      <label className="font-la-mono text-[0.625rem] font-semibold uppercase text-la-text-secondary">
+                        6. Plataforma(s) Selecionadas
+                      </label>
+                      <div className="flex flex-wrap items-center gap-1.5 pt-1">
+                        {AVAILABLE_PLATFORMS.map((plat) => {
+                          const active =
+                            selectedSlot.platforms.includes(plat);
+                          return (
+                            <button
+                              key={plat}
+                              type="button"
+                              onClick={() =>
+                                updateSlotById(selectedSlot.id, (prev) => ({
+                                  ...prev,
+                                  platforms: active
+                                    ? prev.platforms.filter((p) => p !== plat)
+                                    : [...prev.platforms, plat],
+                                }))
+                              }
+                              className={clsx(
+                                "rounded-la-xs border px-2.5 py-1 font-la-mono text-[0.6875rem] transition-colors",
+                                active
+                                  ? "border-la-gold bg-la-gold-faint font-semibold text-la-gold-light"
+                                  : "border-white/10 bg-black/50 text-la-text-muted"
+                              )}
+                            >
+                              {plat}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                    <div className="flex flex-col gap-1">
+                      <label className="font-la-mono text-[0.625rem] font-semibold uppercase text-la-text-secondary">
+                        7. Pilar da Linha Editorial Associado
+                      </label>
+                      <select
+                        value={selectedSlot.editorialPillar}
+                        onChange={(e) =>
+                          updateSlotById(selectedSlot.id, (prev) => ({
+                            ...prev,
+                            editorialPillar: e.target.value,
+                          }))
+                        }
+                        className="min-h-[2.5rem] rounded-la-md border border-white/14 bg-black/60 px-3 font-la-sans text-[0.8125rem] text-la-text-primary"
+                      >
+                        {AVAILABLE_PILLARS.map((pil) => (
+                          <option key={pil} value={pil}>
+                            {pil}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div className="flex flex-col gap-1">
+                      <label className="font-la-mono text-[0.625rem] font-semibold uppercase text-la-text-secondary">
+                        8. Objetivo Estratégico Daquele Conteúdo
+                      </label>
+                      <input
+                        type="text"
+                        value={selectedSlot.strategicObjective}
+                        onChange={(e) =>
+                          updateSlotById(selectedSlot.id, (prev) => ({
+                            ...prev,
+                            strategicObjective: e.target.value,
+                          }))
+                        }
+                        className="min-h-[2.5rem] rounded-la-md border border-white/14 bg-black/60 px-3 font-la-sans text-[0.8125rem] text-la-text-primary"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="rounded-la-xl border border-la-border-gold/50 bg-la-gold-faint/40 p-4">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <label className="font-la-mono text-[0.6875rem] font-bold uppercase text-la-gold-light">
+                        9. Tema Principal do Conteúdo (Conectado à Função 02)
+                      </label>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setSelectedSlotId(null);
+                          handleTriggerGoToThemes();
+                        }}
+                        className="font-la-mono text-[0.6875rem] font-semibold text-la-gold-light hover:underline"
+                      >
+                        Abrir Biblioteca de Temas →
+                      </button>
+                    </div>
+
+                    <input
+                      type="text"
+                      placeholder="Digite o tema ou escolha uma das 3 sugestões da IA abaixo..."
+                      value={selectedSlot.mainTheme}
+                      onChange={(e) =>
+                        updateSlotById(selectedSlot.id, (prev) => ({
+                          ...prev,
+                          mainTheme: e.target.value,
+                        }))
+                      }
+                      className="mt-2 min-h-[2.5rem] w-full rounded-la-md border border-white/15 bg-black/75 px-3.5 py-2 font-la-sans text-[0.875rem] font-medium text-la-text-primary"
+                    />
+
+                    <div className="mt-3">
+                      <span className="font-la-mono text-[0.5625rem] uppercase text-la-text-secondary">
+                        3 Temas Sugeridos pela IA para este Slot (1 clique para aplicar):
+                      </span>
+                      <div className="mt-1.5 flex flex-col gap-1.5">
+                        {selectedSlot.aiSuggestedThemes.map((sugTheme, idx) => (
+                          <button
+                            key={idx}
+                            type="button"
+                            onClick={() =>
+                              updateSlotById(selectedSlot.id, (prev) => ({
+                                ...prev,
+                                mainTheme: sugTheme,
+                              }))
+                            }
+                            className={clsx(
+                              "flex items-center justify-between gap-2 rounded-la-md border px-3 py-1.5 text-left font-la-sans text-[0.75rem] transition-colors",
+                              selectedSlot.mainTheme === sugTheme
+                                ? "border-la-gold bg-la-gold text-la-text-inverse font-semibold"
+                                : "border-white/10 bg-black/60 text-la-text-secondary hover:border-la-border-gold hover:text-la-text-primary"
+                            )}
+                          >
+                            <span>
+                              {idx + 1}. {sugTheme}
+                            </span>
+                            <span className="shrink-0 font-la-mono text-[0.625rem]">
+                              {selectedSlot.mainTheme === sugTheme
+                                ? "Em uso"
+                                : "Usar tema"}
+                            </span>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                    <div className="flex flex-col gap-1 sm:col-span-2">
+                      <label className="font-la-mono text-[0.625rem] font-semibold uppercase text-la-text-secondary">
+                        10. Dor, Desejo, Objeção ou Mito do ICP que será atacado
+                      </label>
+                      <input
+                        type="text"
+                        value={selectedSlot.icpPainDesireOrObjection}
+                        onChange={(e) =>
+                          updateSlotById(selectedSlot.id, (prev) => ({
+                            ...prev,
+                            icpPainDesireOrObjection: e.target.value,
+                          }))
+                        }
+                        className="min-h-[2.5rem] rounded-la-md border border-white/14 bg-black/60 px-3 font-la-sans text-[0.8125rem] text-la-text-primary"
+                      />
+                    </div>
+
+                    <div className="flex flex-col gap-1">
+                      <label className="font-la-mono text-[0.625rem] font-semibold uppercase text-la-text-secondary">
+                        Nível de Consciência
+                      </label>
+                      <select
+                        value={selectedSlot.icpAwarenessLevel}
+                        onChange={(e) =>
+                          updateSlotById(selectedSlot.id, (prev) => ({
+                            ...prev,
+                            icpAwarenessLevel: e.target
+                              .value as CalendarSlotItem["icpAwarenessLevel"],
+                          }))
+                        }
+                        className="min-h-[2.5rem] rounded-la-md border border-white/14 bg-black/60 px-3 font-la-sans text-[0.8125rem] text-la-text-primary"
+                      >
+                        <option value="Inconsciente">Inconsciente</option>
+                        <option value="Consciente do Problema">
+                          Consciente do Problema
+                        </option>
+                        <option value="Consciente da Solução">
+                          Consciente da Solução
+                        </option>
+                        <option value="Consciente do Produto">
+                          Consciente do Produto
+                        </option>
+                        <option value="Totalmente Consciente">
+                          Totalmente Consciente
+                        </option>
+                      </select>
+                    </div>
+                  </div>
+
+                  {selectedSlot.storySequencesBreakdown ? (
+                    <div className="rounded-la-xl border border-emerald-400/40 bg-emerald-950/20 p-4">
+                      <span className="font-la-mono text-[0.6875rem] font-bold uppercase text-emerald-300">
+                        DETALHAMENTO DAS 4 SEQUÊNCIAS DE STORIES DO DIA (4 A 5 STORIES CADA)
+                      </span>
+                      <div className="mt-3 grid grid-cols-1 gap-2.5 sm:grid-cols-2">
+                        {selectedSlot.storySequencesBreakdown.map((seq) => (
+                          <div
+                            key={seq.period}
+                            className="rounded-la-lg border border-white/10 bg-black/60 p-3"
+                          >
+                            <div className="flex items-center justify-between">
+                              <span className="font-la-mono text-[0.6875rem] font-bold text-emerald-200">
+                                {seq.period} ({seq.suggestedTime})
+                              </span>
+                              <span className="font-la-mono text-[0.625rem] text-la-gold-light">
+                                {seq.storiesCount} stories · {seq.retinaFocus}
+                              </span>
+                            </div>
+                            <p className="mt-1 font-la-sans text-[0.75rem] leading-[1.45] text-la-text-secondary">
+                              {seq.narrativeDirection}
+                            </p>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ) : null}
+
+                  <div className="flex flex-col gap-1">
+                    <label className="font-la-mono text-[0.625rem] font-semibold uppercase text-la-text-secondary">
+                      11. Campo de Referência ou Link de Exemplo / Inspiração
+                    </label>
+                    <div className="flex gap-2">
+                      <input
+                        type="url"
+                        placeholder="https://instagram.com/p/exemplo..."
+                        value={selectedSlot.referenceLink}
+                        onChange={(e) =>
+                          updateSlotById(selectedSlot.id, (prev) => ({
+                            ...prev,
+                            referenceLink: e.target.value,
+                          }))
+                        }
+                        className="min-h-[2.5rem] flex-1 rounded-la-md border border-white/14 bg-black/60 px-3 font-la-sans text-[0.8125rem] text-la-text-primary"
+                      />
+                      {selectedSlot.referenceLink ? (
+                        <a
+                          href={selectedSlot.referenceLink}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="inline-flex items-center gap-1 rounded-la-md border border-white/14 bg-black/60 px-3 font-la-mono text-[0.6875rem] text-la-gold-light hover:border-la-gold"
+                        >
+                          <ExternalLink className="h-3.5 w-3.5" />
+                          <span>Abrir</span>
+                        </a>
+                      ) : null}
+                    </div>
+                  </div>
+
+                  <div className="flex flex-col gap-1">
+                    <label className="font-la-mono text-[0.625rem] font-semibold uppercase text-la-text-secondary">
+                      12. Observações e Briefing de Execução
+                    </label>
+                    <textarea
+                      rows={3}
+                      value={selectedSlot.executionNotes}
+                      onChange={(e) =>
+                        updateSlotById(selectedSlot.id, (prev) => ({
+                          ...prev,
+                          executionNotes: e.target.value,
+                        }))
+                      }
+                      className="w-full rounded-la-md border border-white/14 bg-black/60 p-3 font-la-sans text-[0.8125rem] leading-[1.55] text-la-text-primary"
+                    />
+                  </div>
+
+                  <div className="flex flex-col justify-between gap-3 rounded-la-xl border border-white/10 bg-black/50 p-4 sm:flex-row sm:items-center">
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <Gift className="h-4 w-4 text-la-gold" />
+                        <span className="font-la-sans text-[0.875rem] font-semibold text-la-text-primary">
+                          Qualificação para Material Complementar (Função 03)
+                        </span>
+                      </div>
+                      <p className="mt-0.5 font-la-sans text-[0.75rem] text-la-text-secondary">
+                        Quando habilitado, a Função 03 libera a geração de
+                        planilha, checklist ou diagnóstico PDF para este slot.
+                      </p>
+                    </div>
+
+                    <label className="inline-flex cursor-pointer items-center gap-2">
+                      <input
+                        type="checkbox"
+                        checked={selectedSlot.eligibleForComplementaryMaterial}
+                        onChange={(e) =>
+                          updateSlotById(selectedSlot.id, (prev) => ({
+                            ...prev,
+                            eligibleForComplementaryMaterial: e.target.checked,
+                            complementaryMaterialType: e.target.checked
+                              ? "Checklist / Planilha Executiva"
+                              : "Nenhum",
+                          }))
+                        }
+                        className="h-4 w-4 accent-[#CFA965]"
+                      />
+                      <span className="font-la-mono text-[0.75rem] font-semibold text-la-gold-light">
+                        {selectedSlot.eligibleForComplementaryMaterial
+                          ? "Qualificado"
+                          : "Não qualificado"}
+                      </span>
+                    </label>
+                  </div>
+                </div>
+              </div>
+
+              <div className="mt-6 flex flex-wrap items-center justify-between gap-3 border-t border-white/12 pt-4">
+                <button
+                  type="button"
+                  onClick={() => handleDeleteSlot(selectedSlot.id)}
+                  className="inline-flex items-center gap-1.5 rounded-la-md border border-red-500/40 bg-red-950/25 px-3 py-2 font-la-mono text-[0.6875rem] text-red-200 hover:bg-red-950/50"
+                >
+                  <Trash2 className="h-3.5 w-3.5" />
+                  <span>Excluir Slot</span>
+                </button>
+
+                <div className="flex flex-wrap items-center gap-2.5">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const slotId = selectedSlot.id;
+                      const theme =
+                        selectedSlot.mainTheme ||
+                        selectedSlot.provisionalTitle;
+                      setSelectedSlotId(null);
+                      handleTriggerGoToScripts(slotId, theme);
+                    }}
+                    className="inline-flex min-h-[2.625rem] items-center gap-2 rounded-la-md bg-la-gold px-5 py-2 font-la-sans text-[0.875rem] font-semibold text-la-text-inverse shadow-[var(--la-elevation-gold)] hover:bg-la-gold-light"
+                  >
+                    <FileText className="h-4 w-4" />
+                    <span>Gerar / Abrir Roteiro deste Slot (F03)</span>
+                    <ArrowRight className="h-4 w-4" />
+                  </button>
+                </div>
+              </div>
+            </motion.aside>
+          </div>
+        ) : null}
+      </AnimatePresence>
+
+      {/* =================================================================== */}
+      {/* MODAL: ADICIONAR NOVO SLOT EM UMA DATA ESPECÍFICA                   */}
+      {/* =================================================================== */}
+      <AnimatePresence>
+        {addingSlotForDate ? (
+          <div className="fixed inset-0 z-[190] flex items-center justify-center p-4">
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setAddingSlotForDate(null)}
               className="fixed inset-0 bg-black/80 backdrop-blur-md"
             />
 
@@ -1500,178 +2941,41 @@ export function CalendarioEditorialModule({
               initial={{ opacity: 0, scale: 0.96, y: 8 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.96, y: 8 }}
-              className="relative z-10 w-full max-w-[36rem] rounded-la-xl border border-la-border-gold/55 bg-[#090C14]/98 p-6 shadow-2xl"
+              className="relative z-10 w-full max-w-[30rem] rounded-la-xl border border-la-border-gold/55 bg-[#090C14]/98 p-6 shadow-2xl"
             >
-              <div className="flex items-center justify-between border-b border-white/10 pb-3.5">
+              <div className="flex items-center justify-between border-b border-white/10 pb-3">
                 <div>
-                  <span className="font-la-mono text-[0.625rem] font-semibold uppercase text-la-gold-light">
-                    SLOT DO CALENDÁRIO · {inspectingSlot.dayOfWeek},{" "}
-                    {inspectingSlot.time}
+                  <span className="font-la-mono text-[0.625rem] uppercase text-la-gold-light">
+                    NOVO SLOT NA AGENDA • DIA {addingSlotForDate.dayNumber} NOV
                   </span>
-                  <h3 className="font-la-sans text-[1.1875rem] font-semibold text-la-text-primary">
-                    {inspectingSlot.format} ({inspectingSlot.platform})
+                  <h3 className="font-la-sans text-[1.125rem] font-semibold text-la-text-primary">
+                    Adicionar Conteúdo ({addingSlotForDate.dayOfWeekLabel})
                   </h3>
                 </div>
                 <button
                   type="button"
-                  onClick={() => setInspectingSlotId(null)}
-                  className="inline-flex h-8 w-8 items-center justify-center rounded-la-md text-la-text-muted hover:text-la-text-primary"
+                  onClick={() => setAddingSlotForDate(null)}
+                  className="text-la-text-muted hover:text-la-text-primary"
                 >
                   <X className="h-4 w-4" />
                 </button>
               </div>
 
               <form
-                onSubmit={handleSaveSlotInspection}
-                className="mt-4 flex flex-col gap-4"
-              >
-                <div className="grid grid-cols-2 gap-2.5 rounded-la-lg border border-white/10 bg-black/50 p-3.5 font-la-mono text-[0.6875rem]">
-                  <div>
-                    <span className="block text-[0.5625rem] uppercase text-la-text-muted">
-                      Classificação RETINA
-                    </span>
-                    <span className="font-semibold text-la-gold-light">
-                      {inspectingSlot.retinaType}
-                    </span>
-                  </div>
-                  <div>
-                    <span className="block text-[0.5625rem] uppercase text-la-text-muted">
-                      Status Atual
-                    </span>
-                    <span className="font-semibold text-la-text-primary">
-                      {resolveSlotStatusMeta(inspectingSlot.status).label}
-                    </span>
-                  </div>
-                  <div className="col-span-2 border-t border-white/8 pt-2">
-                    <span className="block text-[0.5625rem] uppercase text-la-text-muted">
-                      Pilar Editorial Sustentado
-                    </span>
-                    <span className="text-la-text-primary">
-                      {inspectingSlot.pillar}
-                    </span>
-                  </div>
-                </div>
-
-                <div className="flex flex-col gap-1.5">
-                  <label className="font-la-mono text-[0.6875rem] font-semibold uppercase text-la-text-secondary">
-                    Tema Estratégico Conectado ao Slot
-                  </label>
-                  <textarea
-                    rows={2}
-                    placeholder="Defina ou conecte um tema da Biblioteca Estratégica..."
-                    value={slotThemeDraft}
-                    onChange={(e) => setSlotThemeDraft(e.target.value)}
-                    className="w-full rounded-la-md border border-white/14 bg-black/60 p-3 font-la-sans text-[0.875rem] text-la-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-la-gold-light"
-                  />
-                </div>
-
-                <div className="flex flex-wrap items-center justify-between gap-2 border-t border-white/10 pt-4">
-                  <div className="flex items-center gap-2">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setInspectingSlotId(null);
-                        onRequestGoToThemes?.(inspectingSlot.id);
-                      }}
-                      className="rounded-la-md border border-white/14 bg-white/[0.04] px-3 py-2 font-la-mono text-[0.6875rem] text-la-gold-light hover:border-la-border-gold"
-                    >
-                      Escolher da Biblioteca de Temas
-                    </button>
-
-                    {slotThemeDraft.trim() ? (
-                      <button
-                        type="button"
-                        onClick={() => {
-                          const themeToSend = slotThemeDraft.trim();
-                          setInspectingSlotId(null);
-                          onRequestGoToScripts?.(
-                            inspectingSlot.id,
-                            themeToSend
-                          );
-                        }}
-                        className="rounded-la-md border border-la-border-gold/60 bg-la-gold-faint px-3 py-2 font-la-mono text-[0.6875rem] font-semibold text-la-gold-light"
-                      >
-                        Transformar em Roteiro →
-                      </button>
-                    ) : null}
-                  </div>
-
-                  <button
-                    type="submit"
-                    className="rounded-la-md bg-la-gold px-5 py-2 font-la-sans text-[0.8125rem] font-semibold text-la-text-inverse hover:bg-la-gold-light"
-                  >
-                    Salvar Slot
-                  </button>
-                </div>
-              </form>
-            </motion.div>
-          </div>
-        ) : null}
-      </AnimatePresence>
-
-      {/* =====================================================================
-          MODAL 2: ADICIONAR NOVO SLOT AO CALENDÁRIO ATIVO
-         ===================================================================== */}
-      <AnimatePresence>
-        {isAddSlotModalOpen ? (
-          <div className="fixed inset-0 z-[150] flex items-center justify-center p-4">
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              onClick={() => setIsAddSlotModalOpen(false)}
-              className="fixed inset-0 bg-black/80 backdrop-blur-md"
-            />
-
-            <motion.div
-              role="dialog"
-              aria-modal="true"
-              initial={{ opacity: 0, scale: 0.96, y: 8 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.96, y: 8 }}
-              className="relative z-10 w-full max-w-[34rem] rounded-la-xl border border-la-border-gold/55 bg-[#090C14]/98 p-6 shadow-2xl"
-            >
-              <h3 className="font-la-sans text-[1.1875rem] font-semibold text-la-text-primary">
-                Adicionar Slot de Conteúdo — Semana 0{selectedWeek}
-              </h3>
-
-              <form
-                onSubmit={handleAddSlotSubmit}
+                onSubmit={handleAddSlotToDay}
                 className="mt-4 flex flex-col gap-3.5"
               >
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="flex flex-col gap-1">
-                    <label className="font-la-mono text-[0.6875rem] uppercase text-la-text-secondary">
-                      Dia da Semana
-                    </label>
-                    <select
-                      value={newSlotDay}
-                      onChange={(e) =>
-                        setNewSlotDay(
-                          e.target.value as CalendarSlotItem["dayOfWeek"]
-                        )
-                      }
-                      className="min-h-[2.5rem] rounded-la-md border border-white/14 bg-[#0B0F18] px-3 py-1.5 font-la-sans text-[0.8125rem] text-la-text-primary"
-                    >
-                      {DAYS_OF_WEEK.map((d) => (
-                        <option key={d} value={d} className="bg-[#090C14]">
-                          {d}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-
-                  <div className="flex flex-col gap-1">
-                    <label className="font-la-mono text-[0.6875rem] uppercase text-la-text-secondary">
-                      Horário Sugerido
-                    </label>
-                    <input
-                      type="text"
-                      value={newSlotTime}
-                      onChange={(e) => setNewSlotTime(e.target.value)}
-                      className="min-h-[2.5rem] rounded-la-md border border-white/14 bg-black/60 px-3 py-1.5 font-la-sans text-[0.8125rem] text-la-text-primary"
-                    />
-                  </div>
+                <div className="flex flex-col gap-1">
+                  <label className="font-la-mono text-[0.6875rem] uppercase text-la-text-secondary">
+                    Título Provisório ou Tema
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="Ex.: O erro invisível na gestão de risco"
+                    value={newSlotTitle}
+                    onChange={(e) => setNewSlotTitle(e.target.value)}
+                    className="min-h-[2.5rem] rounded-la-md border border-white/14 bg-black/60 px-3 font-la-sans text-[0.875rem] text-la-text-primary"
+                  />
                 </div>
 
                 <div className="grid grid-cols-2 gap-3">
@@ -1682,69 +2986,58 @@ export function CalendarioEditorialModule({
                     <select
                       value={newSlotFormat}
                       onChange={(e) =>
-                        setNewSlotFormat(e.target.value as ContentFormatLabel)
+                        setNewSlotFormat(e.target.value as SlotContentFormat)
                       }
-                      className="min-h-[2.5rem] rounded-la-md border border-white/14 bg-[#0B0F18] px-3 py-1.5 font-la-sans text-[0.8125rem] text-la-text-primary"
+                      className="min-h-[2.5rem] rounded-la-md border border-white/14 bg-black/60 px-3 font-la-sans text-[0.8125rem] text-la-text-primary"
                     >
-                      {[
-                        "Vídeo Curto (Reel)",
-                        "Carrossel",
-                        "Post Estático",
-                        "Vídeo Longo (YouTube)",
-                        "Live Semanal",
-                        "Sequência de Stories",
-                      ].map((f) => (
-                        <option key={f} value={f} className="bg-[#090C14]">
-                          {f}
-                        </option>
-                      ))}
+                      {(Object.keys(FORMAT_META) as SlotContentFormat[]).map(
+                        (f) => (
+                          <option key={f} value={f}>
+                            {FORMAT_META[f].shortLabel}
+                          </option>
+                        )
+                      )}
                     </select>
                   </div>
 
                   <div className="flex flex-col gap-1">
                     <label className="font-la-mono text-[0.6875rem] uppercase text-la-text-secondary">
-                      Objetivo RETINA
+                      Tipo RETINA
                     </label>
                     <select
                       value={newSlotRetina}
                       onChange={(e) =>
-                        setNewSlotRetina(e.target.value as RetinaCategory)
+                        setNewSlotRetina(e.target.value as RetinaTypeKey)
                       }
-                      className="min-h-[2.5rem] rounded-la-md border border-white/14 bg-[#0B0F18] px-3 py-1.5 font-la-sans text-[0.8125rem] text-la-text-primary"
+                      className="min-h-[2.5rem] rounded-la-md border border-white/14 bg-black/60 px-3 font-la-sans text-[0.8125rem] text-la-text-primary"
                     >
-                      {[
-                        "Transformação",
-                        "Níveis de Consciência",
-                        "Autoridade",
-                        "Relacionamento",
-                        "Engajamento",
-                        "Interação",
-                      ].map((r) => (
-                        <option key={r} value={r} className="bg-[#090C14]">
-                          {r}
-                        </option>
-                      ))}
+                      {(Object.keys(RETINA_META) as RetinaTypeKey[]).map(
+                        (r) => (
+                          <option key={r} value={r}>
+                            {RETINA_META[r].label}
+                          </option>
+                        )
+                      )}
                     </select>
                   </div>
                 </div>
 
                 <div className="flex flex-col gap-1">
                   <label className="font-la-mono text-[0.6875rem] uppercase text-la-text-secondary">
-                    Tema Inicial (Opcional — pode ser vinculado depois)
+                    Horário Sugerido
                   </label>
                   <input
                     type="text"
-                    placeholder="Deixe em branco para alocar na aba Temas..."
-                    value={newSlotTheme}
-                    onChange={(e) => setNewSlotTheme(e.target.value)}
-                    className="min-h-[2.5rem] rounded-la-md border border-white/14 bg-black/60 px-3.5 py-1.5 font-la-sans text-[0.8125rem] text-la-text-primary"
+                    value={newSlotTime}
+                    onChange={(e) => setNewSlotTime(e.target.value)}
+                    className="min-h-[2.5rem] rounded-la-md border border-white/14 bg-black/60 px-3 font-la-mono text-[0.8125rem] text-la-gold-light"
                   />
                 </div>
 
-                <div className="mt-2 flex justify-end gap-3 border-t border-white/10 pt-4">
+                <div className="mt-2 flex justify-end gap-2.5 border-t border-white/10 pt-4">
                   <button
                     type="button"
-                    onClick={() => setIsAddSlotModalOpen(false)}
+                    onClick={() => setAddingSlotForDate(null)}
                     className="rounded-la-md border border-white/12 px-4 py-2 font-la-sans text-[0.8125rem] text-la-text-secondary"
                   >
                     Cancelar
@@ -1753,180 +3046,7 @@ export function CalendarioEditorialModule({
                     type="submit"
                     className="rounded-la-md bg-la-gold px-5 py-2 font-la-sans text-[0.8125rem] font-semibold text-la-text-inverse"
                   >
-                    Criar Slot na Agenda
-                  </button>
-                </div>
-              </form>
-            </motion.div>
-          </div>
-        ) : null}
-      </AnimatePresence>
-
-      {/* =====================================================================
-          MODAL 3: NOVO CALENDÁRIO CALIBRADO POR CAPACIDADE REAL (Seção 6.3.1)
-         ===================================================================== */}
-      <AnimatePresence>
-        {isNewCalendarModalOpen ? (
-          <div className="fixed inset-0 z-[150] flex items-center justify-center p-4">
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              onClick={() => setIsNewCalendarModalOpen(false)}
-              className="fixed inset-0 bg-black/80 backdrop-blur-md"
-            />
-
-            <motion.div
-              role="dialog"
-              aria-modal="true"
-              initial={{ opacity: 0, scale: 0.96, y: 8 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.96, y: 8 }}
-              className="relative z-10 w-full max-w-[38rem] rounded-la-xl border border-la-border-gold/55 bg-[#090C14]/98 p-6 shadow-2xl"
-            >
-              <div className="flex items-center justify-between border-b border-white/10 pb-3.5">
-                <div>
-                  <span className="font-la-mono text-[0.625rem] font-semibold uppercase text-la-gold-light">
-                    PLANEJAMENTO BASEADO EM CAPACIDADE REAL
-                  </span>
-                  <h3 className="font-la-sans text-[1.25rem] font-semibold text-la-text-primary">
-                    Novo Calendário Editorial
-                  </h3>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setIsNewCalendarModalOpen(false)}
-                  className="inline-flex h-8 w-8 items-center justify-center rounded-la-md text-la-text-muted hover:text-la-text-primary"
-                >
-                  <X className="h-4 w-4" />
-                </button>
-              </div>
-
-              <form
-                onSubmit={handleCreateCalendarSubmit}
-                className="mt-4 flex flex-col gap-3.5"
-              >
-                <div className="flex flex-col gap-1">
-                  <label className="font-la-mono text-[0.6875rem] uppercase text-la-text-secondary">
-                    Nome do Período / Calendário *
-                  </label>
-                  <input
-                    type="text"
-                    placeholder="Ex.: Ciclo de Conversão — Outubro"
-                    value={newCalName}
-                    onChange={(e) => setNewCalName(e.target.value)}
-                    className="min-h-[2.5rem] rounded-la-md border border-white/14 bg-black/60 px-3.5 py-2 font-la-sans text-[0.875rem] text-la-text-primary"
-                  />
-                </div>
-
-                <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-                  <div className="flex flex-col gap-1">
-                    <label className="font-la-mono text-[0.6875rem] uppercase text-la-text-secondary">
-                      Início
-                    </label>
-                    <input
-                      type="text"
-                      value={newCalStart}
-                      onChange={(e) => setNewCalStart(e.target.value)}
-                      className="min-h-[2.5rem] rounded-la-md border border-white/14 bg-black/60 px-3 py-1.5 font-la-sans text-[0.8125rem] text-la-text-primary"
-                    />
-                  </div>
-                  <div className="flex flex-col gap-1">
-                    <label className="font-la-mono text-[0.6875rem] uppercase text-la-text-secondary">
-                      Término
-                    </label>
-                    <input
-                      type="text"
-                      value={newCalEnd}
-                      onChange={(e) => setNewCalEnd(e.target.value)}
-                      className="min-h-[2.5rem] rounded-la-md border border-white/14 bg-black/60 px-3 py-1.5 font-la-sans text-[0.8125rem] text-la-text-primary"
-                    />
-                  </div>
-                  <div className="flex flex-col gap-1">
-                    <label className="font-la-mono text-[0.6875rem] uppercase text-la-text-secondary">
-                      Objetivo do Ciclo
-                    </label>
-                    <input
-                      type="text"
-                      value={newCalObjective}
-                      onChange={(e) => setNewCalObjective(e.target.value)}
-                      className="min-h-[2.5rem] rounded-la-md border border-white/14 bg-black/60 px-3 py-1.5 font-la-sans text-[0.8125rem] text-la-text-primary"
-                    />
-                  </div>
-                </div>
-
-                <div className="rounded-la-lg border border-white/10 bg-black/45 p-3.5">
-                  <span className="block font-la-mono text-[0.625rem] font-semibold uppercase tracking-[0.08em] text-la-gold-light">
-                    Capacidade Real de Produção Semanal
-                  </span>
-                  <div className="mt-2.5 grid grid-cols-2 gap-2.5 sm:grid-cols-3">
-                    {[
-                      {
-                        label: "Reels / sem",
-                        val: capShortVideos,
-                        setter: setCapShortVideos,
-                      },
-                      {
-                        label: "Carrosséis / sem",
-                        val: capCarousels,
-                        setter: setCapCarousels,
-                      },
-                      {
-                        label: "Posts Estáticos",
-                        val: capStaticPosts,
-                        setter: setCapStaticPosts,
-                      },
-                      {
-                        label: "Vídeo Longo",
-                        val: capLongVideos,
-                        setter: setCapLongVideos,
-                      },
-                      {
-                        label: "Lives / sem",
-                        val: capLives,
-                        setter: setCapLives,
-                      },
-                      {
-                        label: "Blocos Stories/dia",
-                        val: capStoriesBlocks,
-                        setter: setCapStoriesBlocks,
-                      },
-                    ].map((capItem) => (
-                      <div
-                        key={capItem.label}
-                        className="flex items-center justify-between rounded-la-md border border-white/8 bg-white/[0.02] px-2.5 py-1.5 font-la-mono text-[0.6875rem]"
-                      >
-                        <span className="text-la-text-secondary">
-                          {capItem.label}
-                        </span>
-                        <input
-                          type="number"
-                          min={0}
-                          max={14}
-                          value={capItem.val}
-                          onChange={(e) =>
-                            capItem.setter(Number(e.target.value) || 0)
-                          }
-                          className="w-11 rounded-la-xs border border-white/15 bg-black/70 px-1.5 py-0.5 text-center text-la-gold-light"
-                        />
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                <div className="mt-2 flex justify-end gap-3 border-t border-white/10 pt-4">
-                  <button
-                    type="button"
-                    onClick={() => setIsNewCalendarModalOpen(false)}
-                    className="rounded-la-md border border-white/12 px-4 py-2 font-la-sans text-[0.8125rem] text-la-text-secondary"
-                  >
-                    Cancelar
-                  </button>
-                  <button
-                    type="submit"
-                    className="rounded-la-md bg-la-gold px-5 py-2 font-la-sans text-[0.8125rem] font-semibold text-la-text-inverse hover:bg-la-gold-light"
-                  >
-                    Gerar Calendário Executável
+                    Criar e Abrir Painel 360°
                   </button>
                 </div>
               </form>

@@ -2,6 +2,7 @@
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { loginSchema } from "@/lib/validations/auth";
+import { WORKSPACE_ROUTES } from "@/lib/constants/routes";
 import type { AuthResponse, UserSession } from "@/types/auth";
 
 export async function POST(request: Request) {
@@ -16,32 +17,40 @@ export async function POST(request: Request) {
       );
     }
 
-    const { email, password, rememberMe } = result.data;
+    const { email, rememberMe } = result.data;
+    const normalizedEmail = email.trim().toLowerCase();
 
-    // TODO: Substituir por chamada real ao BackEnd NestJS via fetch()
-    // Simulação temporária de validação
-    if (email === "erro@legionaltaire.com.br") {
+    // Simulação de credencial inválida
+    if (normalizedEmail === "erro@legionaltaire.com.br") {
       return NextResponse.json(
         { success: false, message: "E-mail ou senha incorretos." },
         { status: 401 }
       );
     }
 
-    // Mock de usuário sem projeto editorial
-    const hasProject = email !== "novo@legionaltaire.com.br";
+    // Identifica cenário do cliente conforme Documento 00 (Seção 1.1 e 1.11):
+    // - novo@... -> Cenário A: Aluno novo sem projetos (vai para Onboarding Editorial Inicial)
+    // - painel@... -> Cenário C: Aluno recorrente com preferência no Painel do Dia (/dashboard)
+    // - Demais e-mails -> Cenário B: Aluno com projetos ativos (vai para Central Estratégica /dashboard/editorial)
+    const isNewUserWithoutProjects =
+      normalizedEmail === "novo@legionaltaire.com.br" ||
+      normalizedEmail.startsWith("novo@");
+
+    const prefersDailyPanel =
+      normalizedEmail === "painel@legionaltaire.com.br";
 
     const mockUser: UserSession = {
-      id: "usr_mock123",
-      email,
-      fullName: "Usuário Mockado",
+      id: isNewUserWithoutProjects ? "usr_new_01" : "usr_roberto_zane",
+      email: normalizedEmail,
+      fullName: isNewUserWithoutProjects ? "Novo Estrategista" : "Roberto Zane",
       role: "owner",
       tier: "pro",
-      hasActiveProject: hasProject,
-      activeProjectContext: hasProject
+      hasActiveProject: !isNewUserWithoutProjects,
+      activeProjectContext: !isNewUserWithoutProjects
         ? {
-            id: "prj_abc789",
-            name: "Projeto Principal Altaire",
-            niche: "Tecnologia B2B",
+            id: "proj-produto-x",
+            name: "Produto X — Lançamento Semente",
+            niche: "Finanças / Algorithmic Trading",
             createdAt: new Date().toISOString(),
             updatedAt: new Date().toISOString(),
           }
@@ -57,16 +66,19 @@ export async function POST(request: Request) {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
       sameSite: "lax",
-      maxAge: rememberMe ? 60 * 60 * 24 * 30 : 60 * 60 * 24, // 30 dias ou 1 dia
+      maxAge: rememberMe ? 60 * 60 * 24 * 30 : 60 * 60 * 24,
       path: "/",
     });
 
-    // Lógica Canônica de Roteamento Pós-Login
-    // Sem projeto -> Vai para Base Estratégica (Onboarding)
-    // Com projeto -> Vai para o Dashboard ou Base Estratégica já carregada
-    const redirectUrl = mockUser.hasActiveProject
-      ? "/editorial/base"
-      : "/editorial/base?onboarding=true";
+    // Roteamento Pós-Login Oficial (Zero 404):
+    // Cenário A (Sem projeto) -> /dashboard/editorial?onboarding=true
+    // Cenário C (Preferência Painel do Dia) -> /dashboard
+    // Cenário B (Padrão com projetos) -> /dashboard/editorial (Central Estratégica)
+    const redirectUrl = isNewUserWithoutProjects
+      ? WORKSPACE_ROUTES.onboardingEditorial
+      : prefersDailyPanel
+        ? WORKSPACE_ROUTES.painelDoDia
+        : WORKSPACE_ROUTES.centralEstrategica;
 
     const responsePayload: AuthResponse = {
       success: true,

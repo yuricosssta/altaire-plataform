@@ -34,7 +34,7 @@ import {
 } from "lucide-react";
 import { clsx } from "clsx";
 import LogoBloco from "@/components/LogoBloco";
-import { ROUTES } from "@/lib/constants/routes";
+import { ROUTES, sanitizeReturnTo } from "@/lib/constants/routes";
 import {
   onboardingSchema,
   registerSchema,
@@ -191,7 +191,7 @@ export default function CadastroPage() {
   const [verificationCode, setVerificationCode] = useState<string>("842910");
   const [codeResentFeedback, setCodeResentFeedback] = useState<boolean>(false);
   const [redirectUrl, setRedirectUrl] = useState<string>(
-    "/dashboard/editorial"
+    ROUTES.onboarding
   );
 
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
@@ -432,7 +432,7 @@ export default function CadastroPage() {
         /* Ignora restrição de storage */
       }
 
-      setRedirectUrl("/dashboard/editorial");
+      setRedirectUrl(sanitizeReturnTo(ROUTES.onboarding, ROUTES.onboarding));
       setCurrentStep(3);
     } catch {
       setServerError(
