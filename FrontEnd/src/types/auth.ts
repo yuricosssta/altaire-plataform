@@ -1,6 +1,12 @@
 // FrontEnd/src/types/auth.ts
 
-export type UserRole = "owner" | "strategist" | "editor" | "viewer";
+export type UserRole =
+  | "owner"
+  | "admin"
+  | "member"
+  | "strategist"
+  | "editor"
+  | "viewer";
 export type SubscriptionTier = "free" | "individual" | "pro" | "agency";
 
 export interface ActiveProjectContext {

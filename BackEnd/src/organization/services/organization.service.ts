@@ -18,6 +18,7 @@ import {
 } from '../schemas/organization-member.schema';
 import { CreateOrganizationDto } from '../dto/create-organization.dto';
 import { UsersService } from '../../users/services/user.service';
+import { resolveAltaireRoleByEmail } from '../../shared/utils/org-role.util';
 
 @Injectable()
 export class OrganizationService {
@@ -28,6 +29,69 @@ export class OrganizationService {
     private memberModel: Model<OrganizationMemberDocument>,
     private usersService: UsersService,
   ) {}
+
+  /**
+   * Garante que a organização canônica "Altaire" exista no MongoDB e que o usuário
+   * esteja vinculado a ela com o papel definido pelo .env (OWNER, ADMIN ou MEMBER por padrão).
+   */
+  async ensureDefaultOrganizationForUser(
+    userId: string,
+    userEmail?: string,
+  ): Promise<void> {
+    if (!(Types.ObjectId as any).isValid(userId)) {
+      return;
+    }
+
+    const userObjectId = new (Types.ObjectId as any)(String(userId));
+    let email = userEmail;
+
+    if (!email) {
+      try {
+        const userDoc = await this.usersService.findById(userId);
+        email = userDoc?.email;
+      } catch {
+        // segue com default MEMBER se não encontrar
+      }
+    }
+
+    const targetRole = resolveAltaireRoleByEmail(email);
+
+    let altaireOrg = await this.orgModel.findOne({ slug: 'altaire' }).exec();
+    if (!altaireOrg) {
+      try {
+        altaireOrg = await this.orgModel.create({
+          name: 'Altaire',
+          acronym: 'ALT',
+          slug: 'altaire',
+          ownerId: userObjectId,
+          plan: 'PRO',
+          status: 'ACTIVE',
+        });
+      } catch {
+        altaireOrg = await this.orgModel.findOne({ slug: 'altaire' }).exec();
+      }
+    }
+
+    if (!altaireOrg) return;
+
+    const existingMembership = await this.memberModel
+      .findOne({
+        organizationId: altaireOrg._id,
+        userId: userObjectId,
+      })
+      .exec();
+
+    if (!existingMembership) {
+      await this.memberModel.create({
+        organizationId: altaireOrg._id,
+        userId: userObjectId,
+        role: targetRole,
+      });
+    } else if (existingMembership.role !== targetRole) {
+      existingMembership.role = targetRole;
+      await existingMembership.save();
+    }
+  }
 
   // 1. CRIAÇÃO E VÍNCULO AUTOMÁTICO
   async create(createDto: CreateOrganizationDto, ownerId: string) {
@@ -83,8 +147,10 @@ export class OrganizationService {
     return savedOrg;
   }
 
-  // 2. LISTAGEM (O Menu Lateral)
-  async findAllForUser(userId: string) {
+  // 2. LISTAGEM (Garante vínculo automático na organização "Altaire")
+  async findAllForUser(userId: string, userEmail?: string) {
+    await this.ensureDefaultOrganizationForUser(userId, userEmail);
+
     const memberships = await this.memberModel
       .find({ userId: new (Types.ObjectId as any)(userId) })
       .populate({

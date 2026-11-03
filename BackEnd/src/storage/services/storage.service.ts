@@ -125,40 +125,63 @@ export class StorageService {
     return newAsset;
   }
 
-  // LISTAGEM DE ARQUIVOS
-  async getOrganizationAssets(orgId: string) {
-    // Busca o consumo atual
-    const org = await this.orgModel
-      .findById(orgId)
-      .select('storageUsed')
-      .exec();
+  // LISTAGEM DE ARQUIVOS (Isolado por usuário se userId for informado)
+  async getOrganizationAssets(orgId: string, userId?: string) {
+    const org = (Types.ObjectId as any).isValid(orgId)
+      ? await this.orgModel.findById(orgId).select('storageUsed').exec()
+      : await this.orgModel
+          .findOne({ slug: 'altaire' })
+          .select('storageUsed')
+          .exec();
+
     if (!org)
       throw new InternalServerErrorException('Organização não encontrada.');
 
-    // Busca todos os arquivos ordenados do mais recente para o mais antigo
+    const filter: Record<string, any> = {
+      organizationId: org._id,
+    };
+
+    if (userId && (Types.ObjectId as any).isValid(userId)) {
+      filter.uploadedBy = new (Types.ObjectId as any)(String(userId));
+    }
+
     const assets = await this.fileAssetModel
-      .find({ organizationId: new (Types.ObjectId as any)(String(orgId)) })
+      .find(filter)
       .sort({ createdAt: -1 })
       .lean()
       .exec();
 
+    const userStorageUsed = userId
+      ? assets.reduce((sum, a: any) => sum + (Number(a.sizeBytes) || 0), 0)
+      : org.storageUsed || 0;
+
     return {
-      storageUsed: org.storageUsed || 0,
+      storageUsed: userStorageUsed,
       assets,
     };
   }
 
   // EXCLUSÃO DE ARQUIVOS (Banco + Nuvem)
-  async deleteAsset(orgId: string, assetId: string) {
-    // Busca o arquivo no banco de dados para descobrir a URL e o Tamanho
-    const asset = await this.fileAssetModel.findOne({
+  async deleteAsset(orgId: string, assetId: string, userId?: string) {
+    const org = (Types.ObjectId as any).isValid(orgId)
+      ? await this.orgModel.findById(orgId).select('_id').exec()
+      : await this.orgModel.findOne({ slug: 'altaire' }).select('_id').exec();
+
+    const query: Record<string, any> = {
       _id: new (Types.ObjectId as any)(String(assetId)),
-      organizationId: new (Types.ObjectId as any)(String(orgId)),
-    });
+    };
+    if (org) {
+      query.organizationId = org._id;
+    }
+    if (userId && (Types.ObjectId as any).isValid(userId)) {
+      query.uploadedBy = new (Types.ObjectId as any)(String(userId));
+    }
+
+    const asset = await this.fileAssetModel.findOne(query);
 
     if (!asset) {
-      throw new InternalServerErrorException(
-        'Arquivo não encontrado no banco de dados.',
+      throw new ForbiddenException(
+        'Arquivo não encontrado ou sem permissão para exclusão.',
       );
     }
 

@@ -12,8 +12,14 @@ export class User extends Document {
   @Prop({ required: true, unique: true })
   email: string;
 
-  @Prop({ required: true })
+  @Prop({ required: false })
   password?: string;
+
+  @Prop({ required: false })
+  googleId?: string;
+
+  @Prop({ required: false, default: 'local' })
+  authProvider?: 'local' | 'google';
 
   @Prop({ required: true, default: false })
   isAdmin: boolean;

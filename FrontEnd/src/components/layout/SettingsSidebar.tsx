@@ -4,22 +4,12 @@
 import React, { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useSelector } from "react-redux";
-import { RootState } from "@/lib/redux/store";
-import { selectAllOrgs, selectCurrentOrg } from "@/lib/redux/slices/organizationSlice";
-import { User, ShieldCheck, Settings, PlusCircle, ArrowLeft, Menu, X } from "lucide-react";
+import { User, ShieldCheck, Settings, ArrowLeft, Menu, X } from "lucide-react";
 import LogoBloco from "../LogoBloco";
 
 export function SettingsSidebar() {
   const pathname = usePathname();
   const [isOpen, setIsOpen] = useState(false);
-  const organizations = useSelector(selectAllOrgs);
-
-  // Pegamos a organização atual para destacar
-  const currentOrg = useSelector(selectCurrentOrg);
-  // Pegamos a lista COMPLETA de organizações do usuário no Redux
-  const authUser = useSelector((state: RootState) => state.auth.user);
-  const userOrganizations = organizations;//authUser?.organizations || [];
 
   const accountLinks = [
     { name: "Meu Perfil", href: "/account/profile", icon: User },
@@ -85,49 +75,6 @@ export function SettingsSidebar() {
                   </Link>
                 );
               })}
-            </div>
-          </div>
-
-          {/* Seção 2: Teams (Lista de todas as organizações) */}
-          <div>
-            <h4 className="px-2 text-xs font-semibold text-foreground mb-3">Equipes</h4>
-            <div className="space-y-1">
-
-              {/* Loop pelas organizações reais do usuário */}
-              {userOrganizations.map((orgWrapper: any) => {
-                const org = orgWrapper.organizationId;
-                // Verifica se esta é a organização atualmente selecionada no Redux
-                const isCurrent = currentOrg?.organizationId?._id === org._id;
-
-                return (
-                  // <Link
-                  <div
-                    key={org._id}
-                    // href={`/account/organization/`} // Ajuste esta rota conforme sua arquitetura
-                    onClick={() => setIsOpen(false)}
-                    className={`flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-md transition-colors ${isCurrent
-                      ? "bg-primary/10 text-primary border border-primary/20"
-                      : "text-muted-foreground hover:bg-accent/50 hover:text-foreground"
-                      }`}
-                  >
-                    <div className={`flex items-center justify-center w-6 h-6 rounded-sm font-bold text-xs flex-shrink-0 ${isCurrent ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground'}`}>
-                      {org.name.charAt(0).toUpperCase()}
-                    </div>
-                    <span className="truncate">{org.name}</span>
-                    {/* </Link> */}
-                  </div>
-                );
-              })}
-
-              {/* Criar nova equipe */}
-              <Link
-                href="/account/organization/new" // Rota para criação de nova org
-                onClick={() => setIsOpen(false)}
-                className="w-full flex items-center gap-3 px-3 py-2.5 text-sm font-medium rounded-md text-muted-foreground hover:bg-accent hover:text-foreground transition-colors mt-3 border border-dashed border-border"
-              >
-                <PlusCircle className="w-4 h-4" />
-                Criar nova equipe
-              </Link>
             </div>
           </div>
         </nav>

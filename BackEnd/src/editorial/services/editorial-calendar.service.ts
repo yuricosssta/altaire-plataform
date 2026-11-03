@@ -10,21 +10,21 @@ import {
   IReviewSuggestion,
   ContentFormat,
   RetinaType,
-  CalendarItemStatus,
   CalendarObjective,
   PeriodType,
+  Platform,
   ICalendarDay,
   ICalendarItem,
   ProductionCapacity,
 } from '../schemas/models/editorial-calendar.interface';
 import { EDITORIAL_EVENTS } from '../../shared/events/editorial.events';
 
-interface CalendarSetup {
+export interface CalendarSetup {
   editorialVersionId: string;
   periodType: PeriodType;
   startDate: Date;
   endDate?: Date;
-  platforms: string[];
+  platforms: Platform[];
   capacity: ProductionCapacity;
   objective: CalendarObjective;
   customName?: string;

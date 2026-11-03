@@ -2,6 +2,7 @@
 "use client";
 
 import {
+  useEffect,
   useMemo,
   useRef,
   useState,
@@ -11,6 +12,8 @@ import {
 } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { useDispatch } from "react-redux";
+import { signIn } from "next-auth/react";
 import { AnimatePresence, motion, useInView, useReducedMotion } from "motion/react";
 import {
   AlertCircle,
@@ -42,6 +45,10 @@ import {
   type RegisterFormData,
 } from "@/lib/validations/auth";
 import type { AuthResponse } from "@/types/auth";
+import { AppDispatch } from "@/lib/redux/store";
+import { setAuthState } from "@/lib/redux/slices/authSlice";
+import { fetchUserProfile } from "@/lib/redux/slices/userSlice";
+import { fetchMyOrganizations } from "@/lib/redux/slices/organizationSlice";
 
 type RegistrationStep = 1 | 2 | 3;
 
@@ -132,31 +139,9 @@ function GoogleBrandIcon() {
   );
 }
 
-function AppleBrandIcon() {
-  return (
-    <svg
-      aria-hidden="true"
-      viewBox="0 0 24 24"
-      className="h-4 w-4 shrink-0 fill-white"
-    >
-      <path d="M12 1c-1.25 0-2.67.65-3.5 1.56C7.77 3.35 7.07 4.76 7.23 6.09c1.41.05 2.76-.71 3.53-1.61.73-.85 1.34-2.18 1.24-3.48zm-4.32 5.56c-2.3.08-4.32 1.44-5.45 3.42-2.3 4.02-.59 9.94 1.63 13.15 1.09 1.57 2.37 3.32 4.08 3.26 1.65-.05 2.27-1.07 4.25-1.07 1.95 0 2.52 1.07 4.28 1.04 1.8-.03 2.92-1.61 3.99-3.18 1.24-1.81 1.75-3.57 1.78-3.67-.03-.02-3.44-1.32-3.47-5.26-.03-3.3 2.69-4.88 2.82-4.96-1.54-2.25-3.95-2.55-4.81-2.61-2.05-.21-4.01 1.21-5.06 1.21-1.07 0-2.69-1.18-4.04-1.33z" />
-    </svg>
-  );
-}
-
-function MicrosoftBrandIcon() {
-  return (
-    <svg aria-hidden="true" viewBox="0 0 24 24" className="h-4 w-4 shrink-0">
-      <path fill="#f35325" d="M1 1h10.5v10.5H1z" />
-      <path fill="#81bc06" d="M12.5 1H23v10.5H12.5z" />
-      <path fill="#05a6f0" d="M1 12.5h10.5V23H1z" />
-      <path fill="#ffba08" d="M12.5 12.5H23V23H12.5z" />
-    </svg>
-  );
-}
-
 export default function CadastroPage() {
   const router = useRouter();
+  const dispatch = useDispatch<AppDispatch>();
   const shouldReduceMotion = useReducedMotion();
 
   const [currentStep, setCurrentStep] = useState<RegistrationStep>(1);
@@ -197,6 +182,25 @@ export default function CadastroPage() {
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
   const [isSocialLoading, setIsSocialLoading] = useState<boolean>(false);
   const [serverError, setServerError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const params = new URLSearchParams(window.location.search);
+    const errorCode = params.get("error");
+    if (!errorCode) return;
+
+    if (errorCode === "GoogleNotConfigured") {
+      setServerError(
+        "As credenciais do Google OAuth (AUTH_GOOGLE_ID e AUTH_GOOGLE_SECRET) ainda não foram preenchidas no arquivo FrontEnd/.env."
+      );
+    } else if (errorCode === "AccessDenied") {
+      setServerError("O cadastro com o Google foi cancelado ou negado.");
+    } else {
+      setServerError(
+        "Não foi possível concluir o cadastro com o Google. Tente novamente ou preencha seus dados abaixo."
+      );
+    }
+  }, []);
 
   /* Palco 3D Lateral */
   const [tilt, setTilt] = useState<{ rotateX: number; rotateY: number }>({
@@ -348,25 +352,35 @@ export default function CadastroPage() {
     setCurrentStep(2);
   };
 
-  const handleSocialQuickRegister = (
-    provider: "google" | "apple" | "microsoft"
-  ) => {
+  const handleSocialQuickRegister = async () => {
+    if (isSocialLoading || isSubmitting) return;
     setIsSocialLoading(true);
     setStep1Errors({});
     setServerError(null);
 
-    window.setTimeout(() => {
-      setCredentials({
-        fullName: credentials.fullName.trim() || "Roberto Zane",
-        email:
-          credentials.email.trim() || `${provider}.auth@legionaltaire.com.br`,
-        password: "OAuth2VerifiedPassword9",
-        confirmPassword: "OAuth2VerifiedPassword9",
-        acceptTerms: true,
+    try {
+      const checkRes = await fetch("/api/auth/google-start", {
+        cache: "no-store",
       });
+      const checkData = (await checkRes.json().catch(() => ({}))) as {
+        configured?: boolean;
+      };
+
+      if (!checkData.configured) {
+        setServerError(
+          "As credenciais do Google OAuth (AUTH_GOOGLE_ID e AUTH_GOOGLE_SECRET) ainda não estão configuradas nas variáveis de ambiente."
+        );
+        setIsSocialLoading(false);
+        return;
+      }
+
+      await signIn("google", { redirectTo: "/api/auth/oauth-success" });
+    } catch {
+      setServerError(
+        "Não foi possível iniciar o cadastro com o Google. Tente novamente."
+      );
       setIsSocialLoading(false);
-      setCurrentStep(2);
-    }, 400);
+    }
   };
 
   const handleStep2Submit = async (event: FormEvent<HTMLFormElement>) => {
@@ -413,6 +427,13 @@ export default function CadastroPage() {
         return;
       }
 
+      if (data.token) {
+        localStorage.setItem("token", data.token);
+        dispatch(setAuthState({ token: data.token }));
+        dispatch(fetchUserProfile());
+        dispatch(fetchMyOrganizations());
+      }
+
       /* Salva apenas os dados do perfil do cliente (sem criar projeto automático no cadastro) */
       try {
         window.localStorage.removeItem("la-initial-project-context");
@@ -432,7 +453,7 @@ export default function CadastroPage() {
         /* Ignora restrição de storage */
       }
 
-      setRedirectUrl("/dashboard/editorial");
+      setRedirectUrl(data.redirectUrl || "/dashboard/editorial?newProject=true");
       setCurrentStep(3);
     } catch {
       setServerError(
@@ -631,16 +652,19 @@ export default function CadastroPage() {
                         o Sistema Operacional Editorial.
                       </p>
 
-                      {/* Grade de Login Social: Google + Apple + Microsoft */}
-                      <div className="mt-5 grid grid-cols-1 gap-2.5 sm:grid-cols-12">
+                      {/* BOTÃO PRINCIPAL DE CADASTRO SOCIAL: Google OAuth */}
+                      <div className="mt-5">
                         <button
                           type="button"
-                          disabled={isSocialLoading}
-                          onClick={() => handleSocialQuickRegister("google")}
-                          className="flex min-h-[2.875rem] items-center justify-center gap-3 rounded-la-md border border-white/14 bg-white/[0.04] px-4 py-2 font-la-sans text-[0.875rem] font-semibold text-la-text-primary transition-all duration-200 hover:border-la-border-gold/65 hover:bg-white/[0.08] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-la-gold-light sm:col-span-8"
+                          disabled={isSocialLoading || isSubmitting}
+                          onClick={handleSocialQuickRegister}
+                          className="flex min-h-[2.875rem] w-full items-center justify-center gap-3 rounded-la-md border border-white/14 bg-white/[0.04] px-4 py-2 font-la-sans text-[0.875rem] font-semibold text-la-text-primary transition-all duration-200 hover:border-la-border-gold/65 hover:bg-white/[0.08] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-la-gold-light"
                         >
                           {isSocialLoading ? (
-                            <span className="h-4 w-4 animate-spin rounded-full border-2 border-la-gold border-t-transparent" />
+                            <>
+                              <span className="h-4 w-4 animate-spin rounded-full border-2 border-la-gold border-t-transparent" />
+                              <span>Redirecionando para o Google...</span>
+                            </>
                           ) : (
                             <>
                               <GoogleBrandIcon />
@@ -648,30 +672,6 @@ export default function CadastroPage() {
                             </>
                           )}
                         </button>
-
-                        <div className="grid grid-cols-2 gap-2.5 sm:col-span-4">
-                          <button
-                            type="button"
-                            disabled={isSocialLoading}
-                            aria-label="Cadastrar com a Apple"
-                            onClick={() => handleSocialQuickRegister("apple")}
-                            className="flex min-h-[2.875rem] items-center justify-center rounded-la-md border border-white/14 bg-white/[0.04] px-4 py-2 transition-all duration-200 hover:border-la-border-gold/65 hover:bg-white/[0.08] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-la-gold-light"
-                          >
-                            <AppleBrandIcon />
-                          </button>
-
-                          <button
-                            type="button"
-                            disabled={isSocialLoading}
-                            aria-label="Cadastrar com a Microsoft"
-                            onClick={() =>
-                              handleSocialQuickRegister("microsoft")
-                            }
-                            className="flex min-h-[2.875rem] items-center justify-center rounded-la-md border border-white/14 bg-white/[0.04] px-4 py-2 transition-all duration-200 hover:border-la-border-gold/65 hover:bg-white/[0.08] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-la-gold-light"
-                          >
-                            <MicrosoftBrandIcon />
-                          </button>
-                        </div>
                       </div>
 
                       <div className="my-4 flex items-center gap-3">

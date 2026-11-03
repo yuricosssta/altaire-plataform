@@ -1,5 +1,19 @@
 # docker-compose.dev.yml
 services:
+  mongodb:
+    image: mongo:7
+    command: ["mongod", "--wiredTigerCacheSizeGB", "0.25", "--quiet"]
+    ports:
+      - "27017:27017"
+    volumes:
+      # Volume nomeado 100% no filesystem nativo do Docker (sem I/O cruzado com o WSL2/host)
+      - mongo_data:/data/db
+    cpus: 0.5
+    mem_limit: 512m
+    memswap_limit: 512m
+    networks:
+      - app-network
+
   backend:
     build:
       context: ./BackEnd
@@ -7,9 +21,17 @@ services:
     ports:
       - "3001:3001"
     volumes:
-      - ./BackEnd:/app
-      - /app/node_modules
+      # Monta APENAS src/ para que dist/, node_modules/ e tsconfig.tsbuildinfo
+      # fiquem 100% no filesystem nativo do container sem tráfego de I/O com o host/WSL2
+      - ./BackEnd/src:/app/src
     env_file: ./BackEnd/.env
+    environment:
+      - NODE_OPTIONS=--max-old-space-size=768
+    cpus: 1.0
+    mem_limit: 1g
+    memswap_limit: 1g
+    depends_on:
+      - mongodb
     networks:
       - app-network
 
@@ -20,13 +42,24 @@ services:
     ports:
       - "3000:3000"
     volumes:
-      - ./FrontEnd:/app
-      - /app/node_modules
+      # Monta APENAS src/ e public/ para que .next/, node_modules/ e tsconfig.tsbuildinfo
+      # fiquem 100% isolados no container, eliminando travamentos no Docker Desktop ao salvar arquivos
+      - ./FrontEnd/src:/app/src
+      - ./FrontEnd/public:/app/public
     env_file: ./FrontEnd/.env
+    environment:
+      - NODE_OPTIONS=--max-old-space-size=1024
+      - NEXT_TELEMETRY_DISABLED=1
+    cpus: 1.5
+    mem_limit: 1536m
+    memswap_limit: 1536m
     depends_on:
       - backend
     networks:
       - app-network
+
+volumes:
+  mongo_data:
 
 networks:
   app-network:

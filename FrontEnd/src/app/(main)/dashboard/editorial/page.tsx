@@ -244,9 +244,12 @@ export default function CentralEstrategicaPage() {
   const [newPhase, setNewPhase] = useState<string>("Estruturação Inicial");
   const [createError, setCreateError] = useState<string | null>(null);
 
-  /* Abre modal automaticamente se vier de "+ Criar -> Novo Projeto" no Header */
+  /* Abre modal automaticamente se vier de "+ Criar -> Novo Projeto" no Header ou 1º acesso (?newProject=true) */
   useEffect(() => {
-    if (searchParams?.get("acao") === "novo-projeto") {
+    if (
+      searchParams?.get("acao") === "novo-projeto" ||
+      searchParams?.get("newProject") === "true"
+    ) {
       setIsCreateModalOpen(true);
     }
   }, [searchParams]);

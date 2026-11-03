@@ -3,11 +3,14 @@
 FROM node:22-alpine AS builder
 WORKDIR /app
 
-# Instala o pnpm (se for o que você usa)
+ENV PNPM_HOME="/pnpm"
+ENV PATH="$PNPM_HOME:$PATH"
+ENV NEXT_TELEMETRY_DISABLED=1
+# Instala o pnpm
 RUN corepack enable && corepack prepare pnpm@9 --activate
 
 COPY package.json pnpm-lock.yaml* ./
-RUN pnpm install --frozen-lockfile
+RUN --mount=type=cache,id=pnpm-frontend,target=/pnpm/store pnpm install --frozen-lockfile
 
 COPY . .
 ARG NEXT_PUBLIC_API_BASE_URL
@@ -24,14 +27,13 @@ RUN addgroup --system --gid 1001 nodejs && \
     adduser --system --uid 1001 appuser
 
 ENV NODE_ENV=production
+ENV NEXT_TELEMETRY_DISABLED=1
 
-# Copia apenas o necessário do standalone (exige "output: 'standalone'" no next.config.js)
+# Copia apenas o necessário do standalone (exige "output: 'standalone'" no next.config.ts)
 COPY --from=builder /app/public ./public
 COPY --from=builder /app/.next/standalone ./
 COPY --from=builder /app/.next/static ./.next/static
 
 USER appuser
-EXPOSE 3001
-
 EXPOSE 3000
 CMD ["node", "server.js"]

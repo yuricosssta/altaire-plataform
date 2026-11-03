@@ -1,3 +1,98 @@
+## ORGANIZAÇÃO PADRÃO "ALTAIRE", GOVERNANÇA POR .ENV (OWNER/ADMIN/MEMBER) E ISOLAMENTO DE USUÁRIOS - 02/11/2026 ##
+Resumo Técnico — Vínculo Automático na Organização "Altaire", Remoção do OrgSwitcher e Isolamento de Dados entre Membros:
+
+1. Governança de Papéis via Variáveis de Ambiente (`BackEnd/src/shared/utils/org-role.util.ts`, `FrontEnd/src/lib/auth/userProvision.ts`, `FrontEnd/src/types/auth.ts`):
+   - Todo novo usuário cadastrado (E-mail/Senha ou Google OAuth) entra automaticamente na organização padrão `"Altaire"` com papel `MEMBER` (`'member'`).
+   - Os papéis `OWNER` (`'owner'`) e `ADMIN` (`'admin'`) são determinados exclusivamente pelas listas de e-mail configuradas no `.env` (`ALTAIRE_OWNER_EMAILS` / `SUPER_ADMIN_EMAIL` e `ALTAIRE_ADMIN_EMAILS`).
+   - Tipagem `UserRole` em `FrontEnd/src/types/auth.ts` expandida para incluir `"admin"` e `"member"`, refletindo o claim `role` assinado no JWT interno e na sessão BFF (`/api/auth/login`, `/api/auth/register`, `/api/auth/session`, `/api/auth/oauth-success` e `src/auth.ts`).
+
+2. Provisionamento Automático no MongoDB e Estado Default no Redux (`OrganizationService.ensureDefaultOrganizationForUser`, `organizationSlice.ts`):
+   - `GET /organizations/my-orgs` garante a existência da organização canônica `{ slug: 'altaire', name: 'Altaire', acronym: 'ALT', plan: 'PRO', status: 'ACTIVE' }` no MongoDB e vincula/sincroniza automaticamente o usuário em `OrganizationMember` com seu papel resolvido (`OWNER`, `ADMIN` ou `MEMBER`).
+   - `organizationSlice.ts` inicializado com `DEFAULT_ALTAIRE_MEMBERSHIP` (`status: 'succeeded'`, `isCreateOrgModalOpen: false`), eliminando completamente o acionamento do `CreateOrganizationModal` no 1º acesso.
+
+3. Remoção do Seletor de Organização e Abertura Imediata do 1º Projeto Editorial (`Sidebar.tsx`, `SettingsSidebar.tsx`, `dashboard/editorial/page.tsx`):
+   - Removido o `<OrgSwitcher />` do topo da `Sidebar.tsx` e a seção `"Equipes / Criar nova equipe"` da `SettingsSidebar.tsx`.
+   - Item `"Recursos Humanos"` (`/dashboard/people`) restrito visualmente na `Sidebar.tsx` apenas para usuários `OWNER` e `ADMIN`.
+   - Em `dashboard/editorial/page.tsx`, o modal de criação do 1º Projeto Editorial (`NewProjectDialog`) abre imediatamente sem aguardar criação manual de organização.
+
+4. Isolamento Estrito de Dados entre Membros no BackEnd:
+   - `EditorialProjectController` / `EditorialProjectService` / `EditorialProjectMongooseRepository`: `findAll` e `findById` filtram e validam `createdBy === userId`, garantindo que cada membro acesse exclusivamente seus próprios projetos editoriais.
+   - `StorageController` / `StorageService`: para usuários `MEMBER`, listagem e exclusão de arquivos filtram por `uploadedBy === userId`.
+   - `OrganizationController` (`GET/POST /organizations/:orgId/members`) e `UsersController` (`GET /users`, `GET /users/search`): listagem de demais membros da Altaire bloqueada para `MEMBER` e liberada apenas para `OWNER` e `ADMIN`.
+
+## BANCO DE DADOS MONGODB LOCAL + ATLAS M0 E LOGIN SOCIAL COM AUTH.JS V5 (NEXTAUTH) - 02/11/2026 ##
+Resumo Técnico — Configuração de MongoDB Híbrido (Docker Local + Atlas Free Tier) e Autenticação Real (Google OAuth + Bcrypt):
+
+1. Infraestrutura de Banco de Dados (`docker-compose.dev.yml` e `BackEnd/.env`):
+   - Adicionado container `mongodb` (`mongo:7`) em `docker-compose.dev.yml` com volume nomeado `mongo_data:/data/db` (100% no OverlayFS do Docker, zero concorrência de I/O com o WSL2/host).
+   - Limites rígidos para preservar recursos do host/VSCode: `cpus: 0.5`, `mem_limit: 512m` e flag `--wiredTigerCacheSizeGB 0.25`.
+   - `BackEnd/.env` configurado por padrão para `MONGO_URI=mongodb://mongodb:27017/altaire`, mantendo template documentado para chaveamento imediato ao MongoDB Atlas Free Tier (M0) em produção/homologação.
+
+2. Regras de Negócio e Persistência de Usuários no BackEnd (`BackEnd/src/users/*`):
+   - `UserSchema`: campo `password` tornado opcional (`required: false`) para suportar usuários OAuth; adicionados `googleId?: string` e `authProvider?: 'local' | 'google'`.
+   - `POST /users/authenticate`: valida credenciais reais de e-mail e senha comparando o hash `bcrypt` no MongoDB, bloqueando login por senha em contas criadas exclusivamente via Google.
+   - `POST /users/oauth`: implementa criação automática no 1º acesso ou Account Linking automático (`googleId` e `avatarUrl`) caso o e-mail verificado do Google já exista no MongoDB.
+
+3. Motor Auth.js v5 (NextAuth) + Integração BFF (`FrontEnd/src/auth.ts`, `/api/auth/[...nextauth]`, `/api/auth/google-start`, `/api/auth/oauth-success`):
+   - Configurado `next-auth` (Auth.js v5) com provedor Google OAuth (`AUTH_GOOGLE_ID` e `AUTH_GOOGLE_SECRET`).
+   - No callback OAuth (`jwt` e `/api/auth/oauth-success`), o BFF provisiona/vincula o usuário no MongoDB via `upsertOAuthBackendUser`, emite o JWT interno HS256 (`JWT_SECRET`) com `sub` de 24 hex chars compatível com o `AuthGuard` do NestJS, grava os cookies HTTP-Only (`auth_token`, `access_token`, `la_session_token`) e redireciona para o projeto editorial ativo ou `/dashboard/editorial?newProject=true`.
+   - Simplificação de `/login` e `/cadastro`: mantido apenas o botão principal "Entrar / Cadastrar com o Google" + E-mail/Senha e removido o passo intermediário mockado (`842910`) no cadastro para entrada direta sem fricção.
+
+## FLUXO DE AUTENTICAÇÃO REAL, SESSÃO BFF E ROTEAMENTO PÓS-LOGIN - 29/10/2026 ##
+Resumo Técnico — Unificação de Sessão JWT (BFF/Redux/BackEnd), Simplificação do Cadastro e Redirecionamento Inteligente:
+
+1. Diagnóstico do Problema:
+   - Redirecionamento para rotas inexistentes: `/api/auth/register` e `/cadastro` redirecionavam para `/editorial/base?onboarding=true` (inexistente no App Router), enquanto `/api/auth/login` redirecionava para `dashboard?onboarding=true` (relativo) ou `/dashboard` sem sincronizar o estado global.
+   - Expulsão imediata pelo Guard (`(main)/layout.tsx`): `login/page.tsx` e `cadastro/page.tsx` não persistiam o token no `localStorage` nem despachavam `setAuthState` no Redux; além disso, `sessionExpired` no `authSlice` não limpava tokens antigos/expirados do `localStorage`, causando falha `401` imediata no `fetchUserProfile` (que chamava o backend direto via `http.ts`) e loop de retorno para `/login`.
+   - Divergência de Tokens e Cookies: as rotas de login/cadastro emitiam strings fictícias (`mock_jwt_token_12345`) no cookie `la_session_token` com IDs não-hexadecimais (`usr_mock123`), incompatíveis com o `verifyInternalToken` do BFF (`auth_token`), `serverUtils` (`access_token`) e `AuthGuard`/Mongoose (`Types.ObjectId` de 24 hex chars) no BackEnd.
+
+2. Ações Implementadas:
+   - Provisionamento Real de Usuário e Emissão de JWT HS256 (`FrontEnd/src/lib/auth/userProvision.ts`, `/api/auth/login`, `/api/auth/register`, `/api/auth/session`):
+     - Busca ou criação automática do usuário real no MongoDB via BackEnd (`GET /users/search` e `POST /users`), garantindo que o claim `sub` do JWT seja sempre um `ObjectId` válido (24 hex chars) com fallback determinístico MD5.
+     - Assinatura de JWT interno real via `createAuthToken()` (`jose`, HS256 com `JWT_SECRET` compartilhado com o NestJS) e gravação unificada nos cookies `auth_token`, `access_token` e `la_session_token`, além do retorno de `token` no payload JSON.
+     - Isolamento de projetos por usuário (`createdBy === payload.sub`) na listagem `GET /api/editorial/projects` e normalização de `id: p.id || p._id` nos endpoints BFF de criação de projetos, versões e onboarding.
+   - Simplificação do Cadastro em 2 Etapas (`FrontEnd/src/app/(auth)/cadastro/page.tsx`):
+     - Removida a Etapa 02 ("Semente do 1º Projeto Editorial") do formulário de cadastro, mantendo apenas `01 · Credenciais` → `02 · Confirmação`.
+     - Nenhuma organização nem projeto editorial é criado durante o `/cadastro`, preservando o acionamento natural do modal obrigatório de criação de empresa (`CreateOrganizationModal` no `OrgSwitcher`) ao entrar no Dashboard.
+   - Redirecionamento Inteligente Pós-Autenticação e Abertura Automática de Novo Projeto:
+     - Usuário com projeto ativo é direcionado diretamente para o Workspace do projeto (`/dashboard/editorial/[projectId]`).
+     - Usuário no 1º acesso (sem projetos) é direcionado para `/dashboard/editorial?newProject=true`, onde o `NewProjectDialog` abre automaticamente após a existência/criação da organização e, ao criar o projeto, navega para `/dashboard/editorial/[projectId]`.
+   - Blindagem do Guard de Sessão e Migração de Perfil para BFF (`(main)/layout.tsx`, `authSlice.ts`, `userSlice.ts`, `AuthInitializer.tsx`):
+     - `MainLayout` passa a consultar primariamente `/api/auth/session` (via cookie HTTP-Only) para hidratar o Redux e o `localStorage` antes de avaliar redirecionamento para `/login`.
+     - `safeDecode` em `authSlice.ts` valida a expiração (`exp`) do JWT e remove tokens expirados ou inválidos do `localStorage` tanto em `setAuthState` quanto em `sessionExpired`.
+     - `fetchUserProfile` em `userSlice.ts` migrado de chamada direta ao backend (`http.get('/users/profile')`) para a rota BFF `/api/auth/profile`.
+
+## OTIMIZAÇÃO DE AMBIENTE E CONTAINERS (WSL2 / DOCKER / VSCODE) - 29/10/2026 ##
+Resumo Técnico — Resolução de Sobrecarga, Concorrência de I/O e Travamento do VSCode:
+
+1. Diagnóstico de Gargalos (WSL2 + Docker Desktop):
+   - Concorrência de CPU e RAM no WSL2: ambiente com recursos limitados compartilhados entre VSCode Server, TypeScript Server e containers Docker.
+   - Tempestade de I/O por Bind Mounts Amplos: a montagem integral de `./BackEnd:/app` e `./FrontEnd:/app` forçava a sincronização contínua de pastas pesadas (`node_modules`, `.next`, `dist`, `tsconfig.tsbuildinfo`), gerando inotify flood e travamentos no host ao salvar arquivos.
+   - Envio Excessivo de Contexto Docker: ausência de `.dockerignore` nos subprojetos causava envio de mais de 1.14 GB ao Docker Daemon por build.
+   - Webpack Dev Overhead: Next.js 15 em modo padrão consumia picos elevados de RAM e CPU no Hot Module Reload (HMR).
+   - Bloqueio EBUSY no NestJS: `"deleteOutDir": true` no `nest-cli.json` tentava executar `rmdir` em diretórios de compilação montados.
+
+2. Ações Implementadas:
+   - Volumes Cirúrgicos em `docker-compose.dev.yml`:
+     - Bind mount restrito ao código-fonte: `./BackEnd/src:/app/src`, `./FrontEnd/src:/app/src` e `./FrontEnd/public:/app/public`.
+     - `node_modules`, `.next` e `dist` mantidos 100% no filesystem nativo OverlayFS dos containers, sem tráfego de I/O cruzado com o host.
+   - Tetos Rígidos de Recursos (CPU e RAM) no Docker Compose:
+     - Frontend: `cpus: 1.5`, `mem_limit: 1536m`, `memswap_limit: 1536m`, `NODE_OPTIONS=--max-old-space-size=1024`.
+     - Backend: `cpus: 1.0`, `mem_limit: 1g`, `memswap_limit: 1g`, `NODE_OPTIONS=--max-old-space-size=768`.
+     - Reserva garantida para o host: containers limitados a no máximo 2.5 vCPUs de 4.0 disponíveis, garantindo 1.5 vCPUs e folga de memória dedicada ao VSCode.
+   - Turbopack no Frontend (`FrontEnd/Dockerfile.dev`):
+     - Comando de execução alterado para `pnpm dev --turbopack --disable-source-maps`, reduzindo drasticamente o tempo de compilação incremental e consumo de memória.
+   - Correção de EBUSY e Pré-aquecimento do Backend (`BackEnd/Dockerfile.dev` e `nest-cli.json`):
+     - `BackEnd/nest-cli.json`: alterado para `"deleteOutDir": false`, evitando tentativa de remoção da raiz de compilação.
+     - `BackEnd/Dockerfile.dev`: adicionados `COPY src ./src` e `RUN pnpm run build` na geração da imagem para pré-aquecer `dist/` e `tsconfig.build.tsbuildinfo`. O `nest start --watch` passa a iniciar incrementalmente em ~2s.
+     - `BackEnd/tsconfig.json`: desativadas declarações e source-maps em compilação de desenvolvimento (`"declaration": false`, `"sourceMap": false`), com exclusão explícita de `dist`, `node_modules` e `coverage`.
+   - Criação de `.dockerignore` e Cache BuildKit:
+     - Criados `BackEnd/.dockerignore` e `FrontEnd/.dockerignore` (ignorando dependências, builds, logs e arquivos de ambiente), reduzindo o envio de contexto de build de ~1.14 GB para ~3 MB.
+     - BuildKit Cache Mount (`--mount=type=cache,target=/pnpm/store`) nos Dockerfiles para otimizar reinstalações do `pnpm`.
+   - Proteção de Watcher e Indexação no Editor (`.vscode/settings.json`):
+     - Inclusão de `files.watcherExclude` e `search.exclude` para pastas geradas (`.next`, `dist`, `node_modules`, `coverage`, `*.tsbuildinfo`).
+     - Teto de memória ajustado para `typescript.tsserver.maxTsServerMemory: 768` e desativação de autodetecção de tasks desnecessárias.
+
 ## SPRINT 13 - 20/10/2026 ##
 Resumo Técnico de Fechamento
 

@@ -27,12 +27,12 @@ NotasDesenvolvedor.txt
 **/.env.development
 
 # IDEs
-**/.vscode/
+.vscode/*
+!.vscode/settings.json
 **/.idea/
 **/*.sublime-workspace
 
 # Docker
-**/.dockerignore
 docker-compose.override.yml
 
 # Específico do BackEnd (Node.js)

@@ -10,6 +10,8 @@ import {
   useState,
   type ReactNode,
 } from "react";
+import { useSelector } from "react-redux";
+import { RootState } from "@/lib/redux/store";
 
 export type ProjectStatus = "active" | "in_setup" | "in_review" | "archived";
 
@@ -531,6 +533,8 @@ export function EditorialWorkspaceProvider({
 }: {
   readonly children: ReactNode;
 }) {
+  const authUser = useSelector((state: RootState) => state.auth?.user);
+  const userProfile = useSelector((state: RootState) => state.user?.profile);
   const [workspaceName, setWorkspaceName] = useState<string>("Roberto Zane");
   const [userFullName, setUserFullName] = useState<string>("Roberto Zane");
   const [userEmail, setUserEmail] = useState<string>(
@@ -601,6 +605,18 @@ export function EditorialWorkspaceProvider({
       setIsHydrated(true);
     }
   }, []);
+
+  useEffect(() => {
+    const resolvedName = userProfile?.name || authUser?.name;
+    const resolvedEmail = userProfile?.email || authUser?.email;
+    if (resolvedName) {
+      setWorkspaceName(resolvedName);
+      setUserFullName(resolvedName);
+    }
+    if (resolvedEmail) {
+      setUserEmail(resolvedEmail);
+    }
+  }, [authUser?.email, authUser?.name, userProfile?.email, userProfile?.name]);
 
   useEffect(() => {
     if (!isHydrated) return;
