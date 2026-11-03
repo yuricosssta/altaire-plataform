@@ -34,10 +34,13 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
         if (res.ok) {
           const data = await res.json();
           if (data?.success && data?.token) {
+            const hadValidToken = Boolean(localStorage.getItem('token'));
             localStorage.setItem('token', data.token);
             dispatch(setAuthState({ token: data.token }));
-            dispatch(fetchUserProfile());
-            dispatch(fetchMyOrganizations());
+            if (!hadValidToken) {
+              dispatch(fetchUserProfile());
+              dispatch(fetchMyOrganizations());
+            }
             if (active) setIsCheckingAuth(false);
             return;
           }

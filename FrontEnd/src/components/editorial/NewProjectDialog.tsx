@@ -50,7 +50,15 @@ export function NewProjectDialog({ onCreated, autoOpen = false }: NewProjectDial
       reset();
       setOpen(false);
     } catch (error: any) {
-      toast.error(error?.message || 'Falha ao criar o projeto editorial.');
+      const apiError = error?.response?.data?.error;
+      const errorMessage =
+        typeof apiError === 'string'
+          ? apiError
+          : apiError?.message ||
+            error?.response?.data?.message ||
+            error?.message ||
+            'Falha ao criar o projeto editorial.';
+      toast.error(errorMessage);
     }
   };
 

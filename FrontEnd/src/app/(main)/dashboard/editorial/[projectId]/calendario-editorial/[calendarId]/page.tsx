@@ -36,7 +36,16 @@ export default function CalendarioEditorialPage() {
         if (active) setCalendar(data);
       })
       .catch((err: any) => {
-        if (active) toast.error(err?.response?.data?.error || err?.message || 'Falha ao carregar o calendário.');
+        if (!active) return;
+        const apiError = err?.response?.data?.error;
+        const errorMessage =
+          typeof apiError === 'string'
+            ? apiError
+            : apiError?.message ||
+              err?.response?.data?.message ||
+              err?.message ||
+              'Falha ao carregar o calendário.';
+        toast.error(errorMessage);
       })
       .finally(() => {
         if (active) setIsLoading(false);
