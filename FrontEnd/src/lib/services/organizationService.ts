@@ -32,7 +32,15 @@ export const apiFetchMyOrganizations = async () => {
     const response = await localClient.get('/organizations/my-orgs');
     return response.data;
   } catch (err: any) {
-    throw err.response?.data || 'Erro ao conectar com o servidor';
+    const apiError = err?.response?.data?.error;
+    const msg =
+      typeof apiError === 'string'
+        ? apiError
+        : apiError?.message ||
+          err?.response?.data?.message ||
+          err?.message ||
+          'Erro ao conectar com o servidor';
+    throw msg;
   }
 };
 
@@ -41,7 +49,15 @@ export const apiCreateOrganization = async (name: string, acronym: string) => {
     const response = await localClient.post('/organizations', { name, acronym });
     return response.data;
   } catch (error: any) {
-    throw error.response?.data || 'Erro ao criar organização';
+    const apiError = error?.response?.data?.error;
+    const msg =
+      typeof apiError === 'string'
+        ? apiError
+        : apiError?.message ||
+          error?.response?.data?.message ||
+          error?.message ||
+          'Erro ao criar organização';
+    throw msg;
   }
 };
 

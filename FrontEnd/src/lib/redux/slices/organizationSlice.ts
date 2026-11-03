@@ -106,7 +106,14 @@ const organizationSlice = createSlice({
       })
       .addCase(fetchMyOrganizations.rejected, (state, action) => {
         state.status = 'succeeded';
-        state.error = action.payload as string;
+        const payload = action.payload as any;
+        state.error =
+          typeof payload === 'string'
+            ? payload
+            : payload?.error?.message ||
+              payload?.message ||
+              action.error?.message ||
+              'Erro ao carregar organizações';
       });
   },
 });

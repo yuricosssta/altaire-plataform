@@ -24,7 +24,16 @@ export default function MapaLinhaEditorialPage() {
         if (active) setMapa(data);
       })
       .catch((err: any) => {
-        if (active) setError(err?.response?.data?.error || err?.message || 'Falha ao carregar o mapa editorial.');
+        if (!active) return;
+        const apiError = err?.response?.data?.error;
+        const errorMessage =
+          typeof apiError === 'string'
+            ? apiError
+            : apiError?.message ||
+              err?.response?.data?.message ||
+              err?.message ||
+              'Falha ao carregar o mapa editorial.';
+        setError(errorMessage);
       })
       .finally(() => {
         if (active) setIsLoading(false);
