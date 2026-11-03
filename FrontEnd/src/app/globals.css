@@ -426,3 +426,23 @@
     }
   }
 }
+/* ==========================================================================
+   CALIBRAÇÃO DE ESCALA EXECUTIVA GLOBAL (PONTO 04)
+   Ajusta a base rem em notebooks (15.6") e desktops para exibir a densidade
+   ideal em 100% de zoom no navegador, sem necessidade de reduzir para 80%.
+   ========================================================================== */
+html {
+  font-size: 13.5px;
+}
+
+@media (max-width: 640px) {
+  html {
+    font-size: 14.5px;
+  }
+}
+
+@media (min-width: 1920px) {
+  html {
+    font-size: 14.5px;
+  }
+}
