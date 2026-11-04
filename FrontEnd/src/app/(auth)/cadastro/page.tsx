@@ -160,7 +160,7 @@ export default function CadastroPage() {
     Partial<Record<keyof RegisterFormData, string>>
   >({});
 
-  /* Passo 2: Qualificação do Perfil Operacional */
+  /* Passo 2: Qualificação do Perfil Operacional (Sem criar 1º Projeto no cadastro - Ponto 01) */
   const [profileData, setProfileData] = useState<OnboardingFormData>({
     operationProfile: "especialista",
     whatsapp: "",
@@ -175,7 +175,7 @@ export default function CadastroPage() {
   const [verificationCode, setVerificationCode] = useState<string>("842910");
   const [codeResentFeedback, setCodeResentFeedback] = useState<boolean>(false);
   const [redirectUrl, setRedirectUrl] = useState<string>(
-    ROUTES.onboarding
+    "/dashboard/editorial"
   );
 
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
@@ -438,6 +438,7 @@ export default function CadastroPage() {
         dispatch(fetchMyOrganizations());
       }
 
+      /* Salva apenas os dados do perfil do cliente (sem criar projeto automático no cadastro) */
       try {
         window.localStorage.removeItem("la-initial-project-context");
         window.localStorage.setItem(
@@ -456,7 +457,7 @@ export default function CadastroPage() {
         /* Ignora restrição de storage */
       }
 
-      setRedirectUrl("/dashboard/editorial");
+      setRedirectUrl(data.redirectUrl || "/dashboard/editorial?newProject=true");
       setCurrentStep(3);
     } catch {
       setServerError(
@@ -567,7 +568,7 @@ export default function CadastroPage() {
               />
 
               <div className="relative z-10 flex flex-col">
-                {/* Barra de Progresso dos 3 Passos */}
+                {/* Barra de Progresso dos 3 Passos (Sem menção a 1º Projeto) */}
                 <div className="mb-5 grid grid-cols-3 gap-2 border-b border-white/10 pb-4">
                   {[
                     { step: 1 as const, label: "01 · Credenciais" },
@@ -655,7 +656,7 @@ export default function CadastroPage() {
                         o Sistema Operacional Editorial.
                       </p>
 
-                      {/* CADASTRO SOCIAL NATIVO: Google OAuth */}
+                      {/* BOTÃO PRINCIPAL DE CADASTRO SOCIAL: Google OAuth */}
                       <div className="mt-5">
                         <button
                           type="button"
@@ -1013,7 +1014,7 @@ export default function CadastroPage() {
                     </motion.div>
                   ) : null}
 
-                  {/* PASSO 2: PERFIL DE OPERAÇÃO, WHATSAPP, NICHO E SEGMENTO PRINCIPAL */}
+                  {/* PASSO 2: APENAS PERFIL DE OPERAÇÃO, WHATSAPP, NICHO E SEGMENTO PRINCIPAL (PONTO 01) */}
                   {currentStep === 2 ? (
                     <motion.div
                       key="register-step-2"
@@ -1057,6 +1058,7 @@ export default function CadastroPage() {
                         noValidate
                         className="mt-4 flex flex-col gap-3.5"
                       >
+                        {/* 1. Perfil da Operação */}
                         <div className="flex flex-col gap-1.5">
                           <span className="font-la-mono text-[0.6875rem] font-semibold uppercase tracking-[0.08em] text-la-text-secondary">
                             Qual é o perfil da sua operação? *
@@ -1095,6 +1097,7 @@ export default function CadastroPage() {
                           </div>
                         </div>
 
+                        {/* 2. WhatsApp */}
                         <div className="flex flex-col gap-1.5">
                           <label
                             htmlFor="reg-whatsapp"
@@ -1130,6 +1133,7 @@ export default function CadastroPage() {
                           ) : null}
                         </div>
 
+                        {/* 3. Nicho Principal */}
                         <div className="flex flex-col gap-1.5">
                           <label
                             htmlFor="reg-niche"
@@ -1165,6 +1169,7 @@ export default function CadastroPage() {
                           ) : null}
                         </div>
 
+                        {/* 4. Segmento de Atuação Principal */}
                         <div className="flex flex-col gap-1.5">
                           <label
                             htmlFor="reg-mainSegment"

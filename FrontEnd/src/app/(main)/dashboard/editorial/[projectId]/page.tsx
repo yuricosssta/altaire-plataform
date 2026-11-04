@@ -26,10 +26,15 @@ import {
   Edit3,
   FileText,
   Flame,
+  Layers,
   Lightbulb,
   MoreVertical,
   Plus,
   Radar,
+  Search,
+  Sparkles,
+  Target,
+  Video,
 } from "lucide-react";
 import { clsx } from "clsx";
 import {
@@ -38,8 +43,6 @@ import {
 } from "@/lib/context/EditorialWorkspaceContext";
 import { LinhaEditorialModule } from "@/components/editorial/workspace/LinhaEditorialModule";
 import { CalendarioEditorialModule } from "@/components/editorial/workspace/CalendarioEditorialModule";
-import { TemasEditorialModule } from "@/components/editorial/workspace/TemasEditorialModule";
-import { RoteirosEditorialModule } from "@/components/editorial/workspace/RoteirosEditorialModule";
 
 export type WorkspaceTabKey =
   | "dashboard"
@@ -316,7 +319,9 @@ export default function ProjectWorkspacePage() {
 
   /* Dados Operacionais da Aba 4: Temas e Ideias Estratégicas (Seção 6.4) */
   const [themesSubTab, setThemesSubTab] = useState<ThemesSubTabKey>("gerar");
-  const [themesList] = useState<readonly ThemeLibraryItem[]>([
+  const [themeSearch, setThemeSearch] = useState<string>("");
+  const [themeRetinaFilter, setThemeRetinaFilter] = useState<string>("all");
+  const [themesList, setThemesList] = useState<readonly ThemeLibraryItem[]>([
     {
       id: "thm-01",
       title: "O erro invisível que bloqueia sua previsibilidade comercial",
@@ -379,8 +384,8 @@ export default function ProjectWorkspacePage() {
     },
   ]);
 
-  /* Slots abertos para integração no Dashboard (Seção 6.4.5) */
-  const [openCalendarSlots] = useState<
+  /* Slots abertos para integração direta na Aba Temas (Seção 6.4.5) */
+  const [openCalendarSlots, setOpenCalendarSlots] = useState<
     readonly OpenCalendarSlotIntegrationItem[]
   >([
     {
@@ -413,7 +418,17 @@ export default function ProjectWorkspacePage() {
     },
   ]);
 
+  const handleAssignThemeToSlot = (slotId: string, themeTitle: string) => {
+    setOpenCalendarSlots((prev) =>
+      prev.map((s) =>
+        s.id === slotId ? { ...s, assignedThemeTitle: themeTitle } : s
+      )
+    );
+  };
+
   /* Dados Operacionais da Aba 5: Roteiros & Ativos por Formato (Seção 6.5) */
+  const [selectedFormatKey, setSelectedFormatKey] =
+    useState<ScriptFormatKey | null>(null);
   const [isNewScriptModalOpen, setIsNewScriptModalOpen] =
     useState<boolean>(false);
   const [newScriptOrigin, setNewScriptOrigin] = useState<
@@ -658,6 +673,37 @@ export default function ProjectWorkspacePage() {
     }
   };
 
+  /* Gerar Novos Temas pelos 3 Modos Oficiais da Função 02 (Seção 6.4.2) */
+  const handleGenerateThemesByMode = (
+    origin: "ROMA & Avatar" | "Dados de Mercado" | "Objetivo e Momento"
+  ) => {
+    const newTheme: ThemeLibraryItem = {
+      id: `thm-${Date.now()}`,
+      title:
+        origin === "ROMA & Avatar"
+          ? `Por que a promessa tradicional de ${project.niche} falha sem diagnóstico`
+          : origin === "Dados de Mercado"
+            ? `A dúvida silenciosa que trava compradores de ${project.subniche}`
+            : `Plano de decisão: como se preparar para ${project.currentPhaseLabel}`,
+      origin,
+      pillar: "Mecanismo Único da Oferta (MUV)",
+      retinaType:
+        origin === "ROMA & Avatar"
+          ? "Transformação"
+          : origin === "Dados de Mercado"
+            ? "Autoridade"
+            : "Níveis de Consciência",
+      painOrObjection: "Objeção prioritária mapeada na Base Estratégica",
+      awarenessLevel: "Consciente da Solução",
+      suggestedFormat: "Vídeos Curtos",
+      priority: true,
+      allocatedSlotLabel: null,
+    };
+
+    setThemesList((prev) => [newTheme, ...prev]);
+    setThemesSubTab("mapa");
+  };
+
   /* Criar Novo Roteiro contextualizado (Seção 6.5.1) */
   const handleCreateScript = (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -684,6 +730,7 @@ export default function ProjectWorkspacePage() {
     };
 
     setScriptsList((prev) => [created, ...prev]);
+    setSelectedFormatKey(formatMeta.key);
     setNewScriptTitle("");
     setIsNewScriptModalOpen(false);
   };
@@ -697,21 +744,40 @@ export default function ProjectWorkspacePage() {
 
   const statusBadge = STATUS_BADGE_STYLES[project.status];
 
+  const filteredThemes = useMemo(() => {
+    return themesList.filter((t) => {
+      if (themeRetinaFilter !== "all" && t.retinaType !== themeRetinaFilter) {
+        return false;
+      }
+      if (!themeSearch.trim()) return true;
+      const q = themeSearch.toLowerCase();
+      return (
+        t.title.toLowerCase().includes(q) ||
+        t.pillar.toLowerCase().includes(q) ||
+        t.origin.toLowerCase().includes(q)
+      );
+    });
+  }, [themesList, themeRetinaFilter, themeSearch]);
+
   const unassignedOpenSlotsCount = useMemo(
     () => openCalendarSlots.filter((s) => !s.assignedThemeTitle).length,
     [openCalendarSlots]
   );
 
-  /* Props tipadas corretamente para LinhaEditorialModule e CalendarioEditorialModule */
-  const linhaModuleProps: ComponentProps<typeof LinhaEditorialModule> = {
+  /* Props blindadas para LinhaEditorialModule e CalendarioEditorialModule */
+  const linhaModuleProps = {
     projectId: project.id,
     projectName: project.name,
+    niche: project.niche,
     projectNiche: project.niche,
+    subniche: project.subniche,
     projectSubniche: project.subniche,
-    projectObjective: project.currentObjectiveLabel,
+    currentObjective: project.currentObjectiveLabel,
     currentPhase: project.currentPhaseLabel,
-    onGoToCalendarTab: () => handleSelectTab("calendario"),
-  };
+    hasActiveLine,
+    onRequestGoToCalendar: () => handleSelectTab("calendario"),
+    onNavigateToCalendar: () => handleSelectTab("calendario"),
+  } as unknown as ComponentProps<typeof LinhaEditorialModule>;
 
   const calendarioModuleProps = {
     projectId: project.id,
@@ -1224,10 +1290,10 @@ export default function ProjectWorkspacePage() {
             </div>
           </section>
 
-          {/* GRADE PRINCIPAL DO DASHBOARD DO PROJETO */}
+          {/* GRADE PRINCIPAL DO DASHBOARD DO PROJETO: Blocos 4 e 5 à esquerda + Blocos 6, 7 e 8 à direita */}
           <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-12">
             <div className="flex flex-col gap-6 lg:col-span-7">
-              {/* BLOCO 4 — PLANO DE EXECUÇÃO — ESTA SEMANA */}
+              {/* BLOCO 4 — PLANO DE EXECUÇÃO — ESTA SEMANA (Seção 5.9.2) */}
               <section className="rounded-la-xl border border-white/10 bg-[#080B12]/95 p-5 sm:p-6">
                 <div className="flex flex-wrap items-center justify-between gap-2 border-b border-white/10 pb-4">
                   <div>
@@ -1332,6 +1398,7 @@ export default function ProjectWorkspacePage() {
                           </tr>
                         ))}
 
+                        {/* Linha de Sequências de Stories com Detalhamento por Bloco (Seção 5.9.2) */}
                         <tr>
                           <td className="py-2.5">
                             <button
@@ -1406,7 +1473,7 @@ export default function ProjectWorkspacePage() {
                 )}
               </section>
 
-              {/* BLOCO 5 — CONTEÚDOS PRIORITÁRIOS DO PROJETO */}
+              {/* BLOCO 5 — CONTEÚDOS PRIORITÁRIOS DO PROJETO (Seção 5.9.2: Até 5 itens) */}
               <section className="rounded-la-xl border border-white/10 bg-[#080B12]/95 p-5 sm:p-6">
                 <div className="border-b border-white/10 pb-3.5">
                   <h2 className="font-la-sans text-[1.125rem] font-semibold text-la-text-primary">
@@ -1492,9 +1559,9 @@ export default function ProjectWorkspacePage() {
               </section>
             </div>
 
-            {/* COLUNA DIREITA DO DASHBOARD DO PROJETO */}
+            {/* COLUNA DIREITA DO DASHBOARD DO PROJETO: Blocos 6, 7 e 8 */}
             <div className="flex flex-col gap-6 lg:col-span-5">
-              {/* BLOCO 6 — ATENÇÃO ESTRATÉGICA */}
+              {/* BLOCO 6 — ATENÇÃO ESTRATÉGICA (Seção 5.9.2: Até 3 alertas construtivos) */}
               <section className="rounded-la-xl border border-white/10 bg-[#080B12]/95 p-5 sm:p-6">
                 <div className="flex items-center gap-2 border-b border-white/10 pb-3">
                   <AlertTriangle className="h-4 w-4 text-amber-400" />
@@ -1564,7 +1631,7 @@ export default function ProjectWorkspacePage() {
                 </div>
               </section>
 
-              {/* BLOCO 7 — TAREFAS DESTE PROJETO */}
+              {/* BLOCO 7 — TAREFAS DESTE PROJETO (Seção 5.9.2: Até 5 tarefas pendentes) */}
               <section className="rounded-la-xl border border-white/10 bg-[#080B12]/95 p-5 sm:p-6">
                 <div className="flex flex-wrap items-center justify-between gap-2 border-b border-white/10 pb-3">
                   <h2 className="font-la-sans text-[1.0625rem] font-semibold text-la-text-primary">
@@ -1657,7 +1724,7 @@ export default function ProjectWorkspacePage() {
                 </div>
               </section>
 
-              {/* BLOCO 8 — ATIVIDADE RECENTE DO PROJETO */}
+              {/* BLOCO 8 — ATIVIDADE RECENTE DO PROJETO (Seção 5.9.2) */}
               <section className="rounded-la-xl border border-white/10 bg-[#080B12]/95 p-5 sm:p-6">
                 <div className="flex items-center gap-2 border-b border-white/10 pb-3">
                   <Clock className="h-4 w-4 text-la-gold" />
@@ -1702,57 +1769,639 @@ export default function ProjectWorkspacePage() {
       ) : null}
 
       {/* =====================================================================
-          ABA 4: TEMAS E IDEIAS ESTRATÉGICAS — FUNÇÃO 02 (SUBÁREAS 1, 2 E 3)
+          ABA 4: TEMAS E IDEIAS ESTRATÉGICAS — FUNÇÃO 02 (SEÇÃO 6.4 E IMAGENS 06 E 07)
          ===================================================================== */}
       {activeTab === "temas" ? (
-        <TemasEditorialModule
-          key={`${project.id}-${themesSubTab}`}
-          projectId={project.id}
-          projectName={project.name}
-          projectNiche={project.niche}
-          projectSubniche={project.subniche}
-          projectObjective={project.currentObjectiveLabel}
-          currentPhase={project.currentPhaseLabel}
-          hasActiveLine={hasActiveLine}
-          hasActiveCalendar={project.hasActiveCalendar}
-          initialSubTab={themesSubTab}
-          onGoToLineTab={() => handleSelectTab("linha-editorial")}
-          onGoToCalendarTab={() => handleSelectTab("calendario")}
-          onGoToScriptsTab={(_slotId, themeTitle, formatKey) => {
-            if (themeTitle) {
-              setNewScriptTitle(themeTitle);
-              setNewScriptOrigin(_slotId ? "calendar_slot" : "theme_library");
-            }
-            if (
-              formatKey &&
-              SCRIPT_FORMAT_DEFINITIONS.some((f) => f.key === formatKey)
-            ) {
-              setNewScriptFormat(formatKey as ScriptFormatKey);
-            }
-            handleSelectTab("roteiros");
-            setIsNewScriptModalOpen(true);
-          }}
-        />
+        <section className="flex flex-col gap-6 rounded-la-xl border border-white/10 bg-[#080B12]/95 p-6 sm:p-7">
+          {/* Cabeçalho da Aba Temas (Seção 6.4.1) */}
+          <div className="flex flex-col justify-between gap-4 border-b border-white/10 pb-5 lg:flex-row lg:items-center">
+            <div className="flex items-start gap-3.5">
+              <span className="mt-0.5 inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-la-xl border border-la-border-gold/55 bg-la-gold-faint text-la-gold">
+                <Lightbulb className="h-5 w-5" />
+              </span>
+              <div>
+                <h2 className="font-la-sans text-[1.5rem] font-semibold text-la-text-primary">
+                  Temas e Ideias Estratégicas
+                </h2>
+                <p className="mt-0.5 font-la-sans text-[0.875rem] text-la-text-secondary">
+                  Gere, organize e distribua temas alinhados à Base Estratégica,
+                  à Linha Editorial e ao objetivo atual deste projeto.
+                </p>
+              </div>
+            </div>
+
+            {hasActiveCalendar ? (
+              <div className="flex items-center gap-3 rounded-la-lg border border-la-border-gold/50 bg-la-gold-faint px-3.5 py-2">
+                <span className="font-la-mono text-[0.6875rem] text-la-gold-light">
+                  {unassignedOpenSlotsCount} slots ainda sem tema no Calendário
+                  ativo
+                </span>
+                <button
+                  type="button"
+                  onClick={() => handleGenerateThemesByMode("Objetivo e Momento")}
+                  className="rounded-la-xs bg-la-gold px-2.5 py-1 font-la-mono text-[0.625rem] font-bold text-la-text-inverse"
+                >
+                  Gerar temas
+                </button>
+              </div>
+            ) : null}
+          </div>
+
+          {/* Três Sub-Controles Internos (Seção 6.4.5 e Imagem 06): [ Gerar Temas ] [ Mapa de Temas ] [ Integração com Calendário ] */}
+          <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+            {[
+              {
+                key: "gerar" as const,
+                title: "Gerar Temas",
+                subtitle:
+                  "Motor unificado com 3 modos: ROMA & Avatar, Dados de Mercado e Objetivo/Momento.",
+                icon: Sparkles,
+              },
+              {
+                key: "mapa" as const,
+                title: `Mapa de Temas (${themesList.length})`,
+                subtitle:
+                  "Biblioteca estratégica com classificação por pilar, RETINA, filtros e marcações.",
+                icon: Layers,
+              },
+              {
+                key: "integracao" as const,
+                title: "Integração com Calendário",
+                subtitle:
+                  "Encaixe os temas nos slots abertos do calendário editorial e equilibre o período.",
+                icon: Calendar,
+              },
+            ].map((sub) => {
+              const SubIcon = sub.icon;
+              const active = themesSubTab === sub.key;
+              return (
+                <button
+                  key={sub.key}
+                  type="button"
+                  onClick={() => setThemesSubTab(sub.key)}
+                  className={clsx(
+                    "flex items-start gap-3.5 rounded-la-xl border p-4 text-left transition-all",
+                    active
+                      ? "border-la-gold bg-la-gold-faint shadow-[0_0_24px_rgba(207,169,101,0.14)]"
+                      : "border-white/10 bg-black/45 hover:border-white/25"
+                  )}
+                >
+                  <span
+                    className={clsx(
+                      "mt-0.5 inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-la-lg border",
+                      active
+                        ? "border-la-gold bg-la-gold text-la-text-inverse"
+                        : "border-la-border-gold/40 bg-la-gold-faint text-la-gold"
+                    )}
+                  >
+                    <SubIcon className="h-5 w-5" />
+                  </span>
+                  <div>
+                    <span className="block font-la-sans text-[0.9375rem] font-semibold text-la-text-primary">
+                      {sub.title}
+                    </span>
+                    <span className="mt-1 block font-la-sans text-[0.75rem] leading-[1.45] text-la-text-secondary">
+                      {sub.subtitle}
+                    </span>
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+
+          {/* Bloco Explicativo Discreto (Seção 6.4.1 e Imagens 06/07) */}
+          <div className="rounded-la-lg border border-la-border-gold/35 bg-black/50 p-4">
+            <span className="font-la-mono text-[0.625rem] font-semibold uppercase tracking-[0.08em] text-la-gold-light">
+              Como a IA trabalha por baixo dos panos
+            </span>
+            <p className="mt-1 w-full text-justify [text-align-last:left] hyphens-auto font-la-sans text-[0.8125rem] leading-[1.6] text-la-text-secondary">
+              O motor de temas lê automaticamente a Base Estratégica, a Linha
+              Editorial, o Calendário e o momento do negócio. Com isso,
+              transforma ROMA, oferta, ICP, dores, desejos, objeções, RETINA e
+              objetivos em temas que já nascem prontos para entrar no plano de
+              conteúdo.
+            </p>
+          </div>
+
+          {/* SUB-ABA 1: OS 3 MODOS DE GERAÇÃO DE TEMAS (Seção 6.4.2 e Imagem 07) */}
+          {themesSubTab === "gerar" ? (
+            <div className="grid grid-cols-1 items-stretch gap-5 lg:grid-cols-3">
+              {/* Card 1: ROMA & Avatar */}
+              <div className="flex flex-col justify-between rounded-la-xl border border-white/12 bg-[#0B0F19] p-6 transition-colors hover:border-la-gold">
+                <div>
+                  <span className="inline-flex h-11 w-11 items-center justify-center rounded-la-lg border border-la-border-gold/50 bg-la-gold-faint text-la-gold">
+                    <Target className="h-5 w-5" />
+                  </span>
+                  <h3 className="mt-4 font-la-sans text-[1.1875rem] font-semibold text-la-text-primary">
+                    Temas a partir de ROMA & Avatar
+                  </h3>
+                  <p className="mt-2 w-full text-justify [text-align-last:left] hyphens-auto font-la-sans text-[0.8125rem] leading-[1.6] text-la-text-secondary">
+                    Use a promessa, a oferta, o ICP e as objeções reais do
+                    projeto para gerar temas que reforçam posicionamento e
+                    transformação.
+                  </p>
+                </div>
+
+                <div className="mt-6 border-t border-white/10 pt-4">
+                  <span className="block font-la-mono text-[0.625rem] uppercase tracking-[0.06em] text-la-text-muted">
+                    Pilares, dores, desejos e objeções já cadastrados
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => handleGenerateThemesByMode("ROMA & Avatar")}
+                    className="mt-3 inline-flex min-h-[2.625rem] w-full items-center justify-center gap-2 rounded-la-md bg-la-gold px-4 py-2 font-la-sans text-[0.8125rem] font-semibold text-la-text-inverse hover:bg-la-gold-light"
+                  >
+                    <span>Gerar temas estratégicos</span>
+                    <ArrowRight className="h-4 w-4" />
+                  </button>
+                </div>
+              </div>
+
+              {/* Card 2: Dados de Mercado */}
+              <div className="flex flex-col justify-between rounded-la-xl border border-white/12 bg-[#0B0F19] p-6 transition-colors hover:border-la-gold">
+                <div>
+                  <span className="inline-flex h-11 w-11 items-center justify-center rounded-la-lg border border-la-border-gold/50 bg-la-gold-faint text-la-gold">
+                    <Radar className="h-5 w-5" />
+                  </span>
+                  <h3 className="mt-4 font-la-sans text-[1.1875rem] font-semibold text-la-text-primary">
+                    Temas a partir de Dados de Mercado
+                  </h3>
+                  <p className="mt-2 w-full text-justify [text-align-last:left] hyphens-auto font-la-sans text-[0.8125rem] leading-[1.6] text-la-text-secondary">
+                    Investigue linguagem, comentários, vídeos, reviews e lacunas
+                    do mercado para encontrar assuntos que sua audiência já
+                    demonstra querer discutir.
+                  </p>
+                </div>
+
+                <div className="mt-6 border-t border-white/10 pt-4">
+                  <span className="block font-la-mono text-[0.625rem] uppercase tracking-[0.06em] text-la-text-muted">
+                    Pesquisa orientada pelo nicho e pela oferta do projeto
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      handleGenerateThemesByMode("Dados de Mercado")
+                    }
+                    className="mt-3 inline-flex min-h-[2.625rem] w-full items-center justify-center gap-2 rounded-la-md border border-la-border-gold/60 bg-la-gold-faint px-4 py-2 font-la-sans text-[0.8125rem] font-semibold text-la-gold-light hover:bg-la-gold hover:text-la-text-inverse"
+                  >
+                    <span>Pesquisar oportunidades de tema</span>
+                    <ArrowRight className="h-4 w-4" />
+                  </button>
+                </div>
+              </div>
+
+              {/* Card 3: Objetivo e Momento */}
+              <div className="flex flex-col justify-between rounded-la-xl border border-white/12 bg-[#0B0F19] p-6 transition-colors hover:border-la-gold">
+                <div>
+                  <span className="inline-flex h-11 w-11 items-center justify-center rounded-la-lg border border-la-border-gold/50 bg-la-gold-faint text-la-gold">
+                    <Compass className="h-5 w-5" />
+                  </span>
+                  <h3 className="mt-4 font-la-sans text-[1.1875rem] font-semibold text-la-text-primary">
+                    Temas a partir do Objetivo e Momento
+                  </h3>
+                  <p className="mt-2 w-full text-justify [text-align-last:left] hyphens-auto font-la-sans text-[0.8125rem] leading-[1.6] text-la-text-secondary">
+                    Gere temas priorizados para a fase atual: crescimento,
+                    aquecimento, pré-lançamento, conversão, retenção ou
+                    otimização.
+                  </p>
+                </div>
+
+                <div className="mt-6 border-t border-white/10 pt-4">
+                  <span className="block font-la-mono text-[0.625rem] uppercase tracking-[0.06em] text-la-text-muted">
+                    Calendário ativo, objetivo do período e plataformas
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      handleGenerateThemesByMode("Objetivo e Momento")
+                    }
+                    className="mt-3 inline-flex min-h-[2.625rem] w-full items-center justify-center gap-2 rounded-la-md border border-la-border-gold/60 bg-la-gold-faint px-4 py-2 font-la-sans text-[0.8125rem] font-semibold text-la-gold-light hover:bg-la-gold hover:text-la-text-inverse"
+                  >
+                    <span>Gerar temas para este momento</span>
+                    <ArrowRight className="h-4 w-4" />
+                  </button>
+                </div>
+              </div>
+            </div>
+          ) : null}
+
+          {/* SUB-ABA 2: MAPA DE TEMAS / BIBLIOTECA FILTRÁVEL (Seção 6.4.5) */}
+          {themesSubTab === "mapa" ? (
+            <div className="flex flex-col gap-4">
+              <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
+                <div className="relative flex-1 sm:max-w-[22rem]">
+                  <Search className="pointer-events-none absolute top-1/2 left-3.5 h-4 w-4 -translate-y-1/2 text-la-gold" />
+                  <input
+                    type="search"
+                    placeholder="Filtrar temas por assunto, pilar ou origem..."
+                    value={themeSearch}
+                    onChange={(e) => setThemeSearch(e.target.value)}
+                    className="min-h-[2.375rem] w-full rounded-la-md border border-white/12 bg-black/55 py-1.5 pr-4 pl-10 font-la-sans text-[0.8125rem] text-la-text-primary"
+                  />
+                </div>
+
+                <div className="flex flex-wrap items-center gap-1 rounded-la-md border border-white/10 bg-black/50 p-1">
+                  {[
+                    "all",
+                    "Transformação",
+                    "Níveis de Consciência",
+                    "Autoridade",
+                    "Relacionamento",
+                  ].map((ret) => (
+                    <button
+                      key={ret}
+                      type="button"
+                      onClick={() => setThemeRetinaFilter(ret)}
+                      className={clsx(
+                        "rounded-la-xs px-2.5 py-1 font-la-mono text-[0.625rem]",
+                        themeRetinaFilter === ret
+                          ? "bg-la-gold font-semibold text-la-text-inverse"
+                          : "text-la-text-secondary"
+                      )}
+                    >
+                      {ret === "all" ? "Todos RETINA" : ret}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="flex flex-col gap-3">
+                {filteredThemes.map((thm) => (
+                  <div
+                    key={thm.id}
+                    className="flex flex-col justify-between gap-4 rounded-la-xl border border-white/10 bg-black/45 p-4 sm:flex-row sm:items-center"
+                  >
+                    <div className="flex flex-col gap-1">
+                      <div className="flex flex-wrap items-center gap-2 font-la-mono text-[0.625rem]">
+                        <span className="rounded-la-xs border border-la-border-gold/50 bg-la-gold-faint px-2 py-0.5 font-semibold text-la-gold-light">
+                          {thm.retinaType}
+                        </span>
+                        <span className="rounded-la-xs border border-white/10 bg-white/[0.04] px-2 py-0.5 text-la-text-primary">
+                          {thm.suggestedFormat}
+                        </span>
+                        <span className="text-la-text-muted">
+                          Origem: {thm.origin}
+                        </span>
+                        {thm.priority ? (
+                          <span className="text-amber-300">★ Prioritário</span>
+                        ) : null}
+                      </div>
+
+                      <h4 className="mt-1 font-la-sans text-[0.9375rem] font-semibold text-la-text-primary">
+                        {thm.title}
+                      </h4>
+
+                      <p className="font-la-mono text-[0.6875rem] text-la-text-secondary">
+                        Pilar: {thm.pillar} • {thm.painOrObjection} •{" "}
+                        {thm.allocatedSlotLabel ? (
+                          <span className="text-emerald-300">
+                            Alocado: {thm.allocatedSlotLabel}
+                          </span>
+                        ) : (
+                          <span className="text-amber-300">
+                            Disponível para alocar
+                          </span>
+                        )}
+                      </p>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setNewScriptTitle(thm.title);
+                        setNewScriptOrigin("theme_library");
+                        handleSelectTab("roteiros");
+                        setIsNewScriptModalOpen(true);
+                      }}
+                      className="inline-flex min-h-[2.25rem] shrink-0 items-center gap-1.5 rounded-la-md bg-la-gold px-3.5 py-1.5 font-la-sans text-[0.75rem] font-semibold text-la-text-inverse hover:bg-la-gold-light"
+                    >
+                      <span>Enviar para roteiro</span>
+                      <ArrowRight className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ) : null}
+
+          {/* SUB-ABA 3: INTEGRAÇÃO COM CALENDÁRIO (Seção 6.4.5) */}
+          {themesSubTab === "integracao" ? (
+            <div className="flex flex-col gap-4">
+              <div className="rounded-la-lg border border-white/10 bg-black/45 p-4">
+                <h3 className="font-la-sans text-[1rem] font-semibold text-la-text-primary">
+                  Vincular Temas aos Slots do Calendário Ativo
+                </h3>
+                <p className="mt-1 font-la-sans text-[0.8125rem] text-la-text-secondary">
+                  Conecte uma pauta prioritária da biblioteca a cada slot sem
+                  tema para liberar a criação de roteiros.
+                </p>
+              </div>
+
+              <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+                {openCalendarSlots.map((slot, idx) => {
+                  const suggestedTheme =
+                    themesList[idx % themesList.length]?.title ||
+                    "O erro invisível que bloqueia sua previsibilidade";
+
+                  return (
+                    <div
+                      key={slot.id}
+                      className="flex flex-col justify-between gap-3 rounded-la-xl border border-white/10 bg-black/50 p-4"
+                    >
+                      <div>
+                        <div className="flex items-center justify-between font-la-mono text-[0.625rem]">
+                          <span className="font-semibold text-la-gold-light">
+                            {slot.slotLabel}
+                          </span>
+                          <span className="rounded-la-xs border border-white/10 px-2 py-0.5 text-la-text-primary">
+                            {slot.format} • {slot.retinaRequired}
+                          </span>
+                        </div>
+
+                        {slot.assignedThemeTitle ? (
+                          <div className="mt-3 rounded-la-md border border-emerald-500/40 bg-emerald-950/25 p-3">
+                            <span className="font-la-mono text-[0.5625rem] uppercase text-emerald-300">
+                              ✓ TEMA CONECTADO AO CALENDÁRIO
+                            </span>
+                            <p className="mt-0.5 font-la-sans text-[0.8125rem] font-semibold text-la-text-primary">
+                              {slot.assignedThemeTitle}
+                            </p>
+                          </div>
+                        ) : (
+                          <div className="mt-3 rounded-la-md border border-white/8 bg-white/[0.02] p-3">
+                            <span className="font-la-mono text-[0.5625rem] uppercase text-la-text-muted">
+                              Sugestão de encaixe prioritário:
+                            </span>
+                            <p className="mt-0.5 font-la-sans text-[0.8125rem] text-la-text-secondary">
+                              “{suggestedTheme}”
+                            </p>
+                          </div>
+                        )}
+                      </div>
+
+                      <div className="flex items-center justify-end gap-2">
+                        {slot.assignedThemeTitle ? (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setNewScriptTitle(slot.assignedThemeTitle!);
+                              setNewScriptOrigin("calendar_slot");
+                              handleSelectTab("roteiros");
+                              setIsNewScriptModalOpen(true);
+                            }}
+                            className="inline-flex items-center gap-1.5 rounded-la-md bg-la-gold px-3.5 py-1.5 font-la-sans text-[0.75rem] font-semibold text-la-text-inverse"
+                          >
+                            <span>Criar Roteiro deste Slot</span>
+                            <ArrowRight className="h-3.5 w-3.5" />
+                          </button>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() =>
+                              handleAssignThemeToSlot(slot.id, suggestedTheme)
+                            }
+                            className="inline-flex items-center gap-1.5 rounded-la-md border border-la-border-gold/60 bg-la-gold-faint px-3.5 py-1.5 font-la-sans text-[0.75rem] font-semibold text-la-gold-light hover:bg-la-gold hover:text-la-text-inverse"
+                          >
+                            <span>Vincular tema sugerido</span>
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          ) : null}
+        </section>
       ) : null}
 
       {/* =====================================================================
-          ABA 5: CRIAÇÃO DE ROTEIROS — FUNÇÃO 03 (SEÇÃO 6.5)
+          ABA 5: CRIAÇÃO DE ROTEIROS — FUNÇÃO 03 (SEÇÃO 6.5 E IMAGEM 08)
          ===================================================================== */}
       {activeTab === "roteiros" ? (
-        <RoteirosEditorialModule
-          projectId={project.id}
-          projectName={project.name}
-          projectNiche={project.niche}
-          projectSubniche={project.subniche}
-          projectObjective={project.currentObjectiveLabel}
-          currentPhase={project.currentPhaseLabel}
-          hasActiveLine={hasActiveLine}
-          hasActiveCalendar={project.hasActiveCalendar}
-          initialPreselectedThemeTitle={newScriptTitle || null}
-          onGoToLineTab={() => handleSelectTab("linha-editorial")}
-          onGoToCalendarTab={() => handleSelectTab("calendario")}
-          onGoToThemesTab={() => handleSelectTab("temas")}
-        />
+        <section className="flex flex-col gap-6 rounded-la-xl border border-white/10 bg-[#080B12]/95 p-6 sm:p-7">
+          {/* Cabeçalho da Aba Roteiros (Seção 6.5.1 e Imagem 08) */}
+          <div className="flex flex-col justify-between gap-4 border-b border-white/10 pb-5 sm:flex-row sm:items-center">
+            <div>
+              <h2 className="font-la-sans text-[1.5rem] font-semibold text-la-text-primary">
+                Função 03 — Criação de Roteiros
+              </h2>
+              <p className="mt-1 font-la-sans text-[0.875rem] text-la-text-secondary">
+                Escolha um formato para criar ou gerenciar conteúdos prontos
+                para produzir.
+              </p>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => setIsNewScriptModalOpen(true)}
+              className="inline-flex min-h-[2.625rem] shrink-0 items-center gap-2 rounded-la-md bg-la-gold px-5 py-2 font-la-sans text-[0.875rem] font-semibold text-la-text-inverse shadow-[var(--la-elevation-gold)] hover:bg-la-gold-light"
+            >
+              <Plus className="h-4 w-4 stroke-[2.5]" />
+              <span>+ Novo Roteiro</span>
+            </button>
+          </div>
+
+          {/* Orientação caso o projeto ainda não tenha Linha Editorial ativa (Seção 6.5.6) */}
+          {!hasActiveLine ? (
+            <div className="rounded-la-xl border border-amber-400/40 bg-amber-950/15 p-5">
+              <h3 className="font-la-sans text-[1.0625rem] font-semibold text-la-text-primary">
+                Este projeto ainda não possui uma Linha Editorial ativa.
+              </h3>
+              <p className="mt-1 font-la-sans text-[0.8125rem] text-la-text-secondary">
+                Crie a Linha Editorial, o Calendário Editorial e vincule os
+                temas nos slots para que a IA respeite a voz da marca, os
+                pilares, a distribuição RETINA e o objetivo estratégico.
+              </p>
+              <button
+                type="button"
+                onClick={() => handleSelectTab("linha-editorial")}
+                className="mt-3 rounded-la-md bg-la-gold px-4 py-1.5 font-la-sans text-[0.75rem] font-semibold text-la-text-inverse"
+              >
+                Criar Linha Editorial
+              </button>
+            </div>
+          ) : null}
+
+          {/* Os 6 Cards de Formato na Ordem Oficial (Seções 6.5.2 e 6.5.3 e Imagem 08) */}
+          <div className="grid grid-cols-1 items-stretch gap-5 md:grid-cols-2 xl:grid-cols-3">
+            {SCRIPT_FORMAT_DEFINITIONS.map((fmt) => {
+              const itemsForFormat = scriptsList.filter(
+                (s) => s.formatKey === fmt.key
+              );
+              const approvedCount = itemsForFormat.filter(
+                (s) => s.status === "approved"
+              ).length;
+              const draftCount = itemsForFormat.filter(
+                (s) => s.status === "draft"
+              ).length;
+              const prodCount = itemsForFormat.filter(
+                (s) => s.status === "in_production"
+              ).length;
+              const isSelected = selectedFormatKey === fmt.key;
+
+              return (
+                <article
+                  key={fmt.key}
+                  className={clsx(
+                    "flex flex-col justify-between rounded-la-xl border p-6 transition-all",
+                    isSelected
+                      ? "border-la-gold bg-[#0C101B] shadow-[0_0_28px_rgba(207,169,101,0.16)]"
+                      : "border-white/12 bg-[#0B0F19] hover:border-la-border-gold/60"
+                  )}
+                >
+                  <div>
+                    <div className="flex items-start justify-between gap-3">
+                      <span className="inline-flex h-11 w-11 items-center justify-center rounded-la-lg border border-la-border-gold/55 bg-la-gold-faint text-la-gold">
+                        <Video className="h-5 w-5" />
+                      </span>
+                      <span className="font-la-sans text-[1.75rem] font-bold leading-none text-la-text-primary">
+                        {itemsForFormat.length}
+                      </span>
+                    </div>
+
+                    <h3 className="mt-4 font-la-sans text-[1.1875rem] font-semibold text-la-text-primary">
+                      {fmt.name}
+                    </h3>
+
+                    <p className="mt-1.5 font-la-sans text-[0.8125rem] leading-[1.55] text-la-text-secondary">
+                      {fmt.description}
+                    </p>
+
+                    {/* Badges de contadores úteis (Seção 6.5.3: Pronto, Rascunho, Em produção) */}
+                    <div className="mt-4 flex flex-wrap items-center gap-2 font-la-mono text-[0.6875rem]">
+                      {approvedCount > 0 ? (
+                        <span className="rounded-la-xs border border-la-border-gold/55 bg-la-gold-faint px-2.5 py-0.5 font-semibold text-la-gold-light">
+                          Pronto: {approvedCount}
+                        </span>
+                      ) : null}
+                      {draftCount > 0 ? (
+                        <span className="rounded-la-xs border border-white/14 bg-white/[0.05] px-2.5 py-0.5 text-la-text-secondary">
+                          Rascunho: {draftCount}
+                        </span>
+                      ) : null}
+                      {prodCount > 0 ? (
+                        <span className="rounded-la-xs border border-sky-400/45 bg-sky-500/15 px-2.5 py-0.5 text-sky-200">
+                          Em produção: {prodCount}
+                        </span>
+                      ) : null}
+                    </div>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setSelectedFormatKey((prev) =>
+                        prev === fmt.key ? null : fmt.key
+                      )
+                    }
+                    className="mt-5 inline-flex min-h-[2.5rem] w-full items-center justify-center gap-1.5 rounded-la-md border border-la-border-gold/55 bg-la-gold-faint px-4 py-2 font-la-sans text-[0.8125rem] font-semibold text-la-gold-light transition-colors hover:bg-la-gold hover:text-la-text-inverse"
+                  >
+                    <span>
+                      {isSelected ? "Ocultar roteiros" : "Ver roteiros"}
+                    </span>
+                    <ArrowRight className="h-3.5 w-3.5" />
+                  </button>
+                </article>
+              );
+            })}
+          </div>
+
+          {/* Lista de Roteiros do Formato Selecionado */}
+          {selectedFormatKey ? (
+            <div className="mt-2 rounded-la-xl border border-la-border-gold/50 bg-black/55 p-5">
+              <div className="flex flex-wrap items-center justify-between gap-2 border-b border-white/10 pb-3.5">
+                <h3 className="font-la-sans text-[1.125rem] font-semibold text-la-text-primary">
+                  Roteiros de{" "}
+                  {
+                    SCRIPT_FORMAT_DEFINITIONS.find(
+                      (f) => f.key === selectedFormatKey
+                    )?.name
+                  }
+                </h3>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setNewScriptFormat(selectedFormatKey);
+                    setIsNewScriptModalOpen(true);
+                  }}
+                  className="rounded-la-md bg-la-gold px-3.5 py-1.5 font-la-sans text-[0.75rem] font-semibold text-la-text-inverse"
+                >
+                  + Criar roteiro neste formato
+                </button>
+              </div>
+
+              <div className="mt-4 flex flex-col gap-2.5">
+                {scriptsList
+                  .filter((s) => s.formatKey === selectedFormatKey)
+                  .map((scr) => (
+                    <div
+                      key={scr.id}
+                      className="flex flex-col justify-between gap-3 rounded-la-lg border border-white/10 bg-white/[0.02] p-4 sm:flex-row sm:items-center"
+                    >
+                      <div>
+                        <div className="flex flex-wrap items-center gap-2 font-la-mono text-[0.625rem]">
+                          <span
+                            className={clsx(
+                              "rounded-la-xs border px-2 py-0.5 font-semibold",
+                              scr.status === "approved"
+                                ? "border-la-gold bg-la-gold/20 text-la-gold-light"
+                                : "border-white/15 bg-white/[0.05] text-la-text-secondary"
+                            )}
+                          >
+                            {scr.status === "approved"
+                              ? "PRONTO"
+                              : scr.status === "in_production"
+                                ? "EM PRODUÇÃO"
+                                : "RASCUNHO"}
+                          </span>
+                          <span className="text-la-gold-light">
+                            RETINA: {scr.retinaType}
+                          </span>
+                          <span>•</span>
+                          <span className="text-la-text-secondary">
+                            {scr.mode}
+                          </span>
+                          <span>•</span>
+                          <span className="text-la-text-muted">
+                            {scr.linkedSlotLabel}
+                          </span>
+                        </div>
+                        <p className="mt-1 font-la-sans text-[0.9375rem] font-semibold text-la-text-primary">
+                          {scr.title}
+                        </p>
+                      </div>
+
+                      <div className="flex items-center gap-2">
+                        {scr.status !== "approved" ? (
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setScriptsList((prev) =>
+                                prev.map((item) =>
+                                  item.id === scr.id
+                                    ? { ...item, status: "approved" }
+                                    : item
+                                )
+                              )
+                            }
+                            className="rounded-la-md bg-la-gold px-3 py-1.5 font-la-sans text-[0.75rem] font-semibold text-la-text-inverse"
+                          >
+                            Aprovar Roteiro
+                          </button>
+                        ) : (
+                          <span className="font-la-mono text-[0.6875rem] text-emerald-300">
+                            ✓ Pronto para produção
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+              </div>
+            </div>
+          ) : null}
+        </section>
       ) : null}
 
       {/* =====================================================================
@@ -1809,7 +2458,7 @@ export default function ProjectWorkspacePage() {
         ) : null}
       </AnimatePresence>
 
-      {/* MODAL: NOVO ROTEIRO (Seção 6.5.1) */}
+      {/* MODAL: NOVO ROTEIRO PRIORIZANDO SLOT DO CALENDÁRIO OU TEMA DA BIBLIOTECA (Seção 6.5.1) */}
       <AnimatePresence>
         {isNewScriptModalOpen ? (
           <div className="fixed inset-0 z-[150] flex items-center justify-center p-4">
