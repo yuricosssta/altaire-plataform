@@ -37,7 +37,7 @@ import {
 } from "lucide-react";
 import { clsx } from "clsx";
 import LogoBloco from "@/components/LogoBloco";
-import { ROUTES } from "@/lib/constants/routes";
+import { ROUTES, sanitizeReturnTo } from "@/lib/constants/routes";
 import { loginSchema, type LoginFormData } from "@/lib/validations/auth";
 import type { AuthResponse } from "@/types/auth";
 
@@ -116,14 +116,6 @@ function GoogleBrandIcon() {
   );
 }
 
-/**
- * Página Canônica de Login (`/login`).
- *
- * - Suporte completo de autenticação via Google OAuth (Auth.js v5) + E-mail e Senha (bcrypt).
- * - Desktop (`>= 1024px`): Split-Screen com formulário em vidro fumê à esquerda e
- *   Palco 3D/2.5D do Monólito Editorial à direita.
- * - Mobile/Tablet (`< 1024px`): Card em vidro fumê translúcido (`backdrop-blur-2xl`).
- */
 export default function LoginPage() {
   const router = useRouter();
   const dispatch = useDispatch<AppDispatch>();
@@ -298,7 +290,7 @@ export default function LoginPage() {
       dispatch(fetchMyOrganizations());
     }
 
-    const destination = data.redirectUrl || "/dashboard/editorial";
+    const destination = sanitizeReturnTo(data.redirectUrl, "/dashboard/editorial");
     setAuthSuccessMessage(
       data.user?.hasActiveProject
         ? "Sessão autenticada. Carregando seu Projeto Editorial ativo..."

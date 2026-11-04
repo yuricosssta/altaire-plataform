@@ -16,24 +16,34 @@ export async function POST(request: Request) {
 
     if (!result.success) {
       return NextResponse.json(
-        { success: false, message: "Dados de cadastro inválidos ou incompletos." },
+        {
+          success: false,
+          message: "Dados de cadastro inválidos. Verifique os campos preenchidos.",
+        },
         { status: 400 }
       );
     }
 
     const { email, fullName, password } = result.data;
+    const normalizedEmail = email.trim().toLowerCase();
 
-    if (email === "existe@legionaltaire.com.br") {
+    if (
+      normalizedEmail === "existe@legionaltaire.com.br" ||
+      normalizedEmail === "existente@legionaltaire.com.br"
+    ) {
       return NextResponse.json(
-        { success: false, message: "Este e-mail já está em uso." },
+        {
+          success: false,
+          message: "Este endereço de e-mail já possui uma conta ativa.",
+        },
         { status: 409 }
       );
     }
 
     // Cria o usuário real no BackEnd NestJS (MongoDB) com senha criptografada via bcrypt
     const provisioned = await registerBackendUser({
-      email,
-      fullName,
+      email: normalizedEmail,
+      fullName: fullName.trim(),
       password,
     });
 
@@ -64,7 +74,7 @@ export async function POST(request: Request) {
         httpOnly: true,
         secure: process.env.NODE_ENV === "production",
         sameSite: "lax",
-        maxAge: 60 * 60 * 24,
+        maxAge: 60 * 60 * 24 * 7,
         path: "/",
       });
     }
@@ -73,12 +83,12 @@ export async function POST(request: Request) {
     const responsePayload: AuthResponse = {
       success: true,
       user: userSession,
-      redirectUrl: "/dashboard/editorial?newProject=true",
+      redirectUrl: "/dashboard/editorial?newProject=true&onboarding=true",
       token,
     };
 
     return NextResponse.json(responsePayload, { status: 201 });
-  } catch (error) {
+  } catch (error: unknown) {
     if (error instanceof AuthBackendError) {
       return NextResponse.json(
         { success: false, message: error.message },
@@ -87,7 +97,13 @@ export async function POST(request: Request) {
     }
     console.error("[REGISTER_ERROR]", error);
     return NextResponse.json(
-      { success: false, message: "Falha interna no servidor ao criar conta." },
+      {
+        success: false,
+        message:
+          error instanceof Error
+            ? error.message
+            : "Falha ao processar criação de conta.",
+      },
       { status: 500 }
     );
   }

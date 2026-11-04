@@ -3,7 +3,7 @@
 
 import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import Link from "next/link";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { AnimatePresence, motion } from "motion/react";
 import {
   AlertTriangle,
@@ -97,7 +97,7 @@ const STATUS_BADGE_CONFIG: Record<
 
 /**
  * Componente Dropdown Customizado no Design System Dark-First (--la-*).
- * Substitui o `<select>` nativo cinza/azul do Windows/Chrome (Ponto 05).
+ * Substitui o <select> nativo cinza/azul do navegador.
  */
 function DarkCustomSelect<T extends string>({
   value,
@@ -218,6 +218,7 @@ function DarkCustomSelect<T extends string>({
 
 export default function CentralEstrategicaPage() {
   const searchParams = useSearchParams();
+  const router = useRouter();
   const {
     workspaceName,
     projects,
@@ -244,11 +245,17 @@ export default function CentralEstrategicaPage() {
   const [newPhase, setNewPhase] = useState<string>("Estruturação Inicial");
   const [createError, setCreateError] = useState<string | null>(null);
 
-  /* Abre modal automaticamente se vier de "+ Criar -> Novo Projeto" no Header ou 1º acesso (?newProject=true) */
+  /* Abre modal automaticamente se vier de "+ Criar -> Novo Projeto" no Header
+     OU se vier do fluxo de onboarding pós-login/cadastro (?onboarding=true / ?novo=true) */
   useEffect(() => {
+    const acao = searchParams?.get("acao");
+    const onboarding = searchParams?.get("onboarding");
+    const novo = searchParams?.get("novo");
+
     if (
-      searchParams?.get("acao") === "novo-projeto" ||
-      searchParams?.get("newProject") === "true"
+      acao === "novo-projeto" ||
+      onboarding === "true" ||
+      novo === "true"
     ) {
       setIsCreateModalOpen(true);
     }
@@ -294,7 +301,7 @@ export default function CentralEstrategicaPage() {
     };
   }, [projects]);
 
-  /* Se a conta do cliente não tiver nenhum projeto (projects.length === 0), entra automaticamente no Onboarding Inicial (Ponto 02) */
+  /* Se a conta do cliente não tiver nenhum projeto (projects.length === 0), entra automaticamente no Onboarding Inicial */
   const accountHasZeroProjects = projects.length === 0;
 
   const filteredProjects = useMemo(() => {
@@ -335,31 +342,40 @@ export default function CentralEstrategicaPage() {
     );
   }, [editingProject, editNiche, editObjective]);
 
+  /* Conclusão do Ponto C: Cria o projeto e redireciona canonicamente para a Linha Editorial */
   const handleCreateProjectSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setCreateError(null);
 
-    if (!newName.trim() || !newBrand.trim() || !newNiche.trim()) {
+    const trimmedName = newName.trim();
+    const trimmedBrand = newBrand.trim();
+    const trimmedNiche = newNiche.trim();
+
+    if (!trimmedName || !trimmedBrand || !trimmedNiche) {
       setCreateError(
         "Informe obrigatoriamente o Nome do Projeto, a Marca/Especialista e o Nicho principal."
       );
       return;
     }
 
-    createProject({
-      name: newName,
-      brandOrClientName: newBrand,
-      niche: newNiche,
-      subniche: newSubniche,
+    const created = createProject({
+      name: trimmedName,
+      brandOrClientName: trimmedBrand,
+      niche: trimmedNiche,
+      subniche: newSubniche.trim() || "Geral",
       operationTypeLabel: newOpType,
       currentObjectiveLabel: newObjective,
-      currentPhaseLabel: newPhase,
+      currentPhaseLabel: newPhase.trim() || "Estruturação Inicial",
     });
 
     setIsCreateModalOpen(false);
     setNewName("");
     setNewNiche("");
     setNewSubniche("");
+
+    if (created && created.id) {
+      router.push(`/dashboard/editorial/${created.id}?aba=linha-editorial`);
+    }
   };
 
   const handleOpenEditModal = (project: EditorialProjectModel) => {
@@ -381,13 +397,13 @@ export default function CentralEstrategicaPage() {
 
     updateProject({
       id: editingProject.id,
-      name: editName,
-      brandOrClientName: editBrand,
-      niche: editNiche,
-      subniche: editSubniche,
+      name: editName.trim(),
+      brandOrClientName: editBrand.trim(),
+      niche: editNiche.trim(),
+      subniche: editSubniche.trim(),
       operationTypeLabel: editOpType,
       currentObjectiveLabel: editObjective,
-      currentPhaseLabel: editPhase,
+      currentPhaseLabel: editPhase.trim(),
       status: editStatus,
     });
 
@@ -411,7 +427,7 @@ export default function CentralEstrategicaPage() {
 
     duplicateProject({
       sourceProjectId: duplicatingProject.id,
-      newName: dupName,
+      newName: dupName.trim(),
       copyStrategicBase,
       copyLineEditorial,
       copyThemes,
@@ -430,7 +446,7 @@ export default function CentralEstrategicaPage() {
 
   return (
     <div className="flex flex-col gap-7">
-      {/* 1. CABEÇALHO DA CENTRAL ESTRATÉGICA (Seção 4.2 — Limpo, apenas com "+ Novo Projeto") */}
+      {/* 1. CABEÇALHO DA CENTRAL ESTRATÉGICA */}
       <section className="flex flex-col justify-between gap-4 border-b border-white/10 pb-6 lg:flex-row lg:items-end">
         <div className="flex flex-col gap-1.5">
           <div className="inline-flex w-fit items-center gap-2 rounded-la-full border border-la-border-gold/50 bg-la-gold-faint px-3 py-0.5">
@@ -466,7 +482,7 @@ export default function CentralEstrategicaPage() {
         </div>
       </section>
 
-      {/* 2. BARRA DE BUSCA, FILTRO DARK-FIRST CUSTOMIZADO E CONTAGEM (Pontos 03 e 05) */}
+      {/* 2. BARRA DE BUSCA, FILTRO DARK-FIRST CUSTOMIZADO E CONTAGEM */}
       {!accountHasZeroProjects ? (
         <section className="flex flex-col gap-3.5 rounded-la-xl border border-white/10 bg-[#080B12]/95 p-4">
           <div className="flex flex-col justify-between gap-3 lg:flex-row lg:items-center">
@@ -485,7 +501,6 @@ export default function CentralEstrategicaPage() {
             </div>
 
             <div className="flex flex-wrap items-center gap-2.5">
-              {/* Filtro de Operações Customizado Dark-First (Sem <select> nativo cinza/azul) */}
               <DarkCustomSelect
                 value={operationFilter}
                 options={OPERATION_FILTER_OPTIONS}
@@ -529,7 +544,6 @@ export default function CentralEstrategicaPage() {
               {counts.archived > 0 ? ` · ${counts.archived} arquivados` : ""})
             </span>
 
-            {/* Frase em Português Claro e Estratégico (Ponto 03 corrigido) */}
             <span className="text-la-gold-light">
               Cada projeto opera com contexto estratégico e repertório 100%
               isolados
@@ -538,7 +552,7 @@ export default function CentralEstrategicaPage() {
         </section>
       ) : null}
 
-      {/* 3. CENÁRIO A: CONTA SEM PROJETOS OU FILTRO VAZIO (Seções 1.2 e 4.10) */}
+      {/* 3. CENÁRIO A: CONTA SEM PROJETOS OU FILTRO VAZIO */}
       {accountHasZeroProjects ? (
         <section className="mx-auto flex w-full max-w-[46rem] flex-col items-center rounded-la-xl border border-la-border-gold/55 bg-[#080B12]/95 p-8 text-center shadow-[var(--la-elevation-2)] sm:p-10">
           <div className="flex h-14 w-14 items-center justify-center rounded-la-xl border border-la-gold/60 bg-la-gold-faint text-la-gold shadow-[0_0_28px_rgba(207,169,101,0.28)]">
@@ -603,7 +617,7 @@ export default function CentralEstrategicaPage() {
           </button>
         </section>
       ) : (
-        /* 4. GRADE DE CARDS DOS PROJETOS DO CLIENTE (Seções 4.3 a 4.8) */
+        /* 4. GRADE DE CARDS DOS PROJETOS DO CLIENTE */
         <section className="grid grid-cols-1 items-stretch gap-6 md:grid-cols-2 xl:grid-cols-3">
           {filteredProjects.map((project) => {
             const badge = STATUS_BADGE_CONFIG[project.status];
@@ -846,7 +860,7 @@ export default function CentralEstrategicaPage() {
         </section>
       )}
 
-      {/* MODAL 1: CRIAR NOVO PROJETO EDITORIAL (Com Dropdowns Dark-First Customizados) */}
+      {/* MODAL 1: CRIAR NOVO PROJETO EDITORIAL */}
       <AnimatePresence>
         {isCreateModalOpen ? (
           <div className="fixed inset-0 z-[150] flex items-center justify-center p-4">
