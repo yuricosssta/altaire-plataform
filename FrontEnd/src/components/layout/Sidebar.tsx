@@ -4,6 +4,7 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
+import { useDispatch, useSelector } from "react-redux";
 import { AnimatePresence, motion } from "motion/react";
 import {
   BookOpen,
@@ -25,6 +26,9 @@ import {
 import { clsx } from "clsx";
 import LogoBloco from "@/components/LogoBloco";
 import { ROUTES } from "@/lib/constants/routes";
+import { logout } from "@/lib/redux/slices/authSlice";
+import { selectCurrentOrg } from "@/lib/redux/slices/organizationSlice";
+import { AppDispatch, RootState } from "@/lib/redux/store";
 
 export type SidebarNavItem = {
   readonly id:
@@ -158,6 +162,17 @@ export function Sidebar({
 }: SidebarProps) {
   const pathname = usePathname() || "/dashboard";
   const router = useRouter();
+  const dispatch = useDispatch<AppDispatch>();
+  const currentOrg = useSelector(selectCurrentOrg);
+  const authUser = useSelector((state: RootState) => state.auth?.user);
+  const profile = useSelector((state: RootState) => state.user?.profile);
+
+  const isManager =
+    currentOrg?.role === "OWNER" ||
+    currentOrg?.role === "ADMIN" ||
+    authUser?.role === "owner" ||
+    authUser?.role === "admin" ||
+    Boolean((profile as Record<string, unknown> | null)?.isAdmin);
 
   const [isAccountMenuOpen, setIsAccountMenuOpen] = useState<boolean>(false);
   const [isHelpModalOpen, setIsHelpModalOpen] = useState<boolean>(false);
@@ -184,9 +199,11 @@ export function Sidebar({
   const handleLogout = () => {
     try {
       window.localStorage.removeItem("la-session-active");
+      window.localStorage.removeItem("token");
     } catch {
       /* Ignora bloqueio de storage */
     }
+    dispatch(logout());
     router.push(ROUTES.login);
   };
 
@@ -346,20 +363,22 @@ export function Sidebar({
                       />
                     </div>
 
-                    <Link
-                      href="/dashboard/settings"
-                      onClick={() => {
-                        setIsAccountMenuOpen(false);
-                        if (mobileMode && onCloseMobile) onCloseMobile();
-                      }}
-                      className="flex items-center gap-2.5 rounded-la-md px-2.5 py-2 font-la-sans text-[0.75rem] text-la-text-secondary transition-colors hover:bg-white/[0.05] hover:text-la-text-primary"
-                    >
-                      <Users
-                        aria-hidden="true"
-                        className="h-3.5 w-3.5 text-la-gold"
-                      />
-                      <span>Membros & Permissões</span>
-                    </Link>
+                    {isManager ? (
+                      <Link
+                        href="/dashboard/people"
+                        onClick={() => {
+                          setIsAccountMenuOpen(false);
+                          if (mobileMode && onCloseMobile) onCloseMobile();
+                        }}
+                        className="flex items-center gap-2.5 rounded-la-md px-2.5 py-2 font-la-sans text-[0.75rem] text-la-text-secondary transition-colors hover:bg-white/[0.05] hover:text-la-text-primary"
+                      >
+                        <Users
+                          aria-hidden="true"
+                          className="h-3.5 w-3.5 text-la-gold"
+                        />
+                        <span>Membros & Permissões</span>
+                      </Link>
+                    ) : null}
 
                     <Link
                       href="/dashboard/settings"

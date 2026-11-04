@@ -1,0 +1,27 @@
+{
+  "version": 1.1,
+  "atDirectives": [
+    {
+      "name": "@theme",
+      "description": "Tailwind CSS v4 directive used to define design tokens and map CSS variables into utility classes.",
+      "references": [
+        {
+          "name": "Tailwind CSS v4 Functions & Directives",
+          "url": "https://tailwindcss.com/docs/functions-and-directives"
+        }
+      ]
+    },
+    {
+      "name": "@utility",
+      "description": "Tailwind CSS v4 directive used to register custom utility classes."
+    },
+    {
+      "name": "@variant",
+      "description": "Tailwind CSS v4 directive used to apply a variant in custom CSS."
+    },
+    {
+      "name": "@custom-variant",
+      "description": "Tailwind CSS v4 directive used to register a custom variant."
+    }
+  ]
+}

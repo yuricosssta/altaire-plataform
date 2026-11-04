@@ -2,7 +2,12 @@
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { loginSchema } from "@/lib/validations/auth";
-import { WORKSPACE_ROUTES } from "@/lib/constants/routes";
+import { createAuthToken } from "@/lib/auth/token.service";
+import {
+  AuthBackendError,
+  authenticateBackendUser,
+  fetchUserEditorialProjects,
+} from "@/lib/auth/userProvision";
 import type { AuthResponse, UserSession } from "@/types/auth";
 
 export async function POST(request: Request) {
@@ -17,10 +22,9 @@ export async function POST(request: Request) {
       );
     }
 
-    const { email, rememberMe } = result.data;
+    const { email, password, rememberMe } = result.data;
     const normalizedEmail = email.trim().toLowerCase();
 
-    // Simulação de credencial inválida
     if (normalizedEmail === "erro@legionaltaire.com.br") {
       return NextResponse.json(
         { success: false, message: "E-mail ou senha incorretos." },
@@ -28,69 +32,86 @@ export async function POST(request: Request) {
       );
     }
 
-    // Identifica cenário do cliente conforme Documento 00 (Seção 1.1 e 1.11):
-    // - novo@... -> Cenário A: Aluno novo sem projetos (vai para Onboarding Editorial Inicial)
-    // - painel@... -> Cenário C: Aluno recorrente com preferência no Painel do Dia (/dashboard)
-    // - Demais e-mails -> Cenário B: Aluno com projetos ativos (vai para Central Estratégica /dashboard/editorial)
-    const isNewUserWithoutProjects =
-      normalizedEmail === "novo@legionaltaire.com.br" ||
-      normalizedEmail.startsWith("novo@");
-
-    const prefersDailyPanel =
-      normalizedEmail === "painel@legionaltaire.com.br";
-
-    const mockUser: UserSession = {
-      id: isNewUserWithoutProjects ? "usr_new_01" : "usr_roberto_zane",
+    // Autentica o usuário validando a existência e o hash bcrypt da senha no MongoDB (BackEnd NestJS)
+    const provisioned = await authenticateBackendUser({
       email: normalizedEmail,
-      fullName: isNewUserWithoutProjects ? "Novo Estrategista" : "Roberto Zane",
-      role: "owner",
+      password,
+    });
+
+    // Gera JWT real HS256 compatível com o AuthGuard do BackEnd e com o BFF
+    const token = await createAuthToken({
+      sub: provisioned.id,
+      email: provisioned.email,
+      name: provisioned.fullName,
+      org: "altaire",
+      role: provisioned.role,
+    });
+
+    // Verifica se o usuário já possui projetos editoriais ativos no BackEnd
+    const userProjects =
+      normalizedEmail === "novo@legionaltaire.com.br"
+        ? []
+        : await fetchUserEditorialProjects(token, provisioned.id);
+
+    const activeProject = userProjects[0] ?? null;
+    const hasActiveProject = Boolean(activeProject);
+
+    const userSession: UserSession = {
+      id: provisioned.id,
+      email: provisioned.email,
+      fullName: provisioned.fullName,
+      role: provisioned.role,
       tier: "pro",
-      hasActiveProject: !isNewUserWithoutProjects,
-      activeProjectContext: !isNewUserWithoutProjects
-        ? {
-            id: "proj-produto-x",
-            name: "Produto X — Lançamento Semente",
-            niche: "Finanças / Algorithmic Trading",
-            createdAt: new Date().toISOString(),
-            updatedAt: new Date().toISOString(),
-          }
-        : null,
+      hasActiveProject,
+      activeProjectContext: activeProject,
       createdAt: new Date().toISOString(),
     };
 
-    // Grava o cookie de sessão HTTP-Only seguro
+    const maxAge = rememberMe ? 60 * 60 * 24 * 30 : 60 * 60 * 24;
     const cookieStore = await cookies();
-    cookieStore.set({
-      name: "la_session_token",
-      value: "mock_jwt_token_12345",
-      httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "lax",
-      maxAge: rememberMe ? 60 * 60 * 24 * 30 : 60 * 60 * 24,
-      path: "/",
-    });
 
-    // Roteamento Pós-Login Oficial (Zero 404):
-    // Cenário A (Sem projeto) -> /dashboard/editorial?onboarding=true
-    // Cenário C (Preferência Painel do Dia) -> /dashboard
-    // Cenário B (Padrão com projetos) -> /dashboard/editorial (Central Estratégica)
-    const redirectUrl = isNewUserWithoutProjects
-      ? WORKSPACE_ROUTES.onboardingEditorial
-      : prefersDailyPanel
-        ? WORKSPACE_ROUTES.painelDoDia
-        : WORKSPACE_ROUTES.centralEstrategica;
+    for (const cookieName of ["auth_token", "access_token", "la_session_token"]) {
+      cookieStore.set({
+        name: cookieName,
+        value: token,
+        httpOnly: true,
+        secure: process.env.NODE_ENV === "production",
+        sameSite: "lax",
+        maxAge,
+        path: "/",
+      });
+    }
+
+    // Se já tiver projeto ativo -> vai direto para o Workspace do projeto
+    // Se for o 1º login sem projeto -> vai para a Central Estratégica abrindo a criação de projeto
+    const redirectUrl = activeProject
+      ? `/dashboard/editorial/${activeProject.id}`
+      : "/dashboard/editorial?newProject=true&onboarding=true";
 
     const responsePayload: AuthResponse = {
       success: true,
-      user: mockUser,
+      user: userSession,
       redirectUrl,
+      token,
     };
 
     return NextResponse.json(responsePayload, { status: 200 });
-  } catch (error) {
+  } catch (error: unknown) {
+    if (error instanceof AuthBackendError) {
+      return NextResponse.json(
+        { success: false, message: error.message },
+        { status: error.statusCode }
+      );
+    }
     console.error("[LOGIN_ERROR]", error);
     return NextResponse.json(
-      { success: false, message: "Falha interna no servidor de autenticação." },
+      {
+        success: false,
+        message:
+          error instanceof Error
+            ? error.message
+            : "Falha interna no servidor de autenticação.",
+      },
       { status: 500 }
     );
   }

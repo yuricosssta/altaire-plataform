@@ -5,11 +5,13 @@ import {
   Body,
   Controller,
   Delete,
+  ForbiddenException,
   Get,
   Param,
   Post,
   Put,
   Query,
+  Req,
   UseGuards,
   UseInterceptors,
 } from '@nestjs/common';
@@ -19,11 +21,16 @@ import { UsersService } from '../services/user.service';
 import {
   CreateUser,
   createUserSchema,
+  LoginUser,
+  loginUserSchema,
+  OAuthUser,
+  oauthUserSchema,
   UpdateUser,
   updateUserSchema,
 } from '../validations/users.zod';
 import { GetUser } from '../../shared/decorators/get-user-decorator';
 import { AuthGuard } from '../../auth/auth.guard';
+import { isAltaireOwnerOrAdmin } from '../../shared/utils/org-role.util';
 
 @UseInterceptors(LoggingInterceptor)
 @Controller('users')
@@ -32,13 +39,23 @@ export class UsersController {
 
   @UseGuards(AuthGuard)
   @Get()
-  async getAllUsers() {
+  async getAllUsers(@Req() req: any) {
+    if (!isAltaireOwnerOrAdmin(req.user?.email, req.user?.role)) {
+      throw new ForbiddenException(
+        'Acesso restrito aos gestores (OWNER/ADMIN) da Altaire.',
+      );
+    }
     return this.userService.getAllUsers();
   }
 
   @UseGuards(AuthGuard)
   @Get('search')
-  async searchUser(@Query('term') term: string) {
+  async searchUser(@Query('term') term: string, @Req() req: any) {
+    // Membros isolados só podem consultar a si mesmos
+    if (!isAltaireOwnerOrAdmin(req.user?.email, req.user?.role)) {
+      const self = await this.userService.findById(req.user?.sub);
+      return self ? [self] : [];
+    }
     return this.userService.searchUser(term);
   }
 
@@ -59,6 +76,23 @@ export class UsersController {
     @Body(new ZodValidationPipe(createUserSchema)) user: CreateUser,
   ) {
     return this.userService.createUser(user);
+  }
+
+  @Post('authenticate')
+  async authenticateUser(
+    @Body(new ZodValidationPipe(loginUserSchema)) credentials: LoginUser,
+  ) {
+    return this.userService.validateCredentials(
+      credentials.email,
+      credentials.password,
+    );
+  }
+
+  @Post('oauth')
+  async authenticateOAuth(
+    @Body(new ZodValidationPipe(oauthUserSchema)) oauthUser: OAuthUser,
+  ) {
+    return this.userService.upsertOAuthUser(oauthUser);
   }
 
   @UseGuards(AuthGuard)

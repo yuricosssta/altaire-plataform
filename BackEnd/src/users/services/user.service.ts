@@ -6,13 +6,19 @@ import {
   Injectable,
   InternalServerErrorException,
   NotFoundException,
+  UnauthorizedException,
 } from '@nestjs/common';
 import { UsersRepository } from '../repositories/user.repository';
-import { CreateUser, UpdateUser } from '../validations/users.zod';
+import {
+  CreateUser,
+  OAuthUser,
+  UpdateUser,
+} from '../validations/users.zod';
 import * as bcrypt from 'bcrypt';
 import * as crypto from 'crypto';
-import { IUser } from '../schemas/models/user.interface';
+import { IUser, UserRule } from '../schemas/models/user.interface';
 import { MailService } from '../../shared/services/mail.service';
+import { resolveAltaireRoleByEmail } from '../../shared/utils/org-role.util';
 
 @Injectable()
 export class UsersService {
@@ -22,22 +28,117 @@ export class UsersService {
   ) {}
 
   async findOne(email: string): Promise<IUser | undefined> {
-    return this.userRepository.findOneByEmail(email);
+    return this.userRepository.findOneByEmail(email.trim().toLowerCase());
   }
 
   async createUser(user: CreateUser) {
+    const normalizedEmail = user.email.trim().toLowerCase();
+    const existing = await this.userRepository.findOneByEmail(normalizedEmail);
+    if (existing) {
+      throw new ConflictException('Este e-mail já está em uso.');
+    }
+
+    const orgRole = resolveAltaireRoleByEmail(normalizedEmail);
+    const isAdmin = orgRole === 'OWNER' || orgRole === 'ADMIN';
     const hashedPassword = await bcrypt.hash(user.password, 10);
     try {
-      return await this.userRepository.createUser({
+      const created = await this.userRepository.createUser({
         ...user,
+        email: normalizedEmail,
         password: hashedPassword,
+        authProvider: 'local',
+        isAdmin,
+        rule: isAdmin ? UserRule.Admin : UserRule.Organization,
       } as Partial<IUser>);
+      const { password: _, ...safeUser } = created;
+      return { ...safeUser, role: orgRole.toLowerCase() };
     } catch (e: any) {
       console.error('Erro ao criar usuário:', e);
       if (e.code === 11000) {
-        throw new ConflictException('O E-mail já está em uso');
+        throw new ConflictException('Este e-mail já está em uso.');
       }
       throw new InternalServerErrorException('Erro ao criar usuário');
+    }
+  }
+
+  async validateCredentials(email: string, password: string) {
+    const normalizedEmail = email.trim().toLowerCase();
+    const user = await this.userRepository.findOneByEmail(normalizedEmail);
+
+    if (!user) {
+      throw new UnauthorizedException('E-mail ou senha incorretos.');
+    }
+
+    if (!user.password) {
+      throw new UnauthorizedException(
+        'Esta conta foi criada com o Google. Use o botão "Entrar com o Google" ou redefina sua senha.',
+      );
+    }
+
+    const passwordMatch = await bcrypt.compare(password, user.password);
+    if (!passwordMatch) {
+      throw new UnauthorizedException('E-mail ou senha incorretos.');
+    }
+
+    const orgRole = resolveAltaireRoleByEmail(normalizedEmail);
+    const isAdmin = orgRole === 'OWNER' || orgRole === 'ADMIN';
+    const { password: _, ...safeUser } = user;
+    return { ...safeUser, isAdmin, role: orgRole.toLowerCase() };
+  }
+
+  async upsertOAuthUser(data: OAuthUser) {
+    const normalizedEmail = data.email.trim().toLowerCase();
+    const orgRole = resolveAltaireRoleByEmail(normalizedEmail);
+    const isAdmin = orgRole === 'OWNER' || orgRole === 'ADMIN';
+    const existing = await this.userRepository.findOneByEmail(normalizedEmail);
+
+    if (existing) {
+      const userId = String(existing._id || existing.id);
+      const shouldUpdate =
+        (data.googleId && existing.googleId !== data.googleId) ||
+        (data.avatarUrl && !existing.avatarUrl) ||
+        existing.isAdmin !== isAdmin;
+
+      if (shouldUpdate) {
+        const updated = await this.userRepository.updateUser(userId, {
+          googleId: data.googleId || existing.googleId,
+          avatarUrl: existing.avatarUrl || data.avatarUrl,
+          isAdmin,
+          rule: isAdmin ? UserRule.Admin : UserRule.Organization,
+        });
+        if (updated) {
+          return { ...updated, isAdmin, role: orgRole.toLowerCase() };
+        }
+      }
+
+      const { password: _, ...safeExisting } = existing;
+      return { ...safeExisting, isAdmin, role: orgRole.toLowerCase() };
+    }
+
+    try {
+      const created = await this.userRepository.createUser({
+        email: normalizedEmail,
+        name: data.name.trim(),
+        googleId: data.googleId,
+        avatarUrl: data.avatarUrl,
+        authProvider: 'google',
+        isAdmin,
+        rule: isAdmin ? UserRule.Admin : UserRule.Organization,
+      } as Partial<IUser>);
+      const { password: _, ...safeCreated } = created;
+      return { ...safeCreated, isAdmin, role: orgRole.toLowerCase() };
+    } catch (e: any) {
+      if (e.code === 11000) {
+        const raceUser =
+          await this.userRepository.findOneByEmail(normalizedEmail);
+        if (raceUser) {
+          const { password: _, ...safeRaceUser } = raceUser;
+          return { ...safeRaceUser, isAdmin, role: orgRole.toLowerCase() };
+        }
+      }
+      throw new InternalServerErrorException(
+        'Erro ao autenticar conta Google.',
+      );
     }
   }
 

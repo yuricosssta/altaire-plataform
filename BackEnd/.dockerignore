@@ -1,0 +1,17 @@
+node_modules
+dist
+coverage
+.nyc_output
+.git
+.gitignore
+.vscode
+.idea
+.env
+.env.*
+!.env.example
+*.log
+*.tsbuildinfo
+Dockerfile*
+docker-compose*
+README.md
+

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyInternalToken, getAuthTokenFromRequest } from '@/lib/auth/token.service';
+import { resolveAltaireRoleByEmail } from '@/lib/auth/userProvision';
 import { getBackendApiUrl } from '@/lib/api/serverUtils';
 import { success, error, ERROR_CODES } from '@/lib/api/response';
 
@@ -20,27 +21,36 @@ export async function GET(request: NextRequest) {
     );
   }
 
+  const resolvedRole = payload.role || resolveAltaireRoleByEmail(payload.email);
   const backendUrl = getBackendApiUrl();
-  const meResponse = await fetch(`${backendUrl}/users/${payload.sub}`, {
-    headers: {
-      Authorization: `Bearer ${token}`,
-      'x-org-id': 'altaire',
-      'x-org-role': 'member',
-    },
-  });
 
-  if (!meResponse.ok) {
-    return NextResponse.json(
-      success({
-        sub: payload.sub,
-        email: payload.email,
-        name: payload.name,
-        org: 'altaire',
-        role: 'member',
-      }),
-    );
+  try {
+    const meResponse = await fetch(`${backendUrl}/users/${payload.sub}`, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'x-org-id': 'altaire',
+        'x-org-role': resolvedRole,
+      },
+      cache: 'no-store',
+    });
+
+    if (meResponse.ok) {
+      const userData = await meResponse.json();
+      return NextResponse.json(success(userData));
+    }
+  } catch {
+    // Fallback para os claims do JWT caso o BackEnd esteja inacessível
   }
 
-  const userData = await meResponse.json();
-  return NextResponse.json(success(userData));
+  return NextResponse.json(
+    success({
+      _id: payload.sub,
+      id: payload.sub,
+      sub: payload.sub,
+      email: payload.email,
+      name: payload.name,
+      org: 'altaire',
+      role: resolvedRole,
+    }),
+  );
 }

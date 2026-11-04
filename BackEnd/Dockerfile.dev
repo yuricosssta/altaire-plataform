@@ -2,18 +2,24 @@
 FROM node:22-alpine
 WORKDIR /app
 
+# Toolchain caso módulos nativos (@mongodb-js/zstd, bcrypt) precisem compilar em musl
+RUN apk add --no-cache python3 make g++
+
+ENV PNPM_HOME="/pnpm"
+ENV PATH="$PNPM_HOME:$PATH"
 RUN corepack enable && corepack prepare pnpm@9 --activate
 
-# Copia dependências primeiro
+# Copia apenas dependências primeiro para maximizar cache de camadas
 COPY pnpm-lock.yaml package.json ./
 
-RUN pnpm install
+# Usa cache mount do BuildKit para evitar redownload de pacotes a cada rebuild
+RUN --mount=type=cache,id=pnpm-backend,target=/pnpm/store pnpm install --frozen-lockfile
 
-# O código será montado via volume no Docker Compose, 
-# mas copiamos aqui para o build da imagem não vir vazio
-COPY . .
+# Copia configurações e pré-aquece o cache incremental (dist/tsconfig.build.tsbuildinfo)
+COPY tsconfig.json tsconfig.build.json nest-cli.json ./
+COPY src ./src
+RUN pnpm run build
 
 EXPOSE 3001
 
-# Comando padrão do Nest para Hot Reload
 CMD ["pnpm", "run", "start:dev"]

@@ -3,7 +3,8 @@
 
 import { useEffect, useState, type ReactNode } from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
+import { useDispatch, useSelector } from "react-redux";
 import { AnimatePresence, motion } from "motion/react";
 import { ArrowRight, Sparkles, X } from "lucide-react";
 import { Header } from "@/components/layout/Header";
@@ -12,6 +13,13 @@ import {
   EditorialWorkspaceProvider,
   useEditorialWorkspace,
 } from "@/lib/context/EditorialWorkspaceContext";
+import {
+  selectIsAuthenticated,
+  setAuthState,
+} from "@/lib/redux/slices/authSlice";
+import { fetchUserProfile } from "@/lib/redux/slices/userSlice";
+import { fetchMyOrganizations } from "@/lib/redux/slices/organizationSlice";
+import { AppDispatch, RootState } from "@/lib/redux/store";
 
 const SIDEBAR_COLLAPSED_STORAGE_KEY = "la-sidebar-collapsed";
 const WELCOME_BANNER_DISMISSED_KEY = "la-welcome-banner-dismissed-session";
@@ -194,6 +202,78 @@ export default function MainDashboardLayout({
 }: {
   readonly children: ReactNode;
 }) {
+  const dispatch = useDispatch<AppDispatch>();
+  const isAuthenticated = useSelector(selectIsAuthenticated);
+  const currentToken = useSelector((state: RootState) => state.auth.token);
+  const router = useRouter();
+  const [isCheckingAuth, setIsCheckingAuth] = useState(true);
+
+  useEffect(() => {
+    let active = true;
+
+    async function verifyOrRecoverSession() {
+      if (isAuthenticated && currentToken) {
+        if (active) setIsCheckingAuth(false);
+        return;
+      }
+
+      // 1. Consulta o cookie de sessão no BFF (/api/auth/session) como fonte primária confiável
+      try {
+        const res = await fetch("/api/auth/session", {
+          method: "GET",
+          credentials: "include",
+          cache: "no-store",
+        });
+        if (res.ok) {
+          const data = await res.json();
+          if (data?.success && data?.token) {
+            const hadValidToken = Boolean(localStorage.getItem("token"));
+            localStorage.setItem("token", data.token);
+            dispatch(setAuthState({ token: data.token }));
+            if (!hadValidToken) {
+              dispatch(fetchUserProfile());
+              dispatch(fetchMyOrganizations());
+            }
+            if (active) setIsCheckingAuth(false);
+            return;
+          }
+        }
+      } catch {
+        // Prossegue para fallback via localStorage
+      }
+
+      // 2. Fallback: verifica token válido no localStorage
+      const storedToken =
+        typeof window !== "undefined" ? localStorage.getItem("token") : null;
+      if (storedToken) {
+        dispatch(setAuthState({ token: storedToken }));
+        const updatedToken =
+          typeof window !== "undefined" ? localStorage.getItem("token") : null;
+        if (updatedToken) {
+          dispatch(fetchUserProfile());
+          dispatch(fetchMyOrganizations());
+          if (active) setIsCheckingAuth(false);
+          return;
+        }
+      }
+
+      if (active) {
+        setIsCheckingAuth(false);
+        router.replace("/login");
+      }
+    }
+
+    void verifyOrRecoverSession();
+
+    return () => {
+      active = false;
+    };
+  }, [isAuthenticated, currentToken, dispatch, router]);
+
+  if (isCheckingAuth || !isAuthenticated) {
+    return null;
+  }
+
   return (
     <EditorialWorkspaceProvider>
       <MainDashboardShellInner>{children}</MainDashboardShellInner>

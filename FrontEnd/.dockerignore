@@ -1,0 +1,17 @@
+node_modules
+.next
+out
+build
+coverage
+.git
+.gitignore
+.vscode
+.idea
+.env
+.env.*
+*.log
+*.tsbuildinfo
+Dockerfile*
+docker-compose*
+README.md
+
