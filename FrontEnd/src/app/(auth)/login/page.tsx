@@ -12,6 +12,7 @@ import {
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useDispatch } from "react-redux";
+import { signIn } from "next-auth/react";
 import { AnimatePresence, motion, useInView, useReducedMotion } from "motion/react";
 import { AppDispatch } from "@/lib/redux/store";
 import { setAuthState } from "@/lib/redux/slices/authSlice";
@@ -346,7 +347,6 @@ export default function LoginPage() {
       });
       const checkData = (await checkRes.json().catch(() => ({}))) as {
         configured?: boolean;
-        url?: string;
       };
 
       if (!checkData.configured) {
@@ -357,11 +357,7 @@ export default function LoginPage() {
         return;
       }
 
-      if (checkData.url) {
-        window.location.href = checkData.url;
-      } else {
-        window.location.href = "/api/auth/google-start";
-      }
+      await signIn("google", { redirectTo: "/api/auth/oauth-success" });
     } catch {
       setServerError(
         "Não foi possível iniciar a autenticação com o Google. Tente novamente."

@@ -13,6 +13,7 @@ import {
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useDispatch } from "react-redux";
+import { signIn } from "next-auth/react";
 import { AnimatePresence, motion, useInView, useReducedMotion } from "motion/react";
 import {
   AlertCircle,
@@ -363,22 +364,17 @@ export default function CadastroPage() {
       });
       const checkData = (await checkRes.json().catch(() => ({}))) as {
         configured?: boolean;
-        url?: string;
       };
 
       if (!checkData.configured) {
         setServerError(
-          "As credenciais do Google OAuth (AUTH_GOOGLE_ID e AUTH_GOOGLE_SECRET) ainda não foram preenchidas no arquivo FrontEnd/.env."
+          "As credenciais do Google OAuth (AUTH_GOOGLE_ID e AUTH_GOOGLE_SECRET) ainda não estão configuradas nas variáveis de ambiente."
         );
         setIsSocialLoading(false);
         return;
       }
 
-      if (checkData.url) {
-        window.location.href = checkData.url;
-      } else {
-        window.location.href = "/api/auth/google-start";
-      }
+      await signIn("google", { redirectTo: "/api/auth/oauth-success" });
     } catch {
       setServerError(
         "Não foi possível iniciar o cadastro com o Google. Tente novamente."
