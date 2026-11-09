@@ -11,41 +11,35 @@ import {
 import { AnimatePresence, motion } from "motion/react";
 import {
   AlertTriangle,
-  Archive,
-  ArrowLeft,
   ArrowRight,
   Calendar as CalendarIcon,
   Check,
   CheckCircle2,
   ChevronLeft,
   ChevronRight,
-  Clock,
   Columns,
-  Compass,
   Copy,
-  Edit3,
   ExternalLink,
-  Eye,
   FileText,
-  Flame,
   Gift,
   Layers,
   LayoutGrid,
   Lightbulb,
-  Link2,
   MessageSquare,
   Play,
   Plus,
   Radio,
-  RefreshCw,
   Sliders,
   Sparkles,
-  Target,
   Trash2,
   Video,
   X,
 } from "lucide-react";
 import { clsx } from "clsx";
+import {
+  DarkCustomSelect,
+  type CustomSelectOption,
+} from "@/components/ui/DarkCustomSelect";
 
 /* ========================================================================== */
 /* CONTRATOS E TIPAGENS ESTRITAS DA FUNÇÃO 01 — PARTE 2 (CALENDÁRIO)          */
@@ -105,6 +99,13 @@ export type SlotExecutionStatus =
 
 export type CalendarSubViewMode = "month" | "week" | "kanban";
 
+export type IcpAwarenessLevel =
+  | "Inconsciente"
+  | "Consciente do Problema"
+  | "Consciente da Solução"
+  | "Consciente do Produto"
+  | "Totalmente Consciente";
+
 export interface DailyStoryBlockItem {
   readonly period: "Manhã" | "Almoço" | "Tarde" | "Noite";
   readonly suggestedTime: string;
@@ -134,12 +135,7 @@ export interface CalendarSlotItem {
   readonly mainTheme: string;
   readonly aiSuggestedThemes: readonly string[];
   readonly icpPainDesireOrObjection: string;
-  readonly icpAwarenessLevel:
-    | "Inconsciente"
-    | "Consciente do Problema"
-    | "Consciente da Solução"
-    | "Consciente do Produto"
-    | "Totalmente Consciente";
+  readonly icpAwarenessLevel: IcpAwarenessLevel;
   readonly referenceLink: string;
   readonly executionNotes: string;
   readonly status: SlotExecutionStatus;
@@ -358,6 +354,85 @@ const PERIOD_OBJECTIVES: readonly string[] = [
   "Melhorar engajamento e conversas no Direct",
 ];
 
+const PERIOD_DURATION_LABELS: readonly string[] = [
+  "2 semanas (Sprint de Aquecimento / Campanha)",
+  "4 semanas planejadas (28 dias)",
+  "4 semanas de aquecimento (1 mês)",
+  "6 semanas (Ciclo de Lançamento Completo)",
+  "8 semanas (Operação Contínua Bimestral)",
+];
+
+/* ========================================================================== */
+/* OPÇÕES CANÔNICAS PARA O DARKCUSTOMSELECT                                   */
+/* ========================================================================== */
+
+const FORMAT_FILTER_OPTIONS: readonly CustomSelectOption<
+  "all" | SlotContentFormat
+>[] = [
+  { value: "all", label: "Todos os formatos (6)" },
+  { value: "reel_curto", label: "Reels / Vídeos Curtos" },
+  { value: "video_longo", label: "Vídeos Longos (YouTube)" },
+  { value: "carrossel", label: "Carrosséis 4:5" },
+  { value: "post_estatico", label: "Posts Estáticos" },
+  { value: "live_semanal", label: "Lives Semanais" },
+  { value: "sequencia_stories", label: "Sequências de Stories" },
+];
+
+const SLOT_FORMAT_OPTIONS: readonly CustomSelectOption<SlotContentFormat>[] = (
+  Object.keys(FORMAT_META) as SlotContentFormat[]
+).map((fKey) => ({
+  value: fKey,
+  label: FORMAT_META[fKey].label,
+  badge: FORMAT_META[fKey].shortLabel,
+}));
+
+const SLOT_FORMAT_SHORT_OPTIONS: readonly CustomSelectOption<SlotContentFormat>[] =
+  (Object.keys(FORMAT_META) as SlotContentFormat[]).map((fKey) => ({
+    value: fKey,
+    label: FORMAT_META[fKey].shortLabel,
+  }));
+
+const RETINA_SELECT_OPTIONS: readonly CustomSelectOption<RetinaTypeKey>[] = (
+  Object.keys(RETINA_META) as RetinaTypeKey[]
+).map((rKey) => ({
+  value: rKey,
+  label: `${RETINA_META[rKey].code} · ${RETINA_META[rKey].label}`,
+  hint: RETINA_META[rKey].purpose,
+}));
+
+const SLOT_STATUS_OPTIONS: readonly CustomSelectOption<SlotExecutionStatus>[] =
+  (Object.keys(SLOT_STATUS_META) as SlotExecutionStatus[]).map((stKey) => ({
+    value: stKey,
+    label: SLOT_STATUS_META[stKey].label,
+  }));
+
+const PILLAR_SELECT_OPTIONS: readonly CustomSelectOption<string>[] =
+  AVAILABLE_PILLARS.map((pil) => ({
+    value: pil,
+    label: pil,
+  }));
+
+const AWARENESS_LEVEL_OPTIONS: readonly CustomSelectOption<IcpAwarenessLevel>[] =
+  [
+    { value: "Inconsciente", label: "Inconsciente" },
+    { value: "Consciente do Problema", label: "Consciente do Problema" },
+    { value: "Consciente da Solução", label: "Consciente da Solução" },
+    { value: "Consciente do Produto", label: "Consciente do Produto" },
+    { value: "Totalmente Consciente", label: "Totalmente Consciente" },
+  ];
+
+const PERIOD_OBJECTIVE_OPTIONS: readonly CustomSelectOption<string>[] =
+  PERIOD_OBJECTIVES.map((obj) => ({
+    value: obj,
+    label: obj,
+  }));
+
+const PERIOD_DURATION_OPTIONS: readonly CustomSelectOption<string>[] =
+  PERIOD_DURATION_LABELS.map((dur) => ({
+    value: dur,
+    label: dur,
+  }));
+
 /* ========================================================================== */
 /* GERADOR DE GRADE MENSAL COMPLETA (28 DIAS REAIS — 4 SEMANAS CANÔNICAS)     */
 /* ========================================================================== */
@@ -391,8 +466,10 @@ function generateCanonicalMonthSlots(
         retinaType: "Engajamento",
         platforms: ["Instagram", "TikTok"],
         suggestedTime: "12:00",
-        strategicObjective: "Atrair audiência qualificada quebrando uma crença comum",
-        secondaryObjective: "Gerar compartilhamentos e novos seguidores no perfil",
+        strategicObjective:
+          "Atrair audiência qualificada quebrando uma crença comum",
+        secondaryObjective:
+          "Gerar compartilhamentos e novos seguidores no perfil",
         editorialLineName: lineName,
         editorialPillar: AVAILABLE_PILLARS[0],
         mainTheme:
@@ -410,7 +487,12 @@ function generateCanonicalMonthSlots(
         referenceLink: "https://instagram.com/p/exemplo-reel-contraste",
         executionNotes:
           "Abrir nos primeiros 3 segundos com afirmação contraintuitiva. Ritmo dinâmico e CTA final para ler a legenda.",
-        status: weekNumber === 1 ? "published" : weekNumber === 2 ? "script_ready" : "planned",
+        status:
+          weekNumber === 1
+            ? "published"
+            : weekNumber === 2
+              ? "script_ready"
+              : "planned",
         eligibleForComplementaryMaterial: false,
         complementaryMaterialType: "Nenhum",
       });
@@ -428,7 +510,8 @@ function generateCanonicalMonthSlots(
         retinaType: "Transformacao",
         platforms: ["Instagram", "LinkedIn"],
         suggestedTime: "19:00",
-        strategicObjective: "Gerar salvamentos qualificados e provar competência técnica",
+        strategicObjective:
+          "Gerar salvamentos qualificados e provar competência técnica",
         secondaryObjective: "Educar o comprador sobre o método proprietário (MUV)",
         editorialLineName: lineName,
         editorialPillar: AVAILABLE_PILLARS[3],
@@ -482,7 +565,8 @@ function generateCanonicalMonthSlots(
           "Dor da falta de tempo operacional e excesso de tarefas sem retorno.",
         icpAwarenessLevel: "Consciente da Solução",
         referenceLink: "",
-        executionNotes: "Gravar em ambiente de trabalho real mostrando tela ou quadro branco.",
+        executionNotes:
+          "Gravar em ambiente de trabalho real mostrando tela ou quadro branco.",
         status: weekNumber === 1 ? "recorded" : "planned",
         eligibleForComplementaryMaterial: false,
         complementaryMaterialType: "Nenhum",
@@ -501,7 +585,8 @@ function generateCanonicalMonthSlots(
         retinaType: "Interacao",
         platforms: ["Instagram"],
         suggestedTime: "18:30",
-        strategicObjective: "Gerar comentários qualificados e mapear objeções no Direct",
+        strategicObjective:
+          "Gerar comentários qualificados e mapear objeções no Direct",
         secondaryObjective: "Identificar leads prontos para abordagem consultiva",
         editorialLineName: lineName,
         editorialPillar: AVAILABLE_PILLARS[1],
@@ -515,7 +600,8 @@ function generateCanonicalMonthSlots(
           "Dúvida sobre em qual estágio o próprio negócio está travado.",
         icpAwarenessLevel: "Consciente do Problema",
         referenceLink: "",
-        executionNotes: "Arte estática em alto contraste Dark/Gold com chamada direta para comentar.",
+        executionNotes:
+          "Arte estática em alto contraste Dark/Gold com chamada direta para comentar.",
         status: "planned",
         eligibleForComplementaryMaterial: false,
         complementaryMaterialType: "Nenhum",
@@ -537,8 +623,10 @@ function generateCanonicalMonthSlots(
         retinaType: "Transformacao",
         platforms: ["YouTube"],
         suggestedTime: "17:00",
-        strategicObjective: "Aprofundar nível de consciência e demonstrar domínio técnico absoluto",
-        secondaryObjective: "Gerar leads altamente qualificados para a oferta principal",
+        strategicObjective:
+          "Aprofundar nível de consciência e demonstrar domínio técnico absoluto",
+        secondaryObjective:
+          "Gerar leads altamente qualificados para a oferta principal",
         editorialLineName: lineName,
         editorialPillar: AVAILABLE_PILLARS[2],
         mainTheme: `Como estruturar o Mecanismo Único de ${subniche} do zero até a conversão`,
@@ -571,7 +659,8 @@ function generateCanonicalMonthSlots(
         retinaType: "Autoridade",
         platforms: ["Instagram", "LinkedIn"],
         suggestedTime: "20:00",
-        strategicObjective: "Reforçar autoridade incontestável com prova lógica e técnica",
+        strategicObjective:
+          "Reforçar autoridade incontestável com prova lógica e técnica",
         secondaryObjective: "Apoiar o vídeo longo publicado no YouTube",
         editorialLineName: lineName,
         editorialPillar: AVAILABLE_PILLARS[4],
@@ -607,8 +696,10 @@ function generateCanonicalMonthSlots(
         retinaType: "NiveisDeConsciencia",
         platforms: ["Instagram", "TikTok"],
         suggestedTime: "12:00",
-        strategicObjective: "Quebrar objeção de tempo/rotina e preparar para a oferta",
-        secondaryObjective: "Levar o lead de Consciente da Solução para Consciente do Produto",
+        strategicObjective:
+          "Quebrar objeção de tempo/rotina e preparar para a oferta",
+        secondaryObjective:
+          "Levar o lead de Consciente da Solução para Consciente do Produto",
         editorialLineName: lineName,
         editorialPillar: AVAILABLE_PILLARS[5],
         mainTheme:
@@ -624,7 +715,8 @@ function generateCanonicalMonthSlots(
           "Objeção: 'Minha rotina é corrida demais, não vou dar conta de aplicar.'",
         icpAwarenessLevel: "Consciente do Produto",
         referenceLink: "",
-        executionNotes: "Tom direto, firme e empático. Mostrar que a falta de tempo é consequência da falta de método.",
+        executionNotes:
+          "Tom direto, firme e empático. Mostrar que a falta de tempo é consequência da falta de método.",
         status: "planned",
         eligibleForComplementaryMaterial: false,
         complementaryMaterialType: "Nenhum",
@@ -643,7 +735,8 @@ function generateCanonicalMonthSlots(
         retinaType: "Relacionamento",
         platforms: ["Instagram"],
         suggestedTime: "19:30",
-        strategicObjective: "Gerar identificação profunda por valores e visão de mundo",
+        strategicObjective:
+          "Gerar identificação profunda por valores e visão de mundo",
         secondaryObjective: "Afastar curiosos que buscam atalhos rasos",
         editorialLineName: lineName,
         editorialPillar: AVAILABLE_PILLARS[0],
@@ -679,7 +772,8 @@ function generateCanonicalMonthSlots(
         retinaType: "Autoridade",
         platforms: ["Instagram", "YouTube"],
         suggestedTime: "20:00",
-        strategicObjective: "Interagir ao vivo, demonstrar repertório e conduzir para a oferta",
+        strategicObjective:
+          "Interagir ao vivo, demonstrar repertório e conduzir para a oferta",
         secondaryObjective: "Responder objeções reais da audiência em tempo real",
         editorialLineName: lineName,
         editorialPillar: AVAILABLE_PILLARS[5],
@@ -693,7 +787,8 @@ function generateCanonicalMonthSlots(
           "Objeção: 'Será que esse método funciona especificamente para o meu modelo?'",
         icpAwarenessLevel: "Totalmente Consciente",
         referenceLink: "",
-        executionNotes: "Duração prevista: 45 a 60 min. Abrir com tese central de 15 min e abrir para 3 análises ao vivo + pitch consultivo.",
+        executionNotes:
+          "Duração prevista: 45 a 60 min. Abrir com tese central de 15 min e abrir para 3 análises ao vivo + pitch consultivo.",
         status: "planned",
         eligibleForComplementaryMaterial: true,
         complementaryMaterialType: "Resumo Executivo da Live + Diagnóstico",
@@ -712,8 +807,10 @@ function generateCanonicalMonthSlots(
         retinaType: "Autoridade",
         platforms: ["Instagram", "LinkedIn"],
         suggestedTime: "13:00",
-        strategicObjective: "Consolidar a tese da semana e convidar para a Live das 20h",
-        secondaryObjective: "Gerar salvamentos e lembretes para a transmissão ao vivo",
+        strategicObjective:
+          "Consolidar a tese da semana e convidar para a Live das 20h",
+        secondaryObjective:
+          "Gerar salvamentos e lembretes para a transmissão ao vivo",
         editorialLineName: lineName,
         editorialPillar: AVAILABLE_PILLARS[2],
         mainTheme: `O mapa mental completo para dominar ${subniche} sem improviso`,
@@ -726,7 +823,8 @@ function generateCanonicalMonthSlots(
           "Desejo de ter clareza visual de todo o sistema antes de dar o próximo passo.",
         icpAwarenessLevel: "Consciente do Produto",
         referenceLink: "",
-        executionNotes: "Último slide com chamada direta para ativar o lembrete da Live das 20h.",
+        executionNotes:
+          "Último slide com chamada direta para ativar o lembrete da Live das 20h.",
         status: "planned",
         eligibleForComplementaryMaterial: false,
         complementaryMaterialType: "Nenhum",
@@ -748,8 +846,10 @@ function generateCanonicalMonthSlots(
         retinaType: "Relacionamento",
         platforms: ["Instagram"],
         suggestedTime: "11:30",
-        strategicObjective: "Humanizar o especialista e gerar conexão com o estilo de vida/trabalho",
-        secondaryObjective: "Manter proximidade no fim de semana sem perder posicionamento",
+        strategicObjective:
+          "Humanizar o especialista e gerar conexão com o estilo de vida/trabalho",
+        secondaryObjective:
+          "Manter proximidade no fim de semana sem perder posicionamento",
         editorialLineName: lineName,
         editorialPillar: AVAILABLE_PILLARS[4],
         mainTheme: `O que acontece nos bastidores de uma operação de ${subniche} organizada`,
@@ -795,9 +895,11 @@ function generateCanonicalMonthSlots(
         dayOfWeekIndex === 6
           ? "Rotina, conexão genuína, abertura de caixinha e antecipação da nova semana"
           : "Sustentar narrativa fracionada ao longo do dia (Manhã, Almoço, Tarde e Noite)",
-      secondaryObjective: "Gerar respostas no Direct, enquetes qualificadoras e retenção diária",
+      secondaryObjective:
+        "Gerar respostas no Direct, enquetes qualificadoras e retenção diária",
       editorialLineName: lineName,
-      editorialPillar: AVAILABLE_PILLARS[dayOfWeekIndex % AVAILABLE_PILLARS.length],
+      editorialPillar:
+        AVAILABLE_PILLARS[dayOfWeekIndex % AVAILABLE_PILLARS.length],
       mainTheme: `Narrativa Diária de Stories — ${dayOfWeekLabel} (Semana ${weekNumber})`,
       aiSuggestedThemes: [
         `Sequência de Diagnóstico + Bastidor Real + Caixinha de Dúvidas em ${subniche}`,
@@ -861,17 +963,17 @@ function generateCanonicalMonthSlots(
 /* COMPONENTE PRINCIPAL: CalendarioEditorialModule                            */
 /* ========================================================================== */
 
-export function CalendarioEditorialModule(props: CalendarioEditorialModuleProps) {
+export function CalendarioEditorialModule(
+  props: CalendarioEditorialModuleProps
+) {
   const resolvedProjectId = props.projectId || "proj-default";
-  const projectName = props.projectName || "Produto X — Lançamento Semente";
   const resolvedNiche =
     props.projectNiche || props.niche || "Finanças & Investimentos";
   const resolvedSubniche =
     props.projectSubniche || props.subniche || "Algorithmic Trading";
   const resolvedObjective =
     props.projectObjective || props.currentObjective || "Conversão";
-  const resolvedPhase =
-    props.currentPhase || "Aquecimento — Semana 2 de 4";
+  const resolvedPhase = props.currentPhase || "Aquecimento — Semana 2 de 4";
   const hasActiveLine = props.hasActiveLine ?? true;
   const activeLineName =
     props.activeLineName || "Linha Editorial v1 — Base Estratégica";
@@ -916,7 +1018,7 @@ export function CalendarioEditorialModule(props: CalendarioEditorialModuleProps)
         periodLabel: "4 semanas planejadas (28 dias)",
         periodStart: "02/11/2026",
         periodEnd: "29/11/2026",
-        mainObjective: `Apoiar ${resolvedObjective.toLowerCase()} e consolidar autoridade`,
+        mainObjective: PERIOD_OBJECTIVES[0],
         linkedLineName: activeLineName,
         platforms: ["Instagram", "YouTube", "TikTok", "LinkedIn"],
         weeklyCapacity: {
@@ -940,7 +1042,8 @@ export function CalendarioEditorialModule(props: CalendarioEditorialModuleProps)
           },
           {
             id: "rev-2",
-            title: "Elevar peso de Níveis de Consciência e Autoridade na Semana 3 e 4",
+            title:
+              "Elevar peso de Níveis de Consciência e Autoridade na Semana 3 e 4",
             reason:
               "Com a aproximação do momento de conversão, é recomendável intensificar a quebra de objeções.",
             actionLabel: "Equilibrar Semanas 3 e 4",
@@ -948,7 +1051,8 @@ export function CalendarioEditorialModule(props: CalendarioEditorialModuleProps)
           },
           {
             id: "rev-3",
-            title: "Preencher os slots restantes que ainda estão sem tema principal",
+            title:
+              "Preencher os slots restantes que ainda estão sem tema principal",
             reason:
               "Existem slots na primeira e segunda semana com espaço aberto para vincular temas da Biblioteca Estratégica.",
             actionLabel: "Vincular Temas Recomendados",
@@ -1065,10 +1169,10 @@ export function CalendarioEditorialModule(props: CalendarioEditorialModuleProps)
       id: "cal-fallback",
       name: `Calendário Editorial — ${resolvedPhase}`,
       status: "active",
-      periodLabel: "4 semanas planejadas",
+      periodLabel: "4 semanas planejadas (28 dias)",
       periodStart: "02/11/2026",
       periodEnd: "29/11/2026",
-      mainObjective: resolvedObjective,
+      mainObjective: PERIOD_OBJECTIVES[0],
       linkedLineName: activeLineName,
       platforms: ["Instagram", "YouTube"],
       weeklyCapacity: {
@@ -1089,13 +1193,7 @@ export function CalendarioEditorialModule(props: CalendarioEditorialModuleProps)
       calendars.find((c) => c.status === "active") ??
       fallback
     );
-  }, [
-    calendars,
-    selectedCalendarId,
-    resolvedPhase,
-    resolvedObjective,
-    activeLineName,
-  ]);
+  }, [calendars, selectedCalendarId, resolvedPhase, activeLineName]);
 
   const updateSlotById = useCallback(
     (slotId: string, updater: (prev: CalendarSlotItem) => CalendarSlotItem) => {
@@ -1222,12 +1320,10 @@ export function CalendarioEditorialModule(props: CalendarioEditorialModuleProps)
       format: newSlotFormat,
       retinaType: newSlotRetina,
       platforms:
-        newSlotFormat === "video_longo"
-          ? ["YouTube"]
-          : ["Instagram"],
+        newSlotFormat === "video_longo" ? ["YouTube"] : ["Instagram"],
       suggestedTime: newSlotTime || "18:00",
       strategicObjective: RETINA_META[newSlotRetina].purpose,
-      secondaryObjective: ` Apoiar ${currentCalendar.mainObjective}`,
+      secondaryObjective: `Apoiar ${currentCalendar.mainObjective}`,
       editorialLineName: currentCalendar.linkedLineName,
       editorialPillar: AVAILABLE_PILLARS[0],
       mainTheme: newSlotTitle.trim(),
@@ -1278,8 +1374,7 @@ export function CalendarioEditorialModule(props: CalendarioEditorialModuleProps)
     const created: EditorialCalendarRecord = {
       id: `cal-${Date.now()}`,
       name:
-        newCalName.trim() ||
-        `Calendário Editorial — ${newCalPeriodLabel}`,
+        newCalName.trim() || `Calendário Editorial — ${newCalPeriodLabel}`,
       status: "active",
       periodLabel: newCalPeriodLabel,
       periodStart: newCalStart,
@@ -1388,7 +1483,9 @@ export function CalendarioEditorialModule(props: CalendarioEditorialModuleProps)
             <div className="flex flex-wrap items-center gap-2">
               <span className="inline-flex items-center gap-1.5 rounded-la-full border border-la-border-gold/55 bg-la-gold-faint px-3 py-0.5 font-la-mono text-[0.625rem] font-semibold uppercase tracking-[0.08em] text-la-gold-light">
                 <CalendarIcon className="h-3.5 w-3.5 text-la-gold" />
-                <span>FUNÇÃO 01 · PARTE 2 — CALENDÁRIO EDITORIAL EXECUTÁVEL</span>
+                <span>
+                  FUNÇÃO 01 · PARTE 2 — CALENDÁRIO EDITORIAL EXECUTÁVEL
+                </span>
               </span>
 
               <span className="inline-flex items-center gap-1.5 rounded-la-full border border-white/10 bg-black/50 px-2.5 py-0.5 font-la-mono text-[0.625rem] text-la-text-secondary">
@@ -1428,13 +1525,14 @@ export function CalendarioEditorialModule(props: CalendarioEditorialModuleProps)
               </span>
             </button>
 
+            {/* CORRIGIDO: Ícone <Plus /> preservado e removido o "+" textual duplicado */}
             <button
               type="button"
               onClick={() => setViewMode("setup")}
               className="inline-flex min-h-[2.5rem] items-center gap-2 rounded-la-md bg-la-gold px-4 py-2 font-la-sans text-[0.8125rem] font-semibold text-la-text-inverse shadow-[var(--la-elevation-gold)] hover:bg-la-gold-light"
             >
               <Plus className="h-4 w-4 stroke-[2.5]" />
-              <span>+ Novo Calendário / Capacidade</span>
+              <span>Novo Calendário / Capacidade</span>
             </button>
           </div>
         </div>
@@ -1624,7 +1722,7 @@ export function CalendarioEditorialModule(props: CalendarioEditorialModuleProps)
                   className={clsx(
                     "rounded-la-full border px-2.5 py-0.5 font-la-mono text-[0.625rem]",
                     retinaFilter === "all"
-                      ? "border-la-gold bg-la-gold text-la-text-inverse font-bold"
+                      ? "border-la-gold bg-la-gold font-bold text-la-text-inverse"
                       : "border-white/12 bg-black/50 text-la-text-secondary"
                   )}
                 >
@@ -1645,7 +1743,7 @@ export function CalendarioEditorialModule(props: CalendarioEditorialModuleProps)
                       className={clsx(
                         "inline-flex items-center gap-1.5 rounded-la-full border px-2.5 py-0.5 font-la-mono text-[0.625rem] transition-all",
                         active
-                          ? `${r.badgeClass} ring-1 ring-white/40 font-bold`
+                          ? `${r.badgeClass} font-bold ring-1 ring-white/40`
                           : "border-white/10 bg-black/40 text-la-text-secondary hover:border-white/25"
                       )}
                     >
@@ -1661,28 +1759,21 @@ export function CalendarioEditorialModule(props: CalendarioEditorialModuleProps)
               </div>
 
               <div className="flex flex-wrap items-center gap-2">
-                <select
-                  aria-label="Filtrar por formato"
-                  value={formatFilter}
-                  onChange={(e) =>
-                    setFormatFilter(
-                      e.target.value as "all" | SlotContentFormat
-                    )
-                  }
-                  className="rounded-la-md border border-white/12 bg-[#0B0F19] px-3 py-1 font-la-mono text-[0.6875rem] text-la-text-primary focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-la-gold"
-                >
-                  <option value="all">Todos os formatos (6)</option>
-                  <option value="reel_curto">Reels / Vídeos Curtos</option>
-                  <option value="video_longo">Vídeos Longos (YouTube)</option>
-                  <option value="carrossel">Carrosséis 4:5</option>
-                  <option value="post_estatico">Posts Estáticos</option>
-                  <option value="live_semanal">Lives Semanais</option>
-                  <option value="sequencia_stories">
-                    Sequências de Stories
-                  </option>
-                </select>
+                {/* SELECT 1: Filtro de Formato com DarkCustomSelect */}
+                <div className="min-w-[15rem]">
+                  <DarkCustomSelect
+                    fullWidth
+                    align="right"
+                    value={formatFilter}
+                    options={FORMAT_FILTER_OPTIONS}
+                    onChange={(val) =>
+                      setFormatFilter(val as "all" | SlotContentFormat)
+                    }
+                    ariaLabel="Filtrar por formato"
+                  />
+                </div>
 
-                <label className="inline-flex cursor-pointer items-center gap-1.5 rounded-la-md border border-white/10 bg-black/50 px-2.5 py-1 font-la-mono text-[0.6875rem] text-la-text-secondary">
+                <label className="inline-flex min-h-[2.625rem] cursor-pointer items-center gap-1.5 rounded-la-md border border-white/10 bg-black/50 px-3 py-1 font-la-mono text-[0.6875rem] text-la-text-secondary">
                   <input
                     type="checkbox"
                     checked={showDailyStoriesInGrid}
@@ -2136,13 +2227,57 @@ export function CalendarioEditorialModule(props: CalendarioEditorialModuleProps)
               TELA 1 E 2 DA FUNÇÃO 01 · CAPACIDADE REAL DE PRODUÇÃO
             </span>
             <h3 className="mt-1 font-la-sans text-[1.375rem] font-semibold text-la-text-primary">
-              Disponibilidade e Limites Reais da Operação
+              Disponibilidade, Objetivo e Limites Reais da Operação
             </h3>
             <p className="mt-1 font-la-sans text-[0.875rem] text-la-text-secondary">
               O calendário editorial não pode ser construído em fantasia. Ajuste
-              quantas peças de cada formato você realmente consegue sustentar por
-              semana.
+              o objetivo estratégico do ciclo atual e quantas peças de cada
+              formato você realmente consegue sustentar por semana.
             </p>
+
+            {/* Seletores DarkCustomSelect de Período e Objetivo Estratégico na Capacidade Ativa */}
+            <div className="mt-4 grid grid-cols-1 gap-3.5 rounded-la-lg border border-la-border-gold/35 bg-black/55 p-4 sm:grid-cols-2">
+              <div className="flex flex-col gap-1">
+                <span className="font-la-mono text-[0.625rem] font-semibold uppercase text-la-gold-light">
+                  Período Planejado do Calendário Ativo
+                </span>
+                <DarkCustomSelect
+                  fullWidth
+                  value={currentCalendar.periodLabel}
+                  options={PERIOD_DURATION_OPTIONS}
+                  onChange={(nextPeriod) => {
+                    const next = calendars.map((cal) =>
+                      cal.id === currentCalendar.id
+                        ? { ...cal, periodLabel: nextPeriod }
+                        : cal
+                    );
+                    persistCalendars(next);
+                  }}
+                  ariaLabel="Selecionar duração do período ativo"
+                />
+              </div>
+
+              <div className="flex flex-col gap-1">
+                <span className="font-la-mono text-[0.625rem] font-semibold uppercase text-la-gold-light">
+                  Objetivo Estratégico do Período Ativo
+                </span>
+                <DarkCustomSelect
+                  fullWidth
+                  align="right"
+                  value={currentCalendar.mainObjective}
+                  options={PERIOD_OBJECTIVE_OPTIONS}
+                  onChange={(nextObjective) => {
+                    const next = calendars.map((cal) =>
+                      cal.id === currentCalendar.id
+                        ? { ...cal, mainObjective: nextObjective }
+                        : cal
+                    );
+                    persistCalendars(next);
+                  }}
+                  ariaLabel="Selecionar objetivo estratégico do período ativo"
+                />
+              </div>
+            </div>
 
             <div className="mt-5 grid grid-cols-1 gap-4 sm:grid-cols-2">
               {[
@@ -2239,21 +2374,32 @@ export function CalendarioEditorialModule(props: CalendarioEditorialModuleProps)
                 />
               </div>
 
+              {/* SELECT 2A: Duração / Ciclo do Novo Período com DarkCustomSelect */}
               <div className="flex flex-col gap-1">
-                <label className="font-la-mono text-[0.6875rem] uppercase text-la-text-secondary">
+                <span className="font-la-mono text-[0.6875rem] uppercase text-la-text-secondary">
+                  Duração / Ciclo do Período
+                </span>
+                <DarkCustomSelect
+                  fullWidth
+                  value={newCalPeriodLabel}
+                  options={PERIOD_DURATION_OPTIONS}
+                  onChange={setNewCalPeriodLabel}
+                  ariaLabel="Selecionar duração do novo calendário"
+                />
+              </div>
+
+              {/* SELECT 2B: Objetivo Estratégico do Período com DarkCustomSelect */}
+              <div className="flex flex-col gap-1">
+                <span className="font-la-mono text-[0.6875rem] uppercase text-la-text-secondary">
                   Objetivo Estratégico do Período
-                </label>
-                <select
+                </span>
+                <DarkCustomSelect
+                  fullWidth
                   value={newCalObjective}
-                  onChange={(e) => setNewCalObjective(e.target.value)}
-                  className="min-h-[2.625rem] rounded-la-md border border-white/14 bg-black/60 px-3.5 py-2 font-la-sans text-[0.875rem] text-la-text-primary"
-                >
-                  {PERIOD_OBJECTIVES.map((obj) => (
-                    <option key={obj} value={obj}>
-                      {obj}
-                    </option>
-                  ))}
-                </select>
+                  options={PERIOD_OBJECTIVE_OPTIONS}
+                  onChange={setNewCalObjective}
+                  ariaLabel="Selecionar objetivo estratégico do período"
+                />
               </div>
 
               <div className="grid grid-cols-2 gap-3">
@@ -2377,7 +2523,9 @@ export function CalendarioEditorialModule(props: CalendarioEditorialModuleProps)
                     {cal.name}
                   </h3>
                   <span className="rounded-la-full border border-la-gold bg-la-gold px-2.5 py-0.5 font-la-mono text-[0.5625rem] font-bold uppercase text-la-text-inverse">
-                    {cal.status === "active" ? "ATIVO" : "RASCUNHO / HISTÓRICO"}
+                    {cal.status === "active"
+                      ? "ATIVO"
+                      : "RASCUNHO / HISTÓRICO"}
                   </span>
                 </div>
                 <p className="mt-1 font-la-mono text-[0.75rem] text-la-text-secondary">
@@ -2415,7 +2563,7 @@ export function CalendarioEditorialModule(props: CalendarioEditorialModuleProps)
       ) : null}
 
       {/* =================================================================== */}
-      {/* DRAWER LATERAL 360° DO SLOT (TODAS AS INFORMAÇÕES CANÔNICAS F01)     */}
+      {/* DRAWER LATERAL 360° DO SLOT (COM DARKCUSTOMSELECT EM TODOS CAMPOS)  */}
       {/* =================================================================== */}
       <AnimatePresence>
         {selectedSlot ? (
@@ -2486,53 +2634,44 @@ export function CalendarioEditorialModule(props: CalendarioEditorialModuleProps)
                   </div>
 
                   <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                    {/* SELECT 3: Formato do Conteúdo no Drawer 360° */}
                     <div className="flex flex-col gap-1">
-                      <label className="font-la-mono text-[0.625rem] font-semibold uppercase text-la-text-secondary">
+                      <span className="font-la-mono text-[0.625rem] font-semibold uppercase text-la-text-secondary">
                         2. Formato do Conteúdo
-                      </label>
-                      <select
+                      </span>
+                      <DarkCustomSelect
+                        fullWidth
+                        menuZIndex="z-[260]"
                         value={selectedSlot.format}
-                        onChange={(e) =>
+                        options={SLOT_FORMAT_OPTIONS}
+                        onChange={(nextFmt) =>
                           updateSlotById(selectedSlot.id, (prev) => ({
                             ...prev,
-                            format: e.target.value as SlotContentFormat,
+                            format: nextFmt as SlotContentFormat,
                           }))
                         }
-                        className="min-h-[2.5rem] rounded-la-md border border-white/14 bg-black/60 px-3 font-la-sans text-[0.8125rem] text-la-text-primary"
-                      >
-                        {(Object.keys(FORMAT_META) as SlotContentFormat[]).map(
-                          (fKey) => (
-                            <option key={fKey} value={fKey}>
-                              {FORMAT_META[fKey].label}
-                            </option>
-                          )
-                        )}
-                      </select>
+                        ariaLabel="Selecionar formato do slot"
+                      />
                     </div>
 
+                    {/* SELECT 4: Tipo MATRIZ RETINA no Drawer 360° */}
                     <div className="flex flex-col gap-1">
-                      <label className="font-la-mono text-[0.625rem] font-semibold uppercase text-la-text-secondary">
+                      <span className="font-la-mono text-[0.625rem] font-semibold uppercase text-la-text-secondary">
                         3. Tipo MATRIZ RETINA
-                      </label>
-                      <select
+                      </span>
+                      <DarkCustomSelect
+                        fullWidth
+                        menuZIndex="z-[260]"
                         value={selectedSlot.retinaType}
-                        onChange={(e) =>
+                        options={RETINA_SELECT_OPTIONS}
+                        onChange={(nextRet) =>
                           updateSlotById(selectedSlot.id, (prev) => ({
                             ...prev,
-                            retinaType: e.target.value as RetinaTypeKey,
+                            retinaType: nextRet as RetinaTypeKey,
                           }))
                         }
-                        className="min-h-[2.5rem] rounded-la-md border border-white/14 bg-black/60 px-3 font-la-sans text-[0.8125rem] text-la-text-primary"
-                      >
-                        {(Object.keys(RETINA_META) as RetinaTypeKey[]).map(
-                          (rKey) => (
-                            <option key={rKey} value={rKey}>
-                              {RETINA_META[rKey].code} ·{" "}
-                              {RETINA_META[rKey].label}
-                            </option>
-                          )
-                        )}
-                      </select>
+                        ariaLabel="Selecionar tipo RETINA do slot"
+                      />
                     </div>
 
                     <div className="flex flex-col gap-1">
@@ -2548,36 +2687,30 @@ export function CalendarioEditorialModule(props: CalendarioEditorialModuleProps)
                             suggestedTime: e.target.value,
                           }))
                         }
-                        className="min-h-[2.5rem] rounded-la-md border border-white/14 bg-black/60 px-3 font-la-mono text-[0.8125rem] text-la-gold-light"
+                        className="min-h-[2.625rem] rounded-la-md border border-white/14 bg-black/60 px-3 font-la-mono text-[0.8125rem] text-la-gold-light"
                       />
                     </div>
                   </div>
 
                   <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                    {/* SELECT 5: Status de Execução do Slot no Drawer 360° */}
                     <div className="flex flex-col gap-1">
-                      <label className="font-la-mono text-[0.625rem] font-semibold uppercase text-la-text-secondary">
+                      <span className="font-la-mono text-[0.625rem] font-semibold uppercase text-la-text-secondary">
                         5. Status de Execução do Slot
-                      </label>
-                      <select
+                      </span>
+                      <DarkCustomSelect
+                        fullWidth
+                        menuZIndex="z-[260]"
                         value={selectedSlot.status}
-                        onChange={(e) =>
+                        options={SLOT_STATUS_OPTIONS}
+                        onChange={(nextSt) =>
                           updateSlotById(selectedSlot.id, (prev) => ({
                             ...prev,
-                            status: e.target.value as SlotExecutionStatus,
+                            status: nextSt as SlotExecutionStatus,
                           }))
                         }
-                        className="min-h-[2.5rem] rounded-la-md border border-white/14 bg-black/60 px-3 font-la-sans text-[0.8125rem] text-la-text-primary"
-                      >
-                        {(
-                          Object.keys(
-                            SLOT_STATUS_META
-                          ) as SlotExecutionStatus[]
-                        ).map((stKey) => (
-                          <option key={stKey} value={stKey}>
-                            {SLOT_STATUS_META[stKey].label}
-                          </option>
-                        ))}
-                      </select>
+                        ariaLabel="Selecionar status de execução do slot"
+                      />
                     </div>
 
                     <div className="flex flex-col gap-1">
@@ -2616,26 +2749,24 @@ export function CalendarioEditorialModule(props: CalendarioEditorialModuleProps)
                   </div>
 
                   <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                    {/* SELECT 6: Pilar da Linha Editorial no Drawer 360° */}
                     <div className="flex flex-col gap-1">
-                      <label className="font-la-mono text-[0.625rem] font-semibold uppercase text-la-text-secondary">
+                      <span className="font-la-mono text-[0.625rem] font-semibold uppercase text-la-text-secondary">
                         7. Pilar da Linha Editorial Associado
-                      </label>
-                      <select
+                      </span>
+                      <DarkCustomSelect
+                        fullWidth
+                        menuZIndex="z-[260]"
                         value={selectedSlot.editorialPillar}
-                        onChange={(e) =>
+                        options={PILLAR_SELECT_OPTIONS}
+                        onChange={(nextPillar) =>
                           updateSlotById(selectedSlot.id, (prev) => ({
                             ...prev,
-                            editorialPillar: e.target.value,
+                            editorialPillar: nextPillar,
                           }))
                         }
-                        className="min-h-[2.5rem] rounded-la-md border border-white/14 bg-black/60 px-3 font-la-sans text-[0.8125rem] text-la-text-primary"
-                      >
-                        {AVAILABLE_PILLARS.map((pil) => (
-                          <option key={pil} value={pil}>
-                            {pil}
-                          </option>
-                        ))}
-                      </select>
+                        ariaLabel="Selecionar pilar editorial do slot"
+                      />
                     </div>
 
                     <div className="flex flex-col gap-1">
@@ -2651,7 +2782,7 @@ export function CalendarioEditorialModule(props: CalendarioEditorialModuleProps)
                             strategicObjective: e.target.value,
                           }))
                         }
-                        className="min-h-[2.5rem] rounded-la-md border border-white/14 bg-black/60 px-3 font-la-sans text-[0.8125rem] text-la-text-primary"
+                        className="min-h-[2.625rem] rounded-la-md border border-white/14 bg-black/60 px-3 font-la-sans text-[0.8125rem] text-la-text-primary"
                       />
                     </div>
                   </div>
@@ -2688,7 +2819,8 @@ export function CalendarioEditorialModule(props: CalendarioEditorialModuleProps)
 
                     <div className="mt-3">
                       <span className="font-la-mono text-[0.5625rem] uppercase text-la-text-secondary">
-                        3 Temas Sugeridos pela IA para este Slot (1 clique para aplicar):
+                        3 Temas Sugeridos pela IA para este Slot (1 clique para
+                        aplicar):
                       </span>
                       <div className="mt-1.5 flex flex-col gap-1.5">
                         {selectedSlot.aiSuggestedThemes.map((sugTheme, idx) => (
@@ -2704,7 +2836,7 @@ export function CalendarioEditorialModule(props: CalendarioEditorialModuleProps)
                             className={clsx(
                               "flex items-center justify-between gap-2 rounded-la-md border px-3 py-1.5 text-left font-la-sans text-[0.75rem] transition-colors",
                               selectedSlot.mainTheme === sugTheme
-                                ? "border-la-gold bg-la-gold text-la-text-inverse font-semibold"
+                                ? "border-la-gold bg-la-gold font-semibold text-la-text-inverse"
                                 : "border-white/10 bg-black/60 text-la-text-secondary hover:border-la-border-gold hover:text-la-text-primary"
                             )}
                           >
@@ -2736,46 +2868,37 @@ export function CalendarioEditorialModule(props: CalendarioEditorialModuleProps)
                             icpPainDesireOrObjection: e.target.value,
                           }))
                         }
-                        className="min-h-[2.5rem] rounded-la-md border border-white/14 bg-black/60 px-3 font-la-sans text-[0.8125rem] text-la-text-primary"
+                        className="min-h-[2.625rem] rounded-la-md border border-white/14 bg-black/60 px-3 font-la-sans text-[0.8125rem] text-la-text-primary"
                       />
                     </div>
 
+                    {/* SELECT 7: Nível de Consciência do ICP no Drawer 360° */}
                     <div className="flex flex-col gap-1">
-                      <label className="font-la-mono text-[0.625rem] font-semibold uppercase text-la-text-secondary">
+                      <span className="font-la-mono text-[0.625rem] font-semibold uppercase text-la-text-secondary">
                         Nível de Consciência
-                      </label>
-                      <select
+                      </span>
+                      <DarkCustomSelect
+                        fullWidth
+                        align="right"
+                        menuZIndex="z-[260]"
                         value={selectedSlot.icpAwarenessLevel}
-                        onChange={(e) =>
+                        options={AWARENESS_LEVEL_OPTIONS}
+                        onChange={(nextLvl) =>
                           updateSlotById(selectedSlot.id, (prev) => ({
                             ...prev,
-                            icpAwarenessLevel: e.target
-                              .value as CalendarSlotItem["icpAwarenessLevel"],
+                            icpAwarenessLevel: nextLvl as IcpAwarenessLevel,
                           }))
                         }
-                        className="min-h-[2.5rem] rounded-la-md border border-white/14 bg-black/60 px-3 font-la-sans text-[0.8125rem] text-la-text-primary"
-                      >
-                        <option value="Inconsciente">Inconsciente</option>
-                        <option value="Consciente do Problema">
-                          Consciente do Problema
-                        </option>
-                        <option value="Consciente da Solução">
-                          Consciente da Solução
-                        </option>
-                        <option value="Consciente do Produto">
-                          Consciente do Produto
-                        </option>
-                        <option value="Totalmente Consciente">
-                          Totalmente Consciente
-                        </option>
-                      </select>
+                        ariaLabel="Selecionar nível de consciência do ICP"
+                      />
                     </div>
                   </div>
 
                   {selectedSlot.storySequencesBreakdown ? (
                     <div className="rounded-la-xl border border-emerald-400/40 bg-emerald-950/20 p-4">
                       <span className="font-la-mono text-[0.6875rem] font-bold uppercase text-emerald-300">
-                        DETALHAMENTO DAS 4 SEQUÊNCIAS DE STORIES DO DIA (4 A 5 STORIES CADA)
+                        DETALHAMENTO DAS 4 SEQUÊNCIAS DE STORIES DO DIA (4 A 5
+                        STORIES CADA)
                       </span>
                       <div className="mt-3 grid grid-cols-1 gap-2.5 sm:grid-cols-2">
                         {selectedSlot.storySequencesBreakdown.map((seq) => (
@@ -2979,46 +3102,39 @@ export function CalendarioEditorialModule(props: CalendarioEditorialModuleProps)
                 </div>
 
                 <div className="grid grid-cols-2 gap-3">
+                  {/* SELECT 8: Formato no Modal de Novo Slot */}
                   <div className="flex flex-col gap-1">
-                    <label className="font-la-mono text-[0.6875rem] uppercase text-la-text-secondary">
+                    <span className="font-la-mono text-[0.6875rem] uppercase text-la-text-secondary">
                       Formato
-                    </label>
-                    <select
+                    </span>
+                    <DarkCustomSelect
+                      fullWidth
+                      menuZIndex="z-[260]"
                       value={newSlotFormat}
-                      onChange={(e) =>
-                        setNewSlotFormat(e.target.value as SlotContentFormat)
+                      options={SLOT_FORMAT_SHORT_OPTIONS}
+                      onChange={(val) =>
+                        setNewSlotFormat(val as SlotContentFormat)
                       }
-                      className="min-h-[2.5rem] rounded-la-md border border-white/14 bg-black/60 px-3 font-la-sans text-[0.8125rem] text-la-text-primary"
-                    >
-                      {(Object.keys(FORMAT_META) as SlotContentFormat[]).map(
-                        (f) => (
-                          <option key={f} value={f}>
-                            {FORMAT_META[f].shortLabel}
-                          </option>
-                        )
-                      )}
-                    </select>
+                      ariaLabel="Selecionar formato do novo slot"
+                    />
                   </div>
 
+                  {/* SELECT 9: Tipo RETINA no Modal de Novo Slot */}
                   <div className="flex flex-col gap-1">
-                    <label className="font-la-mono text-[0.6875rem] uppercase text-la-text-secondary">
+                    <span className="font-la-mono text-[0.6875rem] uppercase text-la-text-secondary">
                       Tipo RETINA
-                    </label>
-                    <select
+                    </span>
+                    <DarkCustomSelect
+                      fullWidth
+                      align="right"
+                      menuZIndex="z-[260]"
                       value={newSlotRetina}
-                      onChange={(e) =>
-                        setNewSlotRetina(e.target.value as RetinaTypeKey)
+                      options={RETINA_SELECT_OPTIONS}
+                      onChange={(val) =>
+                        setNewSlotRetina(val as RetinaTypeKey)
                       }
-                      className="min-h-[2.5rem] rounded-la-md border border-white/14 bg-black/60 px-3 font-la-sans text-[0.8125rem] text-la-text-primary"
-                    >
-                      {(Object.keys(RETINA_META) as RetinaTypeKey[]).map(
-                        (r) => (
-                          <option key={r} value={r}>
-                            {RETINA_META[r].label}
-                          </option>
-                        )
-                      )}
-                    </select>
+                      ariaLabel="Selecionar tipo RETINA do novo slot"
+                    />
                   </div>
                 </div>
 

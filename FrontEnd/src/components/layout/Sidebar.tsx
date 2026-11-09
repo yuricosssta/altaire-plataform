@@ -1,19 +1,22 @@
 // FrontEnd/src/components/layout/Sidebar.tsx
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useDispatch, useSelector } from "react-redux";
 import { AnimatePresence, motion } from "motion/react";
 import {
   BookOpen,
+  Calendar,
   Check,
   ChevronsUpDown,
   Compass,
+  FileText,
   FolderArchive,
   FolderKanban,
   HelpCircle,
+  LayoutDashboard,
   LogOut,
   PanelLeftClose,
   PanelLeftOpen,
@@ -25,7 +28,7 @@ import {
 } from "lucide-react";
 import { clsx } from "clsx";
 import LogoBloco from "@/components/LogoBloco";
-import { ROUTES } from "@/lib/constants/routes";
+import { ROUTES, WORKSPACE_ROUTES } from "@/lib/constants/routes";
 import { logout } from "@/lib/redux/slices/authSlice";
 import { selectCurrentOrg } from "@/lib/redux/slices/organizationSlice";
 import { AppDispatch, RootState } from "@/lib/redux/store";
@@ -62,7 +65,7 @@ export const SIDEBAR_GROUPS: readonly SidebarSectionGroup[] = [
         label: "Painel do Dia",
         shortLabel: "Painel",
         description: "O que executar hoje nos projetos ativos",
-        href: "/dashboard",
+        href: WORKSPACE_ROUTES.painelDoDia,
         matchPrefixes: ["/dashboard/painel-do-dia"],
         icon: Radar,
       },
@@ -71,8 +74,13 @@ export const SIDEBAR_GROUPS: readonly SidebarSectionGroup[] = [
         label: "Projetos Editoriais",
         shortLabel: "Projetos",
         description: "Central Estratégica e entrada para workspaces",
-        href: "/dashboard/editorial",
-        matchPrefixes: ["/dashboard/editorial", "/editorial"],
+        href: WORKSPACE_ROUTES.centralEstrategica,
+        matchPrefixes: [
+          "/dashboard/editorial",
+          "/central-estrategica",
+          "/editorial",
+          "/onboarding",
+        ],
         icon: FolderKanban,
         badge: "Central",
       },
@@ -87,8 +95,12 @@ export const SIDEBAR_GROUPS: readonly SidebarSectionGroup[] = [
         label: "Biblioteca de Conteúdo",
         shortLabel: "Biblioteca",
         description: "Acervo de roteiros, carrosséis, stories e ativos",
-        href: "/dashboard/publicacoes",
-        matchPrefixes: ["/dashboard/publicacoes", "/dashboard/biblioteca"],
+        href: WORKSPACE_ROUTES.bibliotecaConteudo,
+        matchPrefixes: [
+          "/dashboard/publicacoes",
+          "/dashboard/biblioteca",
+          "/biblioteca",
+        ],
         icon: BookOpen,
       },
       {
@@ -96,8 +108,13 @@ export const SIDEBAR_GROUPS: readonly SidebarSectionGroup[] = [
         label: "Assets & Arquivos",
         shortLabel: "Assets",
         description: "Identidade visual, fotos, B-rolls, provas e PDFs",
-        href: "/dashboard/armazenamento",
-        matchPrefixes: ["/dashboard/armazenamento", "/dashboard/assets"],
+        href: WORKSPACE_ROUTES.assetsArquivos,
+        matchPrefixes: [
+          "/dashboard/armazenamento",
+          "/dashboard/storage",
+          "/dashboard/assets",
+          "/assets",
+        ],
         icon: FolderArchive,
       },
     ],
@@ -111,10 +128,13 @@ export const SIDEBAR_GROUPS: readonly SidebarSectionGroup[] = [
         label: "Configurações",
         shortLabel: "Ajustes",
         description: "Perfil, plano, preferências e membros da equipe",
-        href: "/dashboard/settings",
+        href: WORKSPACE_ROUTES.configuracoes,
         matchPrefixes: [
-          "/dashboard/configuracoes",
           "/dashboard/settings",
+          "/dashboard/configuracoes",
+          "/configuracoes",
+          "/account",
+          "/dashboard/people",
           "/dashboard/rh",
           "/dashboard/master-admin",
         ],
@@ -122,6 +142,14 @@ export const SIDEBAR_GROUPS: readonly SidebarSectionGroup[] = [
       },
     ],
   },
+] as const;
+
+const WORKSPACE_QUICK_TABS = [
+  { tab: "dashboard" as const, label: "Dashboard", icon: LayoutDashboard },
+  { tab: "linha-editorial" as const, label: "Linha Editorial", icon: Compass },
+  { tab: "calendario" as const, label: "Calendário", icon: Calendar },
+  { tab: "temas" as const, label: "Temas", icon: BookOpen },
+  { tab: "roteiros" as const, label: "Roteiros", icon: FileText },
 ] as const;
 
 export type SidebarProps = {
@@ -140,7 +168,8 @@ export function isSidebarItemActive(
 ): boolean {
   if (item.id === "painel-do-dia") {
     return (
-      pathname === "/dashboard" || pathname.startsWith("/dashboard/painel-do-dia")
+      pathname === "/dashboard" ||
+      pathname.startsWith("/dashboard/painel-do-dia")
     );
   }
 
@@ -167,20 +196,37 @@ export function Sidebar({
   const authUser = useSelector((state: RootState) => state.auth?.user);
   const profile = useSelector((state: RootState) => state.user?.profile);
 
+  const profileRecord = profile as Record<string, unknown> | null;
+  const resolvedWorkspaceName =
+    (typeof profileRecord?.fullName === "string" && profileRecord.fullName.trim()) ||
+    (typeof profileRecord?.name === "string" && profileRecord.name.trim()) ||
+    authUser?.fullName ||
+    workspaceName;
+
+  const resolvedUserEmail =
+    (typeof profileRecord?.email === "string" && profileRecord.email.trim()) ||
+    authUser?.email ||
+    userEmail;
+
   const isManager =
     currentOrg?.role === "OWNER" ||
     currentOrg?.role === "ADMIN" ||
     authUser?.role === "owner" ||
     authUser?.role === "admin" ||
-    Boolean((profile as Record<string, unknown> | null)?.isAdmin);
+    Boolean(profileRecord?.isAdmin);
 
   const [isAccountMenuOpen, setIsAccountMenuOpen] = useState<boolean>(false);
   const [isHelpModalOpen, setIsHelpModalOpen] = useState<boolean>(false);
   const accountMenuRef = useRef<HTMLDivElement>(null);
 
-  const isInsideProjectWorkspace =
-    /^\/dashboard\/editorial\/[^/]+/.test(pathname) ||
-    /^\/editorial\/[^/]+/.test(pathname);
+  const activeProjectIdInUrl = useMemo(() => {
+    const match =
+      pathname.match(/^\/dashboard\/editorial\/([^/]+)/) ??
+      pathname.match(/^\/editorial\/([^/]+)/);
+    return match?.[1] ?? null;
+  }, [pathname]);
+
+  const isInsideProjectWorkspace = Boolean(activeProjectIdInUrl);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -208,7 +254,7 @@ export function Sidebar({
   };
 
   const workspaceInitial =
-    workspaceName.trim().charAt(0).toUpperCase() || "R";
+    resolvedWorkspaceName.trim().charAt(0).toUpperCase() || "R";
 
   const renderSidebarContent = (mobileMode: boolean) => {
     const collapsed = mobileMode ? false : isCollapsed;
@@ -220,7 +266,7 @@ export function Sidebar({
           className="pointer-events-none absolute inset-y-0 right-0 w-px bg-gradient-to-b from-la-gold/25 via-white/8 to-transparent"
         />
 
-        <div className="flex flex-col gap-4 px-3.5 pt-4">
+        <div className="flex flex-1 flex-col gap-4 overflow-y-auto px-3.5 pt-4 scrollbar-none">
           {/* 1. Topo: Marca Altaire Legion + Botão de Recolher/Fechar */}
           <div
             className={clsx(
@@ -233,11 +279,11 @@ export function Sidebar({
                 orientation="horizontal"
                 size="sm"
                 tone="public-dark"
-                href="/dashboard"
+                href={WORKSPACE_ROUTES.painelDoDia}
               />
             ) : (
               <Link
-                href="/dashboard"
+                href={WORKSPACE_ROUTES.painelDoDia}
                 aria-label="Ir para o Painel do Dia"
                 title="Legion Altaire — Painel do Dia"
                 className="inline-flex h-9 w-9 items-center justify-center rounded-la-md border border-la-border-gold/55 bg-la-gold-faint font-la-mono text-[0.8125rem] font-bold text-la-gold-light shadow-[0_0_16px_rgba(207,169,101,0.2)] transition-colors hover:border-la-gold"
@@ -280,14 +326,14 @@ export function Sidebar({
             )}
           </div>
 
-          {/* 2. Seletor de Conta / Workspace */}
+          {/* 2. Seletor de Conta / Workspace (Seção 2.3: Conta separada de Projeto Editorial) */}
           <div ref={accountMenuRef} className="relative">
             <button
               type="button"
               onClick={() => setIsAccountMenuOpen((prev) => !prev)}
               aria-expanded={isAccountMenuOpen}
               aria-haspopup="menu"
-              title={`Workspace da Conta: ${workspaceName}`}
+              title={`Workspace da Conta: ${resolvedWorkspaceName}`}
               className={clsx(
                 "group flex w-full items-center rounded-la-lg border border-white/12 bg-[#0B0F18]/90 transition-all duration-180",
                 "hover:border-la-border-gold/60 hover:bg-[#101522]",
@@ -305,7 +351,7 @@ export function Sidebar({
                 {!collapsed ? (
                   <div className="flex min-w-0 flex-col text-left">
                     <span className="truncate font-la-sans text-[0.875rem] font-semibold leading-tight text-la-text-primary">
-                      {workspaceName}
+                      {resolvedWorkspaceName}
                     </span>
                     <span className="truncate font-la-mono text-[0.625rem] uppercase tracking-[0.06em] text-la-gold-light">
                       Conta / Workspace
@@ -340,10 +386,10 @@ export function Sidebar({
                       {userRoleLabel}
                     </span>
                     <p className="mt-0.5 truncate font-la-sans text-[0.8125rem] font-semibold text-la-text-primary">
-                      {workspaceName}
+                      {resolvedWorkspaceName}
                     </p>
                     <p className="truncate font-la-mono text-[0.6875rem] text-la-text-muted">
-                      {userEmail}
+                      {resolvedUserEmail}
                     </p>
                   </div>
 
@@ -354,7 +400,7 @@ export function Sidebar({
                           {workspaceInitial}
                         </span>
                         <span className="font-la-sans text-[0.75rem] font-semibold text-la-text-primary">
-                          {workspaceName}
+                          {resolvedWorkspaceName}
                         </span>
                       </div>
                       <Check
@@ -365,7 +411,7 @@ export function Sidebar({
 
                     {isManager ? (
                       <Link
-                        href="/dashboard/people"
+                        href={WORKSPACE_ROUTES.configuracoesTab("membros")}
                         onClick={() => {
                           setIsAccountMenuOpen(false);
                           if (mobileMode && onCloseMobile) onCloseMobile();
@@ -381,7 +427,7 @@ export function Sidebar({
                     ) : null}
 
                     <Link
-                      href="/dashboard/settings"
+                      href={WORKSPACE_ROUTES.configuracoes}
                       onClick={() => {
                         setIsAccountMenuOpen(false);
                         if (mobileMode && onCloseMobile) onCloseMobile();
@@ -438,6 +484,7 @@ export function Sidebar({
                       <Link
                         key={item.id}
                         href={item.href}
+                        aria-current={active ? "page" : undefined}
                         onClick={() => {
                           if (mobileMode && onCloseMobile) {
                             onCloseMobile();
@@ -509,25 +556,53 @@ export function Sidebar({
             ))}
           </nav>
 
-          {/* Indicador Contextual quando o Usuário está dentro de um Projeto Editorial */}
-          {isInsideProjectWorkspace && !collapsed ? (
-            <div className="mt-1 rounded-la-lg border border-la-border-gold/45 bg-[#0B0E17]/95 p-3 shadow-[inset_0_1px_1px_rgba(255,255,255,0.08)]">
-              <div className="flex items-center gap-2">
-                <Compass
-                  aria-hidden="true"
-                  className="h-3.5 w-3.5 text-la-gold"
-                />
-                <span className="font-la-mono text-[0.5625rem] font-semibold uppercase tracking-[0.08em] text-la-gold-light">
-                  Workspace Contextual Ativo
-                </span>
+          {/* 4. Indicador Contextual quando o Usuário está dentro de um Projeto Editorial */}
+          {isInsideProjectWorkspace && activeProjectIdInUrl && !collapsed ? (
+            <div className="mt-1 mb-2 rounded-la-lg border border-la-border-gold/45 bg-[#0B0E17]/95 p-3 shadow-[inset_0_1px_1px_rgba(255,255,255,0.08)]">
+              <div className="flex items-center justify-between gap-2">
+                <div className="flex items-center gap-2">
+                  <Compass
+                    aria-hidden="true"
+                    className="h-3.5 w-3.5 text-la-gold"
+                  />
+                  <span className="font-la-mono text-[0.5625rem] font-semibold uppercase tracking-[0.08em] text-la-gold-light">
+                    Workspace Contextual Ativo
+                  </span>
+                </div>
               </div>
+
               <p className="mt-1 w-full text-justify [text-align-last:left] hyphens-auto font-la-sans text-[0.75rem] leading-[1.45] text-la-text-secondary">
-                As abas de Dashboard, Linha, Calendário, Temas e Roteiros operam
-                no topo deste projeto.
+                As abas de estratégia e produção operam dentro deste projeto:
               </p>
+
+              <div className="mt-2 grid grid-cols-1 gap-1 border-t border-white/8 pt-2">
+                {WORKSPACE_QUICK_TABS.map((shortcut) => {
+                  const ShortcutIcon = shortcut.icon;
+                  return (
+                    <Link
+                      key={shortcut.tab}
+                      href={WORKSPACE_ROUTES.projectTab(
+                        activeProjectIdInUrl,
+                        shortcut.tab
+                      )}
+                      onClick={() => {
+                        if (mobileMode && onCloseMobile) onCloseMobile();
+                      }}
+                      className="flex items-center gap-2 rounded-la-xs px-2 py-1 font-la-sans text-[0.75rem] text-la-text-secondary transition-colors hover:bg-white/[0.04] hover:text-la-gold-light"
+                    >
+                      <ShortcutIcon className="h-3 w-3 shrink-0 text-la-gold/85" />
+                      <span className="truncate">{shortcut.label}</span>
+                    </Link>
+                  );
+                })}
+              </div>
+
               <Link
-                href="/dashboard/editorial"
-                className="mt-2 inline-flex items-center gap-1 font-la-mono text-[0.625rem] font-semibold text-la-gold-light hover:underline"
+                href={WORKSPACE_ROUTES.centralEstrategica}
+                onClick={() => {
+                  if (mobileMode && onCloseMobile) onCloseMobile();
+                }}
+                className="mt-2.5 inline-flex items-center gap-1 border-t border-white/8 pt-2 font-la-mono text-[0.625rem] font-semibold text-la-gold-light hover:underline"
               >
                 <span>← Trocar de Projeto Editorial</span>
               </Link>
