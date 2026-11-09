@@ -5,26 +5,20 @@ import {
   useCallback,
   useEffect,
   useMemo,
+  useRef,
   useState,
   type FormEvent,
 } from "react";
 import Link from "next/link";
 import { AnimatePresence, motion } from "motion/react";
 import {
-  AlertTriangle,
-  Archive,
   ArrowLeft,
   ArrowRight,
-  BookOpen,
-  Calendar as CalendarIcon,
-  Check,
   CheckCircle2,
   ChevronLeft,
   ChevronRight,
   ClipboardCopy,
-  Clock,
   Columns,
-  Compass,
   Copy,
   Download,
   Edit3,
@@ -33,32 +27,29 @@ import {
   FileCheck2,
   FileSpreadsheet,
   FileText,
-  Flame,
   Gift,
   Hash,
   Image as ImageIcon,
   Layers,
   LayoutGrid,
-  Lightbulb,
-  ListChecks,
   Maximize2,
   MessageSquare,
   Minimize2,
   Play,
   Plus,
   Radio,
-  RefreshCw,
   RotateCcw,
   Save,
   Search,
-  Sliders,
   Sparkles,
-  Target,
-  Trash2,
   Video,
   X,
 } from "lucide-react";
 import { clsx } from "clsx";
+import {
+  DarkCustomSelect,
+  type CustomSelectOption,
+} from "@/components/ui/DarkCustomSelect";
 import {
   FORMAT_META,
   RETINA_META,
@@ -213,13 +204,19 @@ export interface EditorialScriptRecord {
   /* 6. Materiais Complementares (Funil/Isca) & Materiais de Explicação (Didático) */
   readonly qualifiedForComplementaryMaterial: boolean;
   readonly complementaryMaterial: {
-    readonly typeLabel: "Checklist PDF" | "Workbook Prático" | "Planilha Executiva XLSX";
+    readonly typeLabel:
+      | "Checklist PDF"
+      | "Workbook Prático"
+      | "Planilha Executiva XLSX";
     readonly title: string;
     readonly promise: string;
     readonly sectionsOutline: readonly string[];
   };
   readonly explanationMaterial: {
-    readonly typeLabel: "Mapa Mental da Aula" | "Framework Visual PDF" | "Planilha Didática";
+    readonly typeLabel:
+      | "Mapa Mental da Aula"
+      | "Framework Visual PDF"
+      | "Planilha Didática";
     readonly title: string;
     readonly diagramNodes: readonly string[];
   };
@@ -377,6 +374,47 @@ export const SCRIPT_STATUS_META: Record<
   },
 };
 
+/* ========================================================================== */
+/* OPÇÕES TIPADAS PARA O COMPONENTE DARKCUSTOMSELECT                          */
+/* ========================================================================== */
+
+const FORMAT_RETINA_FILTER_OPTIONS: readonly CustomSelectOption<
+  "all" | RetinaTypeKey
+>[] = [
+  { value: "all", label: "Todos os Tipos RETINA" },
+  ...(Object.keys(RETINA_META) as RetinaTypeKey[]).map((r) => ({
+    value: r,
+    label: `${RETINA_META[r].code} · ${RETINA_META[r].label}`,
+  })),
+];
+
+const FORMAT_STATUS_FILTER_OPTIONS: readonly CustomSelectOption<
+  "all" | ScriptProductionStatus
+>[] = [
+  { value: "all", label: "Status: Todos Ativos" },
+  { value: "ready", label: "Pronto" },
+  { value: "draft", label: "Rascunho" },
+  { value: "in_production", label: "Em Produção" },
+  { value: "ab_test", label: "Em Teste A/B" },
+  { value: "published", label: "Publicado" },
+  { value: "archived", label: "Arquivados" },
+];
+
+const STUDIO_STATUS_SELECT_OPTIONS: readonly CustomSelectOption<ScriptProductionStatus>[] =
+  (Object.keys(SCRIPT_STATUS_META) as ScriptProductionStatus[]).map(
+    (stKey) => ({
+      value: stKey,
+      label: `Status: ${SCRIPT_STATUS_META[stKey].label}`,
+    })
+  );
+
+const CREATE_FORMAT_SELECT_OPTIONS: readonly CustomSelectOption<ScriptFormatSlug>[] =
+  SCRIPT_FORMATS_CATALOG.map((f) => ({
+    value: f.slug,
+    label: f.name,
+    badge: f.shortName,
+  }));
+
 export function mapSlotFormatToScriptSlug(
   slotFormat: SlotContentFormat
 ): ScriptFormatSlug {
@@ -479,7 +517,8 @@ export function buildCompleteScriptPackage(params: {
           },
           {
             id: "blk-long-3",
-            timecodeOrStage: "2:30 – 8:30 · Fase 3: Desenvolvimento em Microciclos (MUV)",
+            timecodeOrStage:
+              "2:30 – 8:30 · Fase 3: Desenvolvimento em Microciclos (MUV)",
             psychologicalRole:
               "Entrega densa dos pilares + Demonstração prática do método proprietário",
             visualAndAudioDirection:
@@ -489,7 +528,8 @@ export function buildCompleteScriptPackage(params: {
           },
           {
             id: "blk-long-4",
-            timecodeOrStage: "8:30 – 11:30 · Fase 4: Quebra de Objeção & Virada de Chave",
+            timecodeOrStage:
+              "8:30 – 11:30 · Fase 4: Quebra de Objeção & Virada de Chave",
             psychologicalRole:
               "Neutralização da trava mental do comprador + Prova de viabilidade na rotina",
             visualAndAudioDirection:
@@ -499,7 +539,8 @@ export function buildCompleteScriptPackage(params: {
           },
           {
             id: "blk-long-5",
-            timecodeOrStage: "11:30 – 13:30 · Fase 5: CTA Estratégico & Material Complementar",
+            timecodeOrStage:
+              "11:30 – 13:30 · Fase 5: CTA Estratégico & Material Complementar",
             psychologicalRole:
               "Chamada para ação sem parecer encerramento precoce + Entrega da isca/próximo passo",
             visualAndAudioDirection:
@@ -512,7 +553,8 @@ export function buildCompleteScriptPackage(params: {
         ? [
             {
               id: "blk-live-1",
-              timecodeOrStage: "00:00 – 08:00 · Bloco 1: Abertura Magnética & Acordo da Live",
+              timecodeOrStage:
+                "00:00 – 08:00 · Bloco 1: Abertura Magnética & Acordo da Live",
               psychologicalRole:
                 "Retenção dos primeiros espectadores + Promessa da transmissão + Incentivo de compartilhamento",
               visualAndAudioDirection:
@@ -523,7 +565,8 @@ export function buildCompleteScriptPackage(params: {
             },
             {
               id: "blk-live-2",
-              timecodeOrStage: "08:00 – 25:00 · Bloco 2: Desconstrução do Erro Invisível",
+              timecodeOrStage:
+                "08:00 – 25:00 · Bloco 2: Desconstrução do Erro Invisível",
               psychologicalRole:
                 "Elevar nível de consciência mostrando por que as tentativas anteriores falharam",
               visualAndAudioDirection:
@@ -533,7 +576,8 @@ export function buildCompleteScriptPackage(params: {
             },
             {
               id: "blk-live-3",
-              timecodeOrStage: "25:00 – 45:00 · Bloco 3: Entrega dos 3 Pilares Práticos (MUV)",
+              timecodeOrStage:
+                "25:00 – 45:00 · Bloco 3: Entrega dos 3 Pilares Práticos (MUV)",
               psychologicalRole:
                 "Ensino profundo de autoridade + Demonstração do Mecanismo Único da Oferta",
               visualAndAudioDirection:
@@ -543,7 +587,8 @@ export function buildCompleteScriptPackage(params: {
             },
             {
               id: "blk-live-4",
-              timecodeOrStage: "45:00 – 60:00 · Bloco 4: Q&A Estratégico & Convite de Conversão",
+              timecodeOrStage:
+                "45:00 – 60:00 · Bloco 4: Q&A Estratégico & Convite de Conversão",
               psychologicalRole:
                 "Quebra de objeções ao vivo + Direcionamento direto para aplicação/compra",
               visualAndAudioDirection:
@@ -575,7 +620,8 @@ export function buildCompleteScriptPackage(params: {
             },
             {
               id: "blk-short-3",
-              timecodeOrStage: "12s – 35s · 3. Virada de Chave & Mecanismo Único",
+              timecodeOrStage:
+                "12s – 35s · 3. Virada de Chave & Mecanismo Único",
               psychologicalRole:
                 "Entregar a lógica de causa e efeito do método proprietário (MUV)",
               visualAndAudioDirection:
@@ -632,7 +678,8 @@ export function buildCompleteScriptPackage(params: {
       roleLabel: "Slide 02 · O Sintoma Silencioso (Identificação)",
       headline: "Por que tanto esforço gera tão pouca previsibilidade?",
       bodyLineBreakCopy: `A maioria dos profissionais em ${niche} acredita que\nprecisa apenas aumentar o volume de trabalho.\n\nMas volume sem direção estratégica só acelera o desgaste.`,
-      visualDesignNote: "Layout editorial em 2 blocos com linha divisória dourada sutil.",
+      visualDesignNote:
+        "Layout editorial em 2 blocos com linha divisória dourada sutil.",
       imagePromptEN: `Abstract dark editorial graphic showing scattered arrows vs one single golden laser beam of direction, dark navy and gold palette --ar 4:5`,
     },
     {
@@ -640,7 +687,8 @@ export function buildCompleteScriptPackage(params: {
       roleLabel: "Slide 03 · Diagnóstico do Erro Invisível",
       headline: "Onde 90% das operações travam de verdade",
       bodyLineBreakCopy: `O gargalo acontece quando você tenta decidir o que fazer\nno exato momento de executar.\n\nIsso gera ruído e atrai apenas curiosos desqualificados.`,
-      visualDesignNote: "Destaque em caixa de alerta escura com borda âmbar/dourada.",
+      visualDesignNote:
+        "Destaque em caixa de alerta escura com borda âmbar/dourada.",
       imagePromptEN: `Dark glassmorphism UI card showing diagnostic metrics in gold and emerald on deep black background --ar 4:5`,
     },
     {
@@ -664,7 +712,8 @@ export function buildCompleteScriptPackage(params: {
       roleLabel: "Slide 06 · Passo 02 do Método (Estrutura)",
       headline: "Passo 02: Conecte o Pilar à Dor do Comprador",
       bodyLineBreakCopy: `Pilar ativo: ${editorialPillar}.\n\nQuando o comprador percebe que você descreve o problema dele\nmelhor do que ele mesmo, a autoridade é instantânea.`,
-      visualDesignNote: "Diagrama simples de causa -> efeito no centro da lâmina.",
+      visualDesignNote:
+        "Diagrama simples de causa -> efeito no centro da lâmina.",
       imagePromptEN: `Two interlocking golden rings symbolizing connection between strategy and buyer psychology on dark background --ar 4:5`,
     },
     {
@@ -672,7 +721,8 @@ export function buildCompleteScriptPackage(params: {
       roleLabel: "Slide 07 · Passo 03 do Método (Ritmo Realista)",
       headline: "Passo 03: Respeite sua Capacidade Real",
       bodyLineBreakCopy: `Não construa um plano de fantasia.\n\nUma agenda enxuta executada com precisão supera qualquer\nplanejamento gigante que morre na segunda semana.`,
-      visualDesignNote: "Comparativo visual lado a lado: Fantasia (X) vs. Realidade Executável (✓).",
+      visualDesignNote:
+        "Comparativo visual lado a lado: Fantasia (X) vs. Realidade Executável (✓).",
       imagePromptEN: `Clean dark executive calendar grid with glowing gold highlights, high-end SaaS interface aesthetic --ar 4:5`,
     },
     {
@@ -680,7 +730,8 @@ export function buildCompleteScriptPackage(params: {
       roleLabel: "Slide 08 · Quebra da Objeção Principal",
       headline: `"Mas e se: ${icpPainOrObjection}?"`,
       bodyLineBreakCopy: `É exatamente quando a rotina está intensa que você mais\nprecisa de um sistema pré-definido.\n\nO método existe para devolver tempo, não para tomar.`,
-      visualDesignNote: "Citação da objeção no topo + resposta direta em destaque.",
+      visualDesignNote:
+        "Citação da objeção no topo + resposta direta em destaque.",
       imagePromptEN: `Dark luxury hourglass with golden sand flowing smoothly, symbol of time mastery and executive control --ar 4:5`,
     },
     {
@@ -688,7 +739,8 @@ export function buildCompleteScriptPackage(params: {
       roleLabel: "Slide 09 · Resumo Executivo (Lâmina de Salvamento)",
       headline: "Resumo para Consultar Sempre:",
       bodyLineBreakCopy: `1. Nunca execute sem contexto estratégico.\n2. Ataque uma dor ou objeção real de ${subniche}.\n3. Equilibre os 6 tipos da matriz RETINA.\n4. Transforme cada pauta em um ativo reutilizável.`,
-      visualDesignNote: "Quadro estilo 'Cheat Sheet' desenhado para estimular o clique em Salvar.",
+      visualDesignNote:
+        "Quadro estilo 'Cheat Sheet' desenhado para estimular o clique em Salvar.",
       imagePromptEN: `Structured golden checklist card floating over dark carbon background, crisp lighting --ar 4:5`,
     },
     {
@@ -696,7 +748,8 @@ export function buildCompleteScriptPackage(params: {
       roleLabel: "Slide 10 · Chamada para Ação (CTA & Próximo Passo)",
       headline: "Salve este post para aplicar na sua semana.",
       bodyLineBreakCopy: `Quer ter acesso ao nosso material prático de ${subniche}?\n\nLeia a legenda abaixo e comente a palavra-chave ou acesse\no link do nosso perfil.`,
-      visualDesignNote: "Botão visual de Salvar + Compartilhar destacados em ouro champagne.",
+      visualDesignNote:
+        "Botão visual de Salvar + Compartilhar destacados em ouro champagne.",
       imagePromptEN: `Minimalist dark luxury closing slide with golden bookmark icon and subtle spotlight --ar 4:5`,
     },
   ];
@@ -712,8 +765,10 @@ export function buildCompleteScriptPackage(params: {
       wordForWordScript: `Hoje o foco na nossa operação de ${subniche} está em um ponto que 90% ignora: "${title}".\n\nSe você já sentiu que ${icpPainOrObjection.toLowerCase()}, acompanhe os próximos stories.`,
       connectionBullet: `Foto de bastidor de trabalho + Texto de 3 parágrafos curtos introduzindo "${title}".`,
       mirrorCaptionNoSound: `Foco do dia em ${subniche}: como resolver "${title}" sem improviso.`,
-      instagramSticker: "Enquete: Você já tem isso estruturado hoje? [Sim, 100% / Ainda travo nisso]",
-      visualBrandingNote: "Foto autoral escurecida em 40% + Caixa de texto com fundo preto translúcido e título em Ouro.",
+      instagramSticker:
+        "Enquete: Você já tem isso estruturado hoje? [Sim, 100% / Ainda travo nisso]",
+      visualBrandingNote:
+        "Foto autoral escurecida em 40% + Caixa de texto com fundo preto translúcido e título em Ouro.",
     },
     {
       cardNumber: 2,
@@ -722,8 +777,10 @@ export function buildCompleteScriptPackage(params: {
       wordForWordScript: `Olha só: muita gente me pergunta por que trava nessa etapa de ${subniche}. A verdade é que sem definir "${editorialPillar}" antes, qualquer esforço vira retrabalho.`,
       connectionBullet: `[VÍDEO 15s] Olhar direto p/ câmera -> Explicar a causa raiz de "${title}" em 1 frase forte.`,
       mirrorCaptionNoSound: `RESUMO NA TELA: Por que tentar executar ${subniche} sem definir "${editorialPillar}" gera retrabalho constante.`,
-      instagramSticker: "Sem sticker (foco total na retenção da fala e leitura da legenda espelho)",
-      visualBrandingNote: "Enquadramento vertical limpo + Legenda espelho posicionada no terço central para leitura sem áudio.",
+      instagramSticker:
+        "Sem sticker (foco total na retenção da fala e leitura da legenda espelho)",
+      visualBrandingNote:
+        "Enquadramento vertical limpo + Legenda espelho posicionada no terço central para leitura sem áudio.",
     },
     {
       cardNumber: 3,
@@ -732,8 +789,10 @@ export function buildCompleteScriptPackage(params: {
       wordForWordScript: `Aqui está exatamente como nós estruturamos esse bloco na prática:\n1. Diagnóstico do gargalo\n2. Alinhamento com a promessa ROMA\n3. Execução enxuta conectada à meta de ${strategicObjective.toLowerCase()}.`,
       connectionBullet: `Print ou foto da tela mostrando os 3 passos práticos aplicados no projeto.`,
       mirrorCaptionNoSound: `Os 3 passos que usamos no bastidor para garantir ${strategicObjective.toLowerCase()}.`,
-      instagramSticker: "Slider de Reação (🔥): Faz sentido essa lógica para o seu momento?",
-      visualBrandingNote: "Fundo #080B12 ou foto de monitor com setas douradas apontando para a estrutura.",
+      instagramSticker:
+        "Slider de Reação (🔥): Faz sentido essa lógica para o seu momento?",
+      visualBrandingNote:
+        "Fundo #080B12 ou foto de monitor com setas douradas apontando para a estrutura.",
     },
     {
       cardNumber: 4,
@@ -743,7 +802,8 @@ export function buildCompleteScriptPackage(params: {
       connectionBullet: `[VÍDEO 15s] Quebrar a objeção "${icpPainOrObjection}" com exemplo real.`,
       mirrorCaptionNoSound: `Clareza estratégica não toma o seu tempo — ela devolve horas da sua semana em ${niche}.`,
       instagramSticker: "Sem sticker",
-      visualBrandingNote: "Legenda espelho com destaque colorido nas palavras-chave de transformação.",
+      visualBrandingNote:
+        "Legenda espelho com destaque colorido nas palavras-chave de transformação.",
     },
     {
       cardNumber: 5,
@@ -756,7 +816,8 @@ export function buildCompleteScriptPackage(params: {
         period === "Tarde" || period === "Noite"
           ? `Caixa de Perguntas: "Qual seu maior gargalo hoje em ${subniche}?"`
           : `Enquete Qualificadora: "Quer ver um exemplo prático disso no próximo bloco?"`,
-      visualBrandingNote: "Design limpo centralizando o Sticker interativo na zona de toque confortável (Lei de Fitts).",
+      visualBrandingNote:
+        "Design limpo centralizando o Sticker interativo na zona de toque confortável (Lei de Fitts).",
     },
   ];
 
@@ -879,7 +940,8 @@ export function buildCompleteScriptPackage(params: {
     },
     {
       id: "img-2",
-      targetPiece: "Capa Vertical 9:16 / 4:5 (Reels, Carrossel ou Post Estático)",
+      targetPiece:
+        "Capa Vertical 9:16 / 4:5 (Reels, Carrossel ou Post Estático)",
       visualConceptPT:
         "Composição minimalista Dark/Gold com metáfora visual de precisão e controle estratégico.",
       promptEnglish: `Minimalist dark obsidian composition #080B12 with a glowing golden compass and architectural grid lines #CFA965, depth of field, luxury SaaS brand identity for ${niche}, clean negative space at top for typography --ar 4:5`,
@@ -1003,7 +1065,8 @@ function createInitialScriptsDataset(
       linkedSlotId: "slot-w1-d2-1",
       linkedSlotLabel: "Segunda-feira, 02 Nov • 12:00 • Instagram Reels",
       retinaType: "Engajamento",
-      strategicObjective: "Atrair audiência qualificada quebrando uma crença comum",
+      strategicObjective:
+        "Atrair audiência qualificada quebrando uma crença comum",
       editorialPillar: "01. Visão de Mundo & Quebra de Mitos do Mercado",
       icpPainOrObjection: "Mito de que volume bruto sem direção gera resultado",
       businessMoment: "Aquecimento — Semana 2 de 4",
@@ -1023,9 +1086,11 @@ function createInitialScriptsDataset(
       linkedSlotId: "slot-w1-d2-2",
       linkedSlotLabel: "Segunda-feira, 02 Nov • 19:00 • Carrossel 4:5",
       retinaType: "Transformacao",
-      strategicObjective: "Gerar salvamentos qualificados e provar competência técnica",
+      strategicObjective:
+        "Gerar salvamentos qualificados e provar competência técnica",
       editorialPillar: "04. Educação Prática & Transformação Aplicável",
-      icpPainOrObjection: "Desejo de ter um método prático que caiba na rotina real",
+      icpPainOrObjection:
+        "Desejo de ter um método prático que caiba na rotina real",
       businessMoment: "Aquecimento — Semana 2 de 4",
       platform: "Instagram",
       niche,
@@ -1042,7 +1107,8 @@ function createInitialScriptsDataset(
       linkedSlotId: "slot-w1-d4-1",
       linkedSlotLabel: "Quarta-feira, 04 Nov • 17:00 • YouTube",
       retinaType: "Transformacao",
-      strategicObjective: "Aprofundar consciência e demonstrar domínio técnico",
+      strategicObjective:
+        "Aprofundar consciência e demonstrar domínio técnico",
       editorialPillar: "03. Mecanismo Único da Oferta (MUV em Ação)",
       icpPainOrObjection: "Precisa ver profundidade técnica antes de confiar",
       businessMoment: "Aquecimento — Semana 2 de 4",
@@ -1062,9 +1128,11 @@ function createInitialScriptsDataset(
       linkedSlotId: "slot-w1-d6-1",
       linkedSlotLabel: "Sexta-feira, 06 Nov • 20:00 • YouTube & Instagram",
       retinaType: "Autoridade",
-      strategicObjective: "Interagir ao vivo, demonstrar repertório e conduzir para a oferta",
+      strategicObjective:
+        "Interagir ao vivo, demonstrar repertório e conduzir para a oferta",
       editorialPillar: "06. Superação de Objeções & Condução para Oferta",
-      icpPainOrObjection: "Dúvida se o método funciona especificamente para o seu modelo",
+      icpPainOrObjection:
+        "Dúvida se o método funciona especificamente para o seu modelo",
       businessMoment: "Aquecimento — Semana 2 de 4",
       platform: "YouTube",
       niche,
@@ -1081,9 +1149,11 @@ function createInitialScriptsDataset(
       linkedSlotId: "slot-w1-d3-2",
       linkedSlotLabel: "Terça-feira, 03 Nov • 18:30 • Post Estático",
       retinaType: "Interacao",
-      strategicObjective: "Gerar comentários qualificados e mapear objeções no Direct",
+      strategicObjective:
+        "Gerar comentários qualificados e mapear objeções no Direct",
       editorialPillar: "02. Diagnóstico dos Erros Invisíveis do ICP",
-      icpPainOrObjection: "Dúvida sobre em qual estágio o próprio negócio está travado",
+      icpPainOrObjection:
+        "Dúvida sobre em qual estágio o próprio negócio está travado",
       businessMoment: "Aquecimento — Semana 2 de 4",
       platform: "Instagram",
       niche,
@@ -1098,11 +1168,14 @@ function createInitialScriptsDataset(
       formatSlug: "stories_sequence",
       originType: "calendar_slot",
       linkedSlotId: "slot-w1-d2-stories",
-      linkedSlotLabel: "Segunda-feira, 02 Nov • 08:30 / 12:30 / 16:30 / 20:30",
+      linkedSlotLabel:
+        "Segunda-feira, 02 Nov • 08:30 / 12:30 / 16:30 / 20:30",
       retinaType: "Relacionamento",
-      strategicObjective: "Sustentar narrativa fracionada ao longo do dia com Q&A",
+      strategicObjective:
+        "Sustentar narrativa fracionada ao longo do dia com Q&A",
       editorialPillar: "05. Bastidores da Execução & Provas Reais",
-      icpPainOrObjection: "Manter o comprador aquecido combinando rotina, prova e interação",
+      icpPainOrObjection:
+        "Manter o comprador aquecido combinando rotina, prova e interação",
       businessMoment: "Aquecimento — Semana 2 de 4",
       platform: "Instagram",
       niche,
@@ -1121,15 +1194,10 @@ function createInitialScriptsDataset(
 export function RoteirosEditorialModule(props: RoteirosEditorialModuleProps) {
   const resolvedProjectId = props.projectId || "proj-default";
   const projectName = props.projectName || "Produto X — Lançamento Semente";
-  const resolvedNiche =
-    props.projectNiche || "Finanças & Investimentos";
-  const resolvedSubniche =
-    props.projectSubniche || "Algorithmic Trading";
-  const resolvedObjective =
-    props.projectObjective || "Conversão";
-  const resolvedPhase =
-    props.currentPhase || "Aquecimento — Semana 2 de 4";
-  const hasActiveLine = props.hasActiveLine ?? true;
+  const resolvedNiche = props.projectNiche || "Finanças & Investimentos";
+  const resolvedSubniche = props.projectSubniche || "Algorithmic Trading";
+  const resolvedObjective = props.projectObjective || "Conversão";
+  const resolvedPhase = props.currentPhase || "Aquecimento — Semana 2 de 4";
 
   const scriptsStorageKey = `la-roteiros-editorial-v2-${resolvedProjectId}`;
   const calendarStorageKey = `la-calendario-editorial-v2-${resolvedProjectId}`;
@@ -1152,10 +1220,7 @@ export function RoteirosEditorialModule(props: RoteirosEditorialModuleProps) {
     readonly StrategicThemeRecord[]
   >([]);
 
-  /* Navegação entre as 3 Camadas da Função 03:
-     - "hub": Painel dos 6 Cards de Formato (Visão Geral de Produção)
-     - "format_list": Tela de Listagem de um Formato Específico (Roteiros + Slots daquele formato + Temas)
-     - "studio": Studio Completo do Roteiro Selecionado (Roteiro + Legenda + Títulos/Capas + Materiais + Briefing) */
+  /* Navegação entre as 3 Camadas da Função 03 */
   const [viewStage, setViewStage] = useState<
     "hub" | "format_list" | "studio"
   >(() => {
@@ -1212,8 +1277,31 @@ export function RoteirosEditorialModule(props: RoteirosEditorialModuleProps) {
   const [createSelectedThemeId, setCreateSelectedThemeId] =
     useState<string>("");
   const [createCustomTitle, setCreateCustomTitle] = useState<string>("");
-  const [createSpeakingMode, setCreateSpeakingMode] =
+  const [createSpeakingMode] =
     useState<ScriptSpeakingMode>("conexao_bullets");
+
+  const studioTitleRef = useRef<HTMLTextAreaElement | null>(null);
+
+  /* Opções dinâmicas para os seletores do Modal de Criação */
+  const createSlotSelectOptions = useMemo((): readonly CustomSelectOption<string>[] => {
+    return [
+      { value: "", label: "Digitar tema personalizado abaixo..." },
+      ...calendarSlots.slice(0, 14).map((s) => ({
+        value: s.id,
+        label: `${String(s.dayNumber).padStart(2, "0")} ${s.monthShort} • ${FORMAT_META[s.format].shortLabel} • ${s.mainTheme || s.provisionalTitle}`,
+      })),
+    ];
+  }, [calendarSlots]);
+
+  const createThemeSelectOptions = useMemo((): readonly CustomSelectOption<string>[] => {
+    return [
+      { value: "", label: "Digitar tema personalizado abaixo..." },
+      ...themeLibrary.map((t) => ({
+        value: t.id,
+        label: `[${RETINA_META[t.retinaType].label}] ${t.title}`,
+      })),
+    ];
+  }, [themeLibrary]);
 
   /* Carrega Roteiros, Calendário (F01) e Temas (F02) do localStorage */
   useEffect(() => {
@@ -1260,7 +1348,7 @@ export function RoteirosEditorialModule(props: RoteirosEditorialModuleProps) {
     props.initialScriptId,
   ]);
 
-  /* Se veio com um Slot ou Tema pré-selecionado da Aba Calendário ou Temas, abre criação ou gera direto */
+  /* Se veio com um Slot ou Tema pré-selecionado da Aba Calendário ou Temas, abre criação */
   useEffect(() => {
     if (props.initialPreselectedThemeTitle) {
       setCreateCustomTitle(props.initialPreselectedThemeTitle);
@@ -1303,6 +1391,14 @@ export function RoteirosEditorialModule(props: RoteirosEditorialModuleProps) {
     resolvedNiche,
     resolvedSubniche,
   ]);
+
+  /* Auto-ajuste de altura do título editável no Studio para nunca cortar */
+  useEffect(() => {
+    const el = studioTitleRef.current;
+    if (!el) return;
+    el.style.height = "auto";
+    el.style.height = `${Math.max(44, el.scrollHeight)}px`;
+  }, [currentScript.title, viewStage]);
 
   const updateCurrentScript = useCallback(
     (updater: (prev: EditorialScriptRecord) => EditorialScriptRecord) => {
@@ -1474,7 +1570,9 @@ export function RoteirosEditorialModule(props: RoteirosEditorialModuleProps) {
       versionHistory: [snapshot, ...prev.versionHistory],
     }));
 
-    setCopiedFeedback(`Nova versão ${nextVerLabel} salva no histórico deste roteiro!`);
+    setCopiedFeedback(
+      `Nova versão ${nextVerLabel} salva no histórico deste roteiro!`
+    );
     setTimeout(() => setCopiedFeedback(null), 2600);
   };
 
@@ -1516,22 +1614,13 @@ export function RoteirosEditorialModule(props: RoteirosEditorialModuleProps) {
   const scriptsForSelectedFormat = useMemo(() => {
     return scripts.filter((s) => {
       if (s.formatSlug !== selectedFormatSlug) return false;
-      if (
-        formatStatusFilter === "all" &&
-        s.status === "archived"
-      ) {
+      if (formatStatusFilter === "all" && s.status === "archived") {
         return false;
       }
-      if (
-        formatStatusFilter !== "all" &&
-        s.status !== formatStatusFilter
-      ) {
+      if (formatStatusFilter !== "all" && s.status !== formatStatusFilter) {
         return false;
       }
-      if (
-        formatRetinaFilter !== "all" &&
-        s.retinaType !== formatRetinaFilter
-      ) {
+      if (formatRetinaFilter !== "all" && s.retinaType !== formatRetinaFilter) {
         return false;
       }
       if (!formatSearch.trim()) return true;
@@ -1636,13 +1725,14 @@ export function RoteirosEditorialModule(props: RoteirosEditorialModuleProps) {
               </button>
             ) : null}
 
+            {/* CORRIGIDO: Ícone <Plus /> preservado e removido o "+" textual duplicado */}
             <button
               type="button"
               onClick={() => setIsCreateModalOpen(true)}
               className="inline-flex min-h-[2.625rem] items-center gap-2 rounded-la-md bg-la-gold px-5 py-2 font-la-sans text-[0.875rem] font-semibold text-la-text-inverse shadow-[var(--la-elevation-gold)] hover:bg-la-gold-light"
             >
               <Plus className="h-4 w-4 stroke-[2.5]" />
-              <span>+ Novo Roteiro Contextualizado</span>
+              <span>Novo Roteiro Contextualizado</span>
             </button>
           </div>
         </div>
@@ -1809,9 +1899,10 @@ export function RoteirosEditorialModule(props: RoteirosEditorialModuleProps) {
                         setFormatListSubTab("calendar_slots");
                         setViewStage("format_list");
                       }}
-                      className="rounded-la-md border border-white/12 bg-black/50 px-2.5 py-1.5 font-la-mono text-[0.625rem] text-la-gold-light hover:border-la-gold"
+                      className="inline-flex items-center justify-center gap-1 rounded-la-md border border-white/12 bg-black/50 px-2.5 py-1.5 font-la-mono text-[0.625rem] text-la-gold-light transition-colors hover:border-la-gold"
                     >
-                      + A partir de Slot (F01)
+                      <Plus className="h-3 w-3 shrink-0" />
+                      <span>A partir de Slot (F01)</span>
                     </button>
                     <button
                       type="button"
@@ -1820,9 +1911,10 @@ export function RoteirosEditorialModule(props: RoteirosEditorialModuleProps) {
                         setFormatListSubTab("library_themes");
                         setViewStage("format_list");
                       }}
-                      className="rounded-la-md border border-white/12 bg-black/50 px-2.5 py-1.5 font-la-mono text-[0.625rem] text-la-text-secondary hover:border-la-gold hover:text-la-text-primary"
+                      className="inline-flex items-center justify-center gap-1 rounded-la-md border border-white/12 bg-black/50 px-2.5 py-1.5 font-la-mono text-[0.625rem] text-la-text-secondary transition-colors hover:border-la-gold hover:text-la-text-primary"
                     >
-                      + A partir de Tema (F02)
+                      <Plus className="h-3 w-3 shrink-0" />
+                      <span>A partir de Tema (F02)</span>
                     </button>
                   </div>
                 </div>
@@ -1883,7 +1975,7 @@ export function RoteirosEditorialModule(props: RoteirosEditorialModuleProps) {
           {/* SUB-ABA A: LISTA DE ROTEIROS CRIADOS NAQUELE FORMATO */}
           {formatListSubTab === "scripts" ? (
             <div className="flex flex-col gap-4">
-              {/* Filtros Internos do Formato (Por Tipo RETINA e por Status) */}
+              {/* Filtros Internos do Formato com DarkCustomSelect */}
               <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
                 <div className="relative flex-1 sm:max-w-[24rem]">
                   <Search className="pointer-events-none absolute top-1/2 left-3.5 h-4 w-4 -translate-y-1/2 text-la-gold" />
@@ -1892,45 +1984,39 @@ export function RoteirosEditorialModule(props: RoteirosEditorialModuleProps) {
                     placeholder="Buscar roteiro por título, pilar ou slot..."
                     value={formatSearch}
                     onChange={(e) => setFormatSearch(e.target.value)}
-                    className="min-h-[2.375rem] w-full rounded-la-md border border-white/12 bg-black/60 py-1.5 pr-4 pl-10 font-la-sans text-[0.8125rem] text-la-text-primary"
+                    className="min-h-[2.625rem] w-full rounded-la-md border border-white/12 bg-black/60 py-1.5 pr-4 pl-10 font-la-sans text-[0.8125rem] text-la-text-primary"
                   />
                 </div>
 
-                <div className="flex flex-wrap items-center gap-2">
-                  <select
-                    value={formatRetinaFilter}
-                    onChange={(e) =>
-                      setFormatRetinaFilter(
-                        e.target.value as "all" | RetinaTypeKey
-                      )
-                    }
-                    className="rounded-la-md border border-white/12 bg-[#0B0F19] px-3 py-1.5 font-la-mono text-[0.6875rem] text-la-text-primary"
-                  >
-                    <option value="all">Todos os Tipos RETINA</option>
-                    {(Object.keys(RETINA_META) as RetinaTypeKey[]).map((r) => (
-                      <option key={r} value={r}>
-                        {RETINA_META[r].label}
-                      </option>
-                    ))}
-                  </select>
+                <div className="flex flex-wrap items-center gap-2.5">
+                  {/* SELECT 1: Filtro por Tipo RETINA com DarkCustomSelect */}
+                  <div className="min-w-[14.5rem]">
+                    <DarkCustomSelect
+                      fullWidth
+                      value={formatRetinaFilter}
+                      options={FORMAT_RETINA_FILTER_OPTIONS}
+                      onChange={(val) =>
+                        setFormatRetinaFilter(val as "all" | RetinaTypeKey)
+                      }
+                      ariaLabel="Filtrar roteiros por tipo RETINA"
+                    />
+                  </div>
 
-                  <select
-                    value={formatStatusFilter}
-                    onChange={(e) =>
-                      setFormatStatusFilter(
-                        e.target.value as "all" | ScriptProductionStatus
-                      )
-                    }
-                    className="rounded-la-md border border-white/12 bg-[#0B0F19] px-3 py-1.5 font-la-mono text-[0.6875rem] text-la-text-primary"
-                  >
-                    <option value="all">Status: Todos Ativos</option>
-                    <option value="ready">Pronto</option>
-                    <option value="draft">Rascunho</option>
-                    <option value="in_production">Em Produção</option>
-                    <option value="ab_test">Em Teste A/B</option>
-                    <option value="published">Publicado</option>
-                    <option value="archived">Arquivados</option>
-                  </select>
+                  {/* SELECT 2: Filtro por Status com DarkCustomSelect */}
+                  <div className="min-w-[14rem]">
+                    <DarkCustomSelect
+                      fullWidth
+                      align="right"
+                      value={formatStatusFilter}
+                      options={FORMAT_STATUS_FILTER_OPTIONS}
+                      onChange={(val) =>
+                        setFormatStatusFilter(
+                          val as "all" | ScriptProductionStatus
+                        )
+                      }
+                      ariaLabel="Filtrar roteiros por status"
+                    />
+                  </div>
                 </div>
               </div>
 
@@ -2008,8 +2094,8 @@ export function RoteirosEditorialModule(props: RoteirosEditorialModuleProps) {
                           </p>
                         </div>
 
-                        {/* Ações Rápidas Oficiais (Abrir Studio, Página Própria, Duplicar, Exportar, Arquivar) */}
-                        <div className="flex flex-wrap items-center gap-2 shrink-0">
+                        {/* Ações Rápidas Oficiais */}
+                        <div className="flex shrink-0 flex-wrap items-center gap-2">
                           <button
                             type="button"
                             onClick={() => {
@@ -2062,7 +2148,7 @@ export function RoteirosEditorialModule(props: RoteirosEditorialModuleProps) {
             </div>
           ) : null}
 
-          {/* SUB-ABA B: SLOTS DO CALENDÁRIO VINCULADOS A ESTE FORMATO (SEÇÃO 3.1 PASSO 2) */}
+          {/* SUB-ABA B: SLOTS DO CALENDÁRIO VINCULADOS A ESTE FORMATO */}
           {formatListSubTab === "calendar_slots" ? (
             <div className="flex flex-col gap-3.5">
               <div className="rounded-la-lg border border-la-border-gold/40 bg-black/50 p-4">
@@ -2187,7 +2273,7 @@ export function RoteirosEditorialModule(props: RoteirosEditorialModuleProps) {
           {/* Painel de Contexto Herdado das Funções 01 e 02 + Controles do Roteiro */}
           <section className="rounded-la-xl border border-la-gold/65 bg-[#090D16]/98 p-6 shadow-2xl">
             <div className="flex flex-col justify-between gap-4 border-b border-white/10 pb-4 xl:flex-row xl:items-start">
-              <div className="flex-1">
+              <div className="min-w-0 flex-1">
                 <div className="flex flex-wrap items-center gap-2">
                   <span className="rounded-la-full bg-la-gold px-2.5 py-0.5 font-la-mono text-[0.625rem] font-bold uppercase text-la-text-inverse">
                     STUDIO DO ROTEIRO •{" "}
@@ -2213,18 +2299,26 @@ export function RoteirosEditorialModule(props: RoteirosEditorialModuleProps) {
                   </span>
                 </div>
 
-                {/* Título Editável do Roteiro */}
-                <input
-                  type="text"
-                  value={currentScript.title}
-                  onChange={(e) =>
-                    updateCurrentScript((prev) => ({
-                      ...prev,
-                      title: e.target.value,
-                    }))
-                  }
-                  className="mt-2.5 w-full rounded-la-md border border-transparent bg-transparent px-1 py-0.5 font-la-sans text-[1.375rem] font-semibold text-la-text-primary focus:border-la-gold focus:bg-black/70 focus:outline-none sm:text-[1.5rem]"
-                />
+                {/* Título Editável Multilinha (Sem Corte) no Studio */}
+                <div className="group/stitle relative mt-2.5">
+                  <textarea
+                    ref={studioTitleRef}
+                    rows={1}
+                    value={currentScript.title}
+                    aria-label="Editar título do roteiro"
+                    onChange={(e) =>
+                      updateCurrentScript((prev) => ({
+                        ...prev,
+                        title: e.target.value,
+                      }))
+                    }
+                    className="w-full resize-none overflow-hidden rounded-la-md border border-white/10 bg-black/45 px-3 py-2 pr-9 font-la-sans text-[1.25rem] font-semibold leading-[1.35] text-la-text-primary transition-colors hover:border-la-border-gold/55 focus:border-la-gold focus:bg-black/75 focus:outline-none sm:text-[1.4375rem]"
+                  />
+                  <Edit3
+                    aria-hidden="true"
+                    className="pointer-events-none absolute top-3 right-3 h-4 w-4 text-la-text-muted opacity-65 transition-colors group-hover/stitle:text-la-gold group-hover/stitle:opacity-100"
+                  />
+                </div>
 
                 {/* Barra de Metadados Injetados das Funções 01 e 02 */}
                 <div className="mt-2 flex flex-wrap items-center gap-3 font-la-mono text-[0.6875rem] text-la-text-secondary">
@@ -2251,33 +2345,29 @@ export function RoteirosEditorialModule(props: RoteirosEditorialModuleProps) {
                 </div>
               </div>
 
-              {/* Controles de Status, Teleprompter e Salvar Nova Versão */}
-              <div className="flex flex-wrap items-center gap-2 shrink-0">
-                <select
-                  value={currentScript.status}
-                  onChange={(e) =>
-                    updateCurrentScript((prev) => ({
-                      ...prev,
-                      status: e.target.value as ScriptProductionStatus,
-                    }))
-                  }
-                  className="min-h-[2.375rem] rounded-la-md border border-white/15 bg-black/70 px-3 font-la-mono text-[0.75rem] text-la-gold-light"
-                >
-                  {(
-                    Object.keys(
-                      SCRIPT_STATUS_META
-                    ) as ScriptProductionStatus[]
-                  ).map((stKey) => (
-                    <option key={stKey} value={stKey}>
-                      Status: {SCRIPT_STATUS_META[stKey].label}
-                    </option>
-                  ))}
-                </select>
+              {/* Controles de Status (com DarkCustomSelect), Teleprompter e Salvar Nova Versão */}
+              <div className="flex shrink-0 flex-wrap items-center gap-2">
+                {/* SELECT 3: Status do Roteiro no Studio com DarkCustomSelect */}
+                <div className="min-w-[13.5rem]">
+                  <DarkCustomSelect
+                    fullWidth
+                    align="right"
+                    value={currentScript.status}
+                    options={STUDIO_STATUS_SELECT_OPTIONS}
+                    onChange={(nextStatus) =>
+                      updateCurrentScript((prev) => ({
+                        ...prev,
+                        status: nextStatus as ScriptProductionStatus,
+                      }))
+                    }
+                    ariaLabel="Alterar status de produção do roteiro"
+                  />
+                </div>
 
                 <button
                   type="button"
                   onClick={() => setIsTeleprompterOpen((prev) => !prev)}
-                  className="inline-flex min-h-[2.375rem] items-center gap-1.5 rounded-la-md border border-white/14 bg-black/60 px-3 py-1.5 font-la-mono text-[0.75rem] text-la-text-primary hover:border-la-gold"
+                  className="inline-flex min-h-[2.625rem] items-center gap-1.5 rounded-la-md border border-white/14 bg-black/60 px-3.5 py-2 font-la-mono text-[0.75rem] text-la-text-primary hover:border-la-gold"
                 >
                   {isTeleprompterOpen ? (
                     <>
@@ -2295,7 +2385,7 @@ export function RoteirosEditorialModule(props: RoteirosEditorialModuleProps) {
                 <button
                   type="button"
                   onClick={handleSaveNewScriptVersion}
-                  className="inline-flex min-h-[2.375rem] items-center gap-1.5 rounded-la-md bg-la-gold px-4 py-1.5 font-la-sans text-[0.8125rem] font-semibold text-la-text-inverse hover:bg-la-gold-light"
+                  className="inline-flex min-h-[2.625rem] items-center gap-1.5 rounded-la-md bg-la-gold px-4 py-2 font-la-sans text-[0.8125rem] font-semibold text-la-text-inverse hover:bg-la-gold-light"
                 >
                   <Save className="h-3.5 w-3.5" />
                   <span>Salvar Nova Versão</span>
@@ -2303,7 +2393,7 @@ export function RoteirosEditorialModule(props: RoteirosEditorialModuleProps) {
               </div>
             </div>
 
-            {/* Seletor de Modo de Roteiro (Exibido para Vídeos Curtos, Vídeos Longos e Stories; Aviso Especial para Lives) */}
+            {/* Seletor de Modo de Roteiro */}
             {currentScript.formatSlug === "short_video" ||
             currentScript.formatSlug === "long_video" ||
             currentScript.formatSlug === "stories_sequence" ? (
@@ -2334,7 +2424,8 @@ export function RoteirosEditorialModule(props: RoteirosEditorialModuleProps) {
                         : "border-white/12 bg-black/60 text-la-text-secondary"
                     )}
                   >
-                    ★ Modo Conexão — Bullet Points de Alta Retenção (Recomendado)
+                    ★ Modo Conexão — Bullet Points de Alta Retenção
+                    (Recomendado)
                   </button>
 
                   <button
@@ -2359,7 +2450,8 @@ export function RoteirosEditorialModule(props: RoteirosEditorialModuleProps) {
             ) : currentScript.formatSlug === "live" ? (
               <div className="mt-4 rounded-la-lg border border-rose-400/40 bg-rose-950/20 p-3.5">
                 <span className="font-la-mono text-[0.625rem] font-bold uppercase text-rose-300">
-                  DIRETRIZ OFICIAL DE LIVE · MODO CONEXÃO (BULLET POINTS DE ALTA RETENÇÃO)
+                  DIRETRIZ OFICIAL DE LIVE · MODO CONEXÃO (BULLET POINTS DE ALTA
+                  RETENÇÃO)
                 </span>
                 <p className="mt-0.5 font-la-sans text-[0.75rem] text-la-text-secondary">
                   O maior erro em transmissões ao vivo é tentar ler um texto
@@ -2435,7 +2527,6 @@ export function RoteirosEditorialModule(props: RoteirosEditorialModuleProps) {
               {/* CASO A: CARROSSEL 4:5 (10 SLIDES INTERATIVOS) */}
               {currentScript.formatSlug === "carousel" ? (
                 <div className="grid grid-cols-1 gap-6 lg:grid-cols-12">
-                  {/* Coluna Esquerda (5/12): Preview Visual 4:5 do Slide Ativo */}
                   <div className="flex flex-col items-center lg:col-span-5">
                     <div className="flex w-full items-center justify-between pb-3">
                       <span className="font-la-mono text-[0.6875rem] font-bold uppercase text-la-gold-light">
@@ -2513,7 +2604,6 @@ export function RoteirosEditorialModule(props: RoteirosEditorialModuleProps) {
                       );
                     })()}
 
-                    {/* Seletor Rápido de Lâminas 1 a 10 */}
                     <div className="mt-4 flex flex-wrap justify-center gap-1.5">
                       {currentScript.carouselSlides.map((s, idx) => (
                         <button
@@ -2533,7 +2623,6 @@ export function RoteirosEditorialModule(props: RoteirosEditorialModuleProps) {
                     </div>
                   </div>
 
-                  {/* Coluna Direita (7/12): Editor Cirúrgico Lâmina por Lâmina */}
                   <div className="flex flex-col gap-4 lg:col-span-7">
                     {(() => {
                       const slide =
@@ -2643,7 +2732,7 @@ export function RoteirosEditorialModule(props: RoteirosEditorialModuleProps) {
                     })()}
                   </div>
                 </div>
-              ) : /* CASO B: SEQUÊNCIAS DIÁRIAS DE STORIES (MANHÃ, ALMOÇO, TARDE, NOITE + Q&A) */
+              ) : /* CASO B: SEQUÊNCIAS DIÁRIAS DE STORIES */
               currentScript.formatSlug === "stories_sequence" ? (
                 <div className="flex flex-col gap-6">
                   <div className="flex flex-wrap items-center justify-between gap-3 border-b border-white/10 pb-4">
@@ -2716,7 +2805,6 @@ export function RoteirosEditorialModule(props: RoteirosEditorialModuleProps) {
                                 </p>
                               </div>
 
-                              {/* Legenda Espelho Obrigatória */}
                               <div className="mt-2.5 rounded-la-md border border-emerald-400/35 bg-emerald-950/20 p-2.5">
                                 <span className="block font-la-mono text-[0.5625rem] font-bold uppercase text-emerald-300">
                                   Legenda Espelho (Sem Som):
@@ -2767,7 +2855,6 @@ export function RoteirosEditorialModule(props: RoteirosEditorialModuleProps) {
                     );
                   })()}
 
-                  {/* 3 Perguntas e Respostas Preditivas de Q&A do Dia */}
                   <div className="rounded-la-xl border border-la-border-gold/50 bg-black/50 p-5">
                     <span className="font-la-mono text-[0.6875rem] font-bold uppercase text-la-gold-light">
                       CAIXINHA DE PERGUNTAS PREDITIVA (Q&A ESTRATÉGICO DA NOITE)
@@ -2800,7 +2887,6 @@ export function RoteirosEditorialModule(props: RoteirosEditorialModuleProps) {
               ) : /* CASO C: VÍDEOS CURTOS, VÍDEOS LONGOS, LIVES E POSTS ESTÁTICOS */
               currentScript.speakingMode === "conexao_bullets" &&
                 currentScript.formatSlug === "short_video" ? (
-                /* Checklist Limpo de 7 Linhas Sequenciais para Colar Perto da Lente da Câmera (Seção 4.1.2) */
                 <div className="flex flex-col gap-4">
                   <div className="flex flex-wrap items-center justify-between gap-2 border-b border-white/10 pb-3">
                     <div>
@@ -2865,14 +2951,12 @@ export function RoteirosEditorialModule(props: RoteirosEditorialModuleProps) {
                   </div>
                 </div>
               ) : (
-                /* Tabela de Blocos Cronológicos (2 Colunas: Direção Visual & SFX | Fala / Bullets) */
                 <div className="flex flex-col gap-4">
                   {currentScript.scriptBlocks.map((blk, idx) => (
                     <div
                       key={blk.id}
                       className="grid grid-cols-1 gap-4 rounded-la-xl border border-white/10 bg-[#0B0F1A] p-5 lg:grid-cols-12"
                     >
-                      {/* Coluna Esquerda (4/12): Tempo, Função Psicológica e Direção Visual / B-Roll */}
                       <div className="flex flex-col gap-2 border-b border-white/10 pb-3 lg:col-span-4 lg:border-r lg:border-b-0 lg:pr-4 lg:pb-0">
                         <span className="font-la-mono text-[0.6875rem] font-bold uppercase text-la-gold-light">
                           {blk.timecodeOrStage}
@@ -2906,7 +2990,6 @@ export function RoteirosEditorialModule(props: RoteirosEditorialModuleProps) {
                         </div>
                       </div>
 
-                      {/* Coluna Direita (8/12): Texto de Narração ou Bullets de Conexão */}
                       <div className="flex flex-col gap-2 lg:col-span-8">
                         <span className="font-la-mono text-[0.625rem] uppercase text-la-gold-light">
                           {currentScript.speakingMode === "conexao_bullets"
@@ -2950,7 +3033,6 @@ export function RoteirosEditorialModule(props: RoteirosEditorialModuleProps) {
                     </div>
                   ))}
 
-                  {/* Se for Live, exibe também o Bloco E: Sequência de Stories de Bastidores Pós-Live */}
                   {currentScript.formatSlug === "live" ? (
                     <div className="rounded-la-xl border border-la-border-gold/50 bg-la-gold-faint/40 p-5">
                       <span className="font-la-mono text-[0.6875rem] font-bold uppercase text-la-gold-light">
@@ -3189,7 +3271,6 @@ export function RoteirosEditorialModule(props: RoteirosEditorialModuleProps) {
           {/* --------------------------------------------------------------- */}
           {studioActiveTab === "materiais" ? (
             <section className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-              {/* Categoria A: Material Complementar (Isca / Funil qualificado pelas Funções 01/02) */}
               <div className="flex flex-col justify-between rounded-la-xl border border-la-border-gold/55 bg-[#080B12]/95 p-6">
                 <div>
                   <div className="flex items-center justify-between">
@@ -3261,7 +3342,6 @@ export function RoteirosEditorialModule(props: RoteirosEditorialModuleProps) {
                 ) : null}
               </div>
 
-              {/* Categoria B: Material de Explicação (Apoio Didático da Aula/Live) */}
               <div className="flex flex-col justify-between rounded-la-xl border border-white/10 bg-[#080B12]/95 p-6">
                 <div>
                   <span className="font-la-mono text-[0.625rem] font-bold uppercase text-sky-300">
@@ -3380,7 +3460,7 @@ export function RoteirosEditorialModule(props: RoteirosEditorialModuleProps) {
       ) : null}
 
       {/* =================================================================== */}
-      {/* MODAL: CRIAR NOVO ROTEIRO CONTEXTUALIZADO (SLOT F01 OU TEMA F02)    */}
+      {/* MODAL: CRIAR NOVO ROTEIRO CONTEXTUALIZADO (COM DARKCUSTOMSELECT)    */}
       {/* =================================================================== */}
       <AnimatePresence>
         {isCreateModalOpen ? (
@@ -3455,69 +3535,55 @@ export function RoteirosEditorialModule(props: RoteirosEditorialModuleProps) {
                   </button>
                 </div>
 
+                {/* SELECT 4: Formato do Conteúdo no Modal com DarkCustomSelect */}
                 <div className="flex flex-col gap-1">
-                  <label className="font-la-mono text-[0.6875rem] uppercase text-la-text-secondary">
+                  <span className="font-la-mono text-[0.6875rem] uppercase text-la-text-secondary">
                     Formato do Conteúdo
-                  </label>
-                  <select
+                  </span>
+                  <DarkCustomSelect
+                    fullWidth
+                    menuZIndex="z-[260]"
                     value={createFormatSlug}
-                    onChange={(e) =>
-                      setCreateFormatSlug(e.target.value as ScriptFormatSlug)
+                    options={CREATE_FORMAT_SELECT_OPTIONS}
+                    onChange={(val) =>
+                      setCreateFormatSlug(val as ScriptFormatSlug)
                     }
-                    className="min-h-[2.5rem] rounded-la-md border border-white/14 bg-black/60 px-3 font-la-sans text-[0.875rem] text-la-text-primary"
-                  >
-                    {SCRIPT_FORMATS_CATALOG.map((f) => (
-                      <option key={f.slug} value={f.slug}>
-                        {f.name}
-                      </option>
-                    ))}
-                  </select>
+                    ariaLabel="Selecionar formato do novo roteiro"
+                  />
                 </div>
 
+                {/* SELECT 5: Slot do Calendário no Modal com DarkCustomSelect */}
                 {createOrigin === "calendar_slot" &&
                 calendarSlots.length > 0 ? (
                   <div className="flex flex-col gap-1">
-                    <label className="font-la-mono text-[0.6875rem] uppercase text-la-text-secondary">
+                    <span className="font-la-mono text-[0.6875rem] uppercase text-la-text-secondary">
                       Selecionar Slot do Calendário (Opcional)
-                    </label>
-                    <select
+                    </span>
+                    <DarkCustomSelect
+                      fullWidth
+                      menuZIndex="z-[260]"
                       value={createSelectedSlotId}
-                      onChange={(e) => setCreateSelectedSlotId(e.target.value)}
-                      className="min-h-[2.5rem] rounded-la-md border border-white/14 bg-black/60 px-3 font-la-sans text-[0.8125rem] text-la-text-primary"
-                    >
-                      <option value="">
-                        Digitar tema personalizado abaixo...
-                      </option>
-                      {calendarSlots.slice(0, 14).map((s) => (
-                        <option key={s.id} value={s.id}>
-                          {String(s.dayNumber).padStart(2, "0")} {s.monthShort}{" "}
-                          • {FORMAT_META[s.format].shortLabel} •{" "}
-                          {s.mainTheme || s.provisionalTitle}
-                        </option>
-                      ))}
-                    </select>
+                      options={createSlotSelectOptions}
+                      onChange={setCreateSelectedSlotId}
+                      ariaLabel="Selecionar slot do calendário editorial"
+                    />
                   </div>
                 ) : null}
 
+                {/* SELECT 6: Tema da Biblioteca no Modal com DarkCustomSelect */}
                 {createOrigin === "theme_library" && themeLibrary.length > 0 ? (
                   <div className="flex flex-col gap-1">
-                    <label className="font-la-mono text-[0.6875rem] uppercase text-la-text-secondary">
+                    <span className="font-la-mono text-[0.6875rem] uppercase text-la-text-secondary">
                       Selecionar Tema Aprovado da Biblioteca (Opcional)
-                    </label>
-                    <select
+                    </span>
+                    <DarkCustomSelect
+                      fullWidth
+                      menuZIndex="z-[260]"
                       value={createSelectedThemeId}
-                      onChange={(e) => setCreateSelectedThemeId(e.target.value)}
-                      className="min-h-[2.5rem] rounded-la-md border border-white/14 bg-black/60 px-3 font-la-sans text-[0.8125rem] text-la-text-primary"
-                    >
-                      <option value="">
-                        Digitar tema personalizado abaixo...
-                      </option>
-                      {themeLibrary.map((t) => (
-                        <option key={t.id} value={t.id}>
-                          [{t.retinaType}] {t.title}
-                        </option>
-                      ))}
-                    </select>
+                      options={createThemeSelectOptions}
+                      onChange={setCreateSelectedThemeId}
+                      ariaLabel="Selecionar tema da biblioteca estratégica"
+                    />
                   </div>
                 ) : null}
 

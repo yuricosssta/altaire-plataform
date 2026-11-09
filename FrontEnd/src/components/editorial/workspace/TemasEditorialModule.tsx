@@ -5,6 +5,7 @@ import {
   useCallback,
   useEffect,
   useMemo,
+  useRef,
   useState,
   type DragEvent,
   type FormEvent,
@@ -13,21 +14,14 @@ import Link from "next/link";
 import { AnimatePresence, motion } from "motion/react";
 import {
   AlertTriangle,
-  Archive,
   ArrowLeft,
   ArrowRight,
-  Bookmark,
   Calendar as CalendarIcon,
   Check,
   CheckCircle2,
-  Compass,
-  Copy,
   Edit3,
   ExternalLink,
-  FileText,
-  Filter,
   Flame,
-  Globe,
   GripVertical,
   Layers,
   Lightbulb,
@@ -37,15 +31,17 @@ import {
   RotateCcw,
   Save,
   Search,
-  Sliders,
   Sparkles,
   Star,
   Target,
   Trash2,
-  TrendingUp,
   X,
 } from "lucide-react";
 import { clsx } from "clsx";
+import {
+  DarkCustomSelect,
+  type CustomSelectOption,
+} from "@/components/ui/DarkCustomSelect";
 import {
   FORMAT_META,
   RETINA_META,
@@ -54,6 +50,58 @@ import {
   type RetinaTypeKey,
   type SlotContentFormat,
 } from "./CalendarioEditorialModule";
+
+/* ========================================================================== */
+/* COMPONENTE AUXILIAR: TÍTULO DE TEMA EDITÁVEL MULTILINHA (SEM CORTE)        */
+/* ========================================================================== */
+
+interface EditableThemeTitleProps {
+  readonly value: string;
+  readonly onChange: (nextValue: string) => void;
+  readonly indexBadge?: string;
+  readonly ariaLabel?: string;
+}
+
+function EditableThemeTitle({
+  value,
+  onChange,
+  indexBadge,
+  ariaLabel,
+}: EditableThemeTitleProps) {
+  const textareaRef = useRef<HTMLTextAreaElement | null>(null);
+
+  useEffect(() => {
+    const el = textareaRef.current;
+    if (!el) return;
+    el.style.height = "auto";
+    el.style.height = `${Math.max(40, el.scrollHeight)}px`;
+  }, [value]);
+
+  return (
+    <div className="group/title relative flex w-full items-start gap-2">
+      {indexBadge ? (
+        <span className="mt-1.5 inline-flex h-6 min-w-[1.625rem] shrink-0 items-center justify-center rounded-la-xs border border-la-border-gold/45 bg-la-gold-faint px-1.5 font-la-mono text-[0.6875rem] font-bold text-la-gold-light">
+          {indexBadge}
+        </span>
+      ) : null}
+
+      <div className="relative flex-1">
+        <textarea
+          ref={textareaRef}
+          rows={1}
+          value={value}
+          aria-label={ariaLabel ?? "Editar título do tema estratégico"}
+          onChange={(e) => onChange(e.target.value)}
+          className="w-full resize-none overflow-hidden rounded-la-md border border-white/10 bg-black/50 px-3 py-2 pr-8 font-la-sans text-[0.9375rem] font-semibold leading-[1.45] text-la-text-primary transition-all placeholder:text-la-text-muted hover:border-la-border-gold/55 focus:border-la-gold focus:bg-[#070A12] focus:outline-none focus:ring-1 focus:ring-la-gold/35"
+        />
+        <Edit3
+          aria-hidden="true"
+          className="pointer-events-none absolute top-2.5 right-2.5 h-3.5 w-3.5 text-la-text-muted opacity-65 transition-colors group-hover/title:text-la-gold group-hover/title:opacity-100"
+        />
+      </div>
+    </div>
+  );
+}
 
 /* ========================================================================== */
 /* CONTRATOS E TIPAGENS ESTRITAS DA FUNÇÃO 02 (TEMAS E INTEGRAÇÃO)            */
@@ -109,6 +157,12 @@ export type ThemeLibraryStatus =
   | "market_test"
   | "archived";
 
+export type SimulationScenarioKey =
+  | "none"
+  | "more_transformation"
+  | "sales_push"
+  | "top_of_funnel";
+
 export interface StrategicThemeRecord {
   readonly id: string;
   readonly title: string;
@@ -154,32 +208,6 @@ const DEFAULT_ROMA_PILLARS: readonly string[] = [
   "06. Superação de Objeções & Condução para Oferta",
 ];
 
-const CONSCIOUSNESS_AXES: readonly {
-  readonly value: ConsciousnessAxis;
-  readonly label: string;
-  readonly hint: string;
-  readonly badgeClass: string;
-}[] = [
-  {
-    value: "Sintoma",
-    label: "Eixo 1 · Sintoma",
-    hint: "Foca no que o público sente no dia a dia antes de diagnosticar a causa.",
-    badgeClass: "border-sky-400/45 bg-sky-500/15 text-sky-200",
-  },
-  {
-    value: "Solução",
-    label: "Eixo 2 · Solução",
-    hint: "Desmistifica o caminho metodológico para resolver o problema.",
-    badgeClass: "border-la-gold/60 bg-la-gold/20 text-la-gold-light",
-  },
-  {
-    value: "Objeção",
-    label: "Eixo 3 · Objeção",
-    hint: "Ataca as desculpas e travas mentais que impedem a ação ou compra.",
-    badgeClass: "border-amber-400/50 bg-amber-500/15 text-amber-200",
-  },
-];
-
 const JOURNEY_STAGES: readonly CustomerJourneyStage[] = [
   "Descoberta",
   "Consideração",
@@ -218,35 +246,177 @@ const MODE_3_PLATFORMS: readonly string[] = [
   "Blog/Site",
 ];
 
-const STATUS_BADGE_MAP: Record<
-  ThemeLibraryStatus,
-  { readonly label: string; readonly className: string }
-> = {
-  active: {
-    label: "Ativo na Biblioteca",
-    className: "border-emerald-400/45 bg-emerald-500/15 text-emerald-200",
+/* ========================================================================== */
+/* OPÇÕES TIPADAS PARA O COMPONENTE DARKCUSTOMSELECT                          */
+/* ========================================================================== */
+
+const MODE_1_VOLUME_OPTIONS: readonly CustomSelectOption<string>[] = [
+  { value: "15", label: "Gerar 15 temas iniciais (~5 por área ROMA)" },
+  { value: "20", label: "Gerar 20 temas iniciais (Padrão rápido)" },
+  { value: "30", label: "Gerar 30 temas iniciais (10 por área ROMA)" },
+  { value: "45", label: "Gerar 45 temas iniciais (15 por área ROMA)" },
+];
+
+const MODE_1_RETINA_PRIORITY_OPTIONS: readonly CustomSelectOption<
+  "all" | RetinaTypeKey
+>[] = [
+  {
+    value: "all",
+    label: "Equilíbrio padrão — Todos os 6 tipos (Recomendado)",
   },
-  favorite: {
-    label: "Favorito ★",
-    className: "border-la-gold bg-la-gold/20 text-la-gold-light",
+  {
+    value: "Relacionamento",
+    label: "Focar mais em Relacionamento (Conexão com seguidores)",
   },
-  priority_next_cycle: {
-    label: "Prioritário p/ Próximo Ciclo",
-    className: "border-sky-400/50 bg-sky-500/15 text-sky-200",
+  {
+    value: "Engajamento",
+    label: "Focar mais em Engajamento (Topo de funil, alcance)",
   },
-  saved_for_sales: {
-    label: "Guardado para Vendas",
-    className: "border-rose-400/50 bg-rose-500/15 text-rose-200",
+  {
+    value: "Transformacao",
+    label: "Focar mais em Transformação (Educativo, salvamentos)",
   },
-  market_test: {
-    label: "Teste de Mercado",
-    className: "border-purple-400/50 bg-purple-500/15 text-purple-200",
+  {
+    value: "Interacao",
+    label: "Focar mais em Interação (Enquetes, caixinhas, Direct)",
   },
-  archived: {
-    label: "Arquivado",
-    className: "border-white/10 bg-black/50 text-la-text-muted",
+  {
+    value: "NiveisDeConsciencia",
+    label: "Focar mais em Níveis de Consciência (Conteúdo de venda)",
   },
-};
+  {
+    value: "Autoridade",
+    label: "Focar mais em Autoridade (Resultados, provas, método)",
+  },
+];
+
+const MODE_2_VOLUME_OPTIONS: readonly CustomSelectOption<string>[] = [
+  { value: "12", label: "12 temas avançados de mercado" },
+  { value: "20", label: "20 temas avançados de mercado" },
+  { value: "30", label: "30 temas avançados de mercado" },
+];
+
+const MODE_3_OBJECTIVE_OPTIONS: readonly CustomSelectOption<string>[] =
+  MODE_3_OBJECTIVES.map((obj) => ({
+    value: obj,
+    label: obj,
+  }));
+
+const MODE_3_MOMENT_OPTIONS: readonly CustomSelectOption<string>[] =
+  MODE_3_BUSINESS_MOMENTS.map((mom) => ({
+    value: mom,
+    label: mom,
+  }));
+
+const MODE_3_VOLUME_OPTIONS: readonly CustomSelectOption<string>[] = [
+  { value: "12", label: "Lote de 12 temas alinhados ao momento" },
+  { value: "18", label: "Lote de 18 temas alinhados ao momento" },
+  { value: "24", label: "Lote de 24 temas alinhados ao momento" },
+];
+
+const MAP_ORIGIN_FILTER_OPTIONS: readonly CustomSelectOption<
+  "all" | ThemeOriginMode
+>[] = [
+  { value: "all", label: "Origem: Todas (3)" },
+  { value: "ROMA & Avatar", label: "ROMA & Avatar" },
+  { value: "Dados de Mercado", label: "Dados de Mercado" },
+  { value: "Objetivo & Momento", label: "Objetivo & Momento" },
+];
+
+const MAP_PILLAR_FILTER_OPTIONS: readonly CustomSelectOption<string>[] = [
+  { value: "all", label: "Pilar ROMA: Todos" },
+  ...DEFAULT_ROMA_PILLARS.map((p) => ({
+    value: p,
+    label: p,
+  })),
+];
+
+const MAP_RETINA_FILTER_OPTIONS: readonly CustomSelectOption<
+  "all" | RetinaTypeKey
+>[] = [
+  { value: "all", label: "Tipo RETINA: Todos" },
+  ...(Object.keys(RETINA_META) as RetinaTypeKey[]).map((r) => ({
+    value: r,
+    label: `${RETINA_META[r].code} · ${RETINA_META[r].label}`,
+  })),
+];
+
+const MAP_AXIS_FILTER_OPTIONS: readonly CustomSelectOption<
+  "all" | ConsciousnessAxis
+>[] = [
+  { value: "all", label: "Consciência: Todos (3)" },
+  { value: "Sintoma", label: "Eixo 1 · Sintoma" },
+  { value: "Solução", label: "Eixo 2 · Solução" },
+  { value: "Objeção", label: "Eixo 3 · Objeção" },
+];
+
+const MAP_JOURNEY_FILTER_OPTIONS: readonly CustomSelectOption<
+  "all" | CustomerJourneyStage
+>[] = [
+  { value: "all", label: "Jornada: Todas (5)" },
+  ...JOURNEY_STAGES.map((j) => ({
+    value: j,
+    label: j,
+  })),
+];
+
+const MAP_FORMAT_FILTER_OPTIONS: readonly CustomSelectOption<
+  "all" | SlotContentFormat
+>[] = [
+  { value: "all", label: "Formato: Todos" },
+  ...(Object.keys(FORMAT_META) as SlotContentFormat[]).map((f) => ({
+    value: f,
+    label: FORMAT_META[f].shortLabel,
+  })),
+];
+
+const INLINE_PILLAR_OPTIONS: readonly CustomSelectOption<string>[] =
+  DEFAULT_ROMA_PILLARS.map((p) => ({
+    value: p,
+    label: p,
+  }));
+
+const INLINE_RETINA_OPTIONS: readonly CustomSelectOption<RetinaTypeKey>[] = (
+  Object.keys(RETINA_META) as RetinaTypeKey[]
+).map((r) => ({
+  value: r,
+  label: `${RETINA_META[r].code} · ${RETINA_META[r].label}`,
+}));
+
+const INLINE_AXIS_OPTIONS: readonly CustomSelectOption<ConsciousnessAxis>[] = [
+  { value: "Sintoma", label: "Eixo 1 · Sintoma" },
+  { value: "Solução", label: "Eixo 2 · Solução" },
+  { value: "Objeção", label: "Eixo 3 · Objeção" },
+];
+
+const INLINE_JOURNEY_OPTIONS: readonly CustomSelectOption<CustomerJourneyStage>[] =
+  JOURNEY_STAGES.map((j) => ({
+    value: j,
+    label: j,
+  }));
+
+const INLINE_FORMAT_OPTIONS: readonly CustomSelectOption<SlotContentFormat>[] =
+  (Object.keys(FORMAT_META) as SlotContentFormat[]).map((f) => ({
+    value: f,
+    label: FORMAT_META[f].shortLabel,
+  }));
+
+const SIMULATION_SCENARIO_OPTIONS: readonly CustomSelectOption<SimulationScenarioKey>[] =
+  [
+    { value: "none", label: "Simular Cenário: Distribuição Padrão" },
+    {
+      value: "more_transformation",
+      label: "Simular: + Transformação, - Engajamento",
+    },
+    {
+      value: "sales_push",
+      label: "Simular: Intensificação de Vendas / Carrinho Aberto",
+    },
+    {
+      value: "top_of_funnel",
+      label: "Simular: Crescimento de Audiência / Topo de Funil",
+    },
+  ];
 
 /* ========================================================================== */
 /* GERADOR INICIAL DE REPERTÓRIO CANÔNICO DA BIBLIOTECA                       */
@@ -306,7 +476,8 @@ function createInitialThemeLibrary(
       id: "thm-init-03",
       title: `A parte que ninguém te explicou sobre gestão de risco em ${sub} quando você tem pouco tempo`,
       origin: "Dados de Mercado",
-      techniqueUsed: "Técnica 7 · Engenharia Reversa de Comentários ('Mas e se...?')",
+      techniqueUsed:
+        "Técnica 7 · Engenharia Reversa de Comentários ('Mas e se...?')",
       romaPillar: DEFAULT_ROMA_PILLARS[1],
       retinaType: "Transformacao",
       consciousnessAxis: "Solução",
@@ -508,7 +679,9 @@ function generateBatchForMode(params: {
   const pillarsToUse =
     selectedPillars.length > 0 ? selectedPillars : DEFAULT_ROMA_PILLARS;
   const targetPlatforms =
-    platforms && platforms.length > 0 ? platforms : ["Instagram", "YouTube", "TikTok"];
+    platforms && platforms.length > 0
+      ? platforms
+      : ["Instagram", "YouTube", "TikTok"];
 
   const templatesRoma: readonly {
     readonly titleFn: (p: string) => string;
@@ -633,7 +806,8 @@ function generateBatchForMode(params: {
     {
       titleFn: () =>
         `A parte que ninguém te explicou sobre ${subniche} quando você precisa conciliar com ${customCommentSnippet}`,
-      technique: "Técnica 7 · Engenharia Reversa de Comentários ('Mas e se...?')",
+      technique:
+        "Técnica 7 · Engenharia Reversa de Comentários ('Mas e se...?')",
       retina: "Transformacao",
       axis: "Solução",
       journey: "Consideração",
@@ -653,7 +827,8 @@ function generateBatchForMode(params: {
     {
       titleFn: () =>
         `Como resolver ${customReviewSnippet} em ${subniche} direto pelo celular em 3 passos`,
-      technique: "Técnica 11 · Engenharia Reversa de Reviews (1★ e 5★ Amazon/Hotmart)",
+      technique:
+        "Técnica 11 · Engenharia Reversa de Reviews (1★ e 5★ Amazon/Hotmart)",
       retina: "Transformacao",
       axis: "Solução",
       journey: "Consideração",
@@ -663,7 +838,8 @@ function generateBatchForMode(params: {
     {
       titleFn: () =>
         `Onde clicar exatamente para configurar seu controle de ${subniche} sem rasgar orçamento`,
-      technique: "Técnica 12 · Mapeamento de Ilhas de Competência (Ultra-específico)",
+      technique:
+        "Técnica 12 · Mapeamento de Ilhas de Competência (Ultra-específico)",
       retina: "Transformacao",
       axis: "Solução",
       journey: "Consideração",
@@ -683,7 +859,8 @@ function generateBatchForMode(params: {
     {
       titleFn: () =>
         `O erro estratégico de grandes operações do mercado e o que isso ensina para seu negócio de ${niche}`,
-      technique: "Técnica 13 · Cruzamento de Interesses Analógicos & Cultura Pop",
+      technique:
+        "Técnica 13 · Cruzamento de Interesses Analógicos & Cultura Pop",
       retina: "Engajamento",
       axis: "Sintoma",
       journey: "Descoberta",
@@ -768,10 +945,11 @@ function generateBatchForMode(params: {
     const tpl = basePool[i % basePool.length]!;
     const pillar = pillarsToUse[i % pillarsToUse.length]!;
     const platform = targetPlatforms[i % targetPlatforms.length]!;
-    const chosenRetina =
-      retinaFocus !== "all" ? retinaFocus : tpl.retina;
+    const chosenRetina = retinaFocus !== "all" ? retinaFocus : tpl.retina;
     const cycleSuffix =
-      i >= basePool.length ? ` (Ângulo #${Math.floor(i / basePool.length) + 1})` : "";
+      i >= basePool.length
+        ? ` (Ângulo #${Math.floor(i / basePool.length) + 1})`
+        : "";
 
     generated.push({
       id: `thm-batch-${Date.now()}-${i}`,
@@ -785,10 +963,12 @@ function generateBatchForMode(params: {
       recommendedFormat: tpl.format,
       recommendedPlatform: platform,
       painDesireOrObjection: tpl.pain,
-      status: mode === "Dados de Mercado" && i % 3 === 0 ? "market_test" : "active",
+      status:
+        mode === "Dados de Mercado" && i % 3 === 0 ? "market_test" : "active",
       isFavorite: i < 3,
       isPriorityNextCycle: mode === "Objetivo & Momento" || i < 4,
-      isSavedForSales: chosenRetina === "NiveisDeConsciencia" || chosenRetina === "Autoridade",
+      isSavedForSales:
+        chosenRetina === "NiveisDeConsciencia" || chosenRetina === "Autoridade",
       isMarketTest: mode === "Dados de Mercado" && i % 3 === 0,
       allocatedSlotIds: [],
       createdAt: "Gerado neste lote",
@@ -804,31 +984,25 @@ function generateBatchForMode(params: {
 
 export function TemasEditorialModule(props: TemasEditorialModuleProps) {
   const resolvedProjectId = props.projectId || "proj-default";
-  const projectName = props.projectName || "Produto X — Lançamento Semente";
   const resolvedNiche =
     props.projectNiche || props.niche || "Finanças & Investimentos";
   const resolvedSubniche =
     props.projectSubniche || props.subniche || "Algorithmic Trading";
   const resolvedObjective =
     props.projectObjective || props.currentObjective || "Conversão";
-  const resolvedPhase =
-    props.currentPhase || "Aquecimento — Semana 2 de 4";
+  const resolvedPhase = props.currentPhase || "Aquecimento — Semana 2 de 4";
   const hasActiveLine = props.hasActiveLine ?? true;
-  const hasActiveCalendar = props.hasActiveCalendar ?? true;
 
   const themesStorageKey = `la-temas-editorial-v2-${resolvedProjectId}`;
   const calendarStorageKey = `la-calendario-editorial-v2-${resolvedProjectId}`;
   const versionsStorageKey = `la-calendario-temas-versions-${resolvedProjectId}`;
 
-  /* Subáreas oficiais da Função 02:
-     - "gerar": Subárea 1 (Motor de Geração nos 3 Modos Oficiais + Estúdio de Curadoria em Lote)
-     - "mapa": Subárea 2 (Mapa Estratégico de Temas / Biblioteca Completa Filtrável)
-     - "integracao": Subárea 3 (Mesa Split-Screen de Integração no Calendário + Reequilíbrio) */
+  /* Subáreas oficiais da Função 02 */
   const [activeSubTab, setActiveSubTab] = useState<
     "gerar" | "mapa" | "integracao"
   >(props.initialSubTab || "gerar");
 
-  /* Qual modo de geração está aberto dentro da Subárea 1 ("hub" mostra os 3 cards principais) */
+  /* Qual modo de geração está aberto dentro da Subárea 1 */
   const [generatorMode, setGeneratorMode] = useState<
     "hub" | "roma_avatar" | "dados_mercado" | "objetivo_momento"
   >(props.initialGeneratorMode || "hub");
@@ -838,7 +1012,7 @@ export function TemasEditorialModule(props: TemasEditorialModuleProps) {
     readonly StrategicThemeRecord[]
   >(() => createInitialThemeLibrary(resolvedNiche, resolvedSubniche));
 
-  /* Lote em Revisão Humana (Gerado nos Modos 1, 2 ou 3 ANTES de entrar no Mapa de Temas!) */
+  /* Lote em Revisão Humana */
   const [stagedBatch, setStagedBatch] = useState<
     readonly StrategicThemeRecord[]
   >([]);
@@ -850,16 +1024,16 @@ export function TemasEditorialModule(props: TemasEditorialModuleProps) {
     null
   );
 
-  /* Parâmetros do Modo 1 — ROMA & Avatar (Seção 3.2.3) */
+  /* Parâmetros do Modo 1 — ROMA & Avatar */
   const [mode1Volume, setMode1Volume] = useState<number>(15);
   const [mode1SelectedPillars, setMode1SelectedPillars] = useState<
     readonly string[]
-  >([]); // vazio = Todos os pilares (recomendado)
+  >([]);
   const [mode1RetinaPriority, setMode1RetinaPriority] = useState<
     "all" | RetinaTypeKey
   >("all");
 
-  /* Parâmetros do Modo 2 — Dados de Mercado Wizard (Seção 3.3.2) */
+  /* Parâmetros do Modo 2 — Dados de Mercado Wizard */
   const [mode2Step, setMode2Step] = useState<1 | 2 | 3>(1);
   const [mode2VideoLinks, setMode2VideoLinks] = useState<string>(
     "https://youtube.com/watch?v=video-mais-visto-nicho-01\nhttps://instagram.com/reel/post-alta-interacao-02"
@@ -873,7 +1047,7 @@ export function TemasEditorialModule(props: TemasEditorialModuleProps) {
     );
   const [mode2Volume, setMode2Volume] = useState<number>(12);
 
-  /* Parâmetros do Modo 3 — Objetivo & Momento do Negócio (Seção 3.4.1) */
+  /* Parâmetros do Modo 3 — Objetivo & Momento do Negócio */
   const [mode3Objective, setMode3Objective] = useState<string>(
     MODE_3_OBJECTIVES[3]
   );
@@ -887,7 +1061,7 @@ export function TemasEditorialModule(props: TemasEditorialModuleProps) {
   ]);
   const [mode3Volume, setMode3Volume] = useState<number>(12);
 
-  /* Filtros da Subárea 2 — Mapa Estratégico de Temas (Seção 4.1) */
+  /* Filtros da Subárea 2 — Mapa Estratégico de Temas */
   const [mapSearch, setMapSearch] = useState<string>("");
   const [mapOriginFilter, setMapOriginFilter] = useState<
     "all" | ThemeOriginMode
@@ -914,7 +1088,7 @@ export function TemasEditorialModule(props: TemasEditorialModuleProps) {
     | "unallocated"
   >("all");
 
-  /* Estados da Subárea 3 — Integração com Calendário Editorial (Seção 5.1 e 5.2) */
+  /* Estados da Subárea 3 — Integração com Calendário Editorial */
   const [calendarsFromF01, setCalendarsFromF01] = useState<
     readonly EditorialCalendarRecord[]
   >([]);
@@ -934,9 +1108,8 @@ export function TemasEditorialModule(props: TemasEditorialModuleProps) {
   const [suggestionOffsetBySlot, setSuggestionOffsetBySlot] = useState<
     Record<string, number>
   >({});
-  const [simulationScenario, setSimulationScenario] = useState<
-    "none" | "more_transformation" | "sales_push" | "top_of_funnel"
-  >("none");
+  const [simulationScenario, setSimulationScenario] =
+    useState<SimulationScenarioKey>("none");
   const [savedCalendarVersions, setSavedCalendarVersions] = useState<
     readonly SavedCalendarThemeVersion[]
   >([]);
@@ -1034,7 +1207,8 @@ export function TemasEditorialModule(props: TemasEditorialModuleProps) {
         retinaType: "Engajamento",
         platforms: ["Instagram", "TikTok"],
         suggestedTime: "12:00",
-        strategicObjective: "Atrair audiência qualificada quebrando uma crença comum",
+        strategicObjective:
+          "Atrair audiência qualificada quebrando uma crença comum",
         secondaryObjective: "Alcance qualificado",
         editorialLineName: "Linha Editorial v1",
         editorialPillar: DEFAULT_ROMA_PILLARS[0],
@@ -1061,7 +1235,8 @@ export function TemasEditorialModule(props: TemasEditorialModuleProps) {
         retinaType: "Transformacao",
         platforms: ["Instagram", "LinkedIn"],
         suggestedTime: "19:00",
-        strategicObjective: "Gerar salvamentos qualificados e provar competência",
+        strategicObjective:
+          "Gerar salvamentos qualificados e provar competência",
         secondaryObjective: "Educar sobre o MUV",
         editorialLineName: "Linha Editorial v1",
         editorialPillar: DEFAULT_ROMA_PILLARS[3],
@@ -1271,13 +1446,15 @@ export function TemasEditorialModule(props: TemasEditorialModuleProps) {
       setSelectedBatchIds(batch.map((b) => b.id));
       setIsGeneratingBatch(false);
       setBatchFeedbackBanner(
-        `Lote de ${batch.length} temas estratégicos gerado a partir de "${mode}"! Revise os títulos abaixo, marque favoritos ou gere variações na mesma linha antes de aprovar para o Mapa de Temas.`
+        `Lote de ${batch.length} temas estratégicos gerado a partir de "${mode}"! Revise os títulos completos abaixo, marque favoritos ou gere variações na mesma linha antes de aprovar para o Mapa de Temas.`
       );
     }, 420);
   };
 
-  /* Botão "Gerar mais temas na mesma linha" (Aprofundar cluster — Seção 3.2.4) */
-  const handleGenerateMoreLikeThisInBatch = (seedTheme: StrategicThemeRecord) => {
+  /* Botão "Gerar mais temas na mesma linha" (Aprofundar cluster) */
+  const handleGenerateMoreLikeThisInBatch = (
+    seedTheme: StrategicThemeRecord
+  ) => {
     const variations: StrategicThemeRecord[] = [
       {
         ...seedTheme,
@@ -1289,7 +1466,7 @@ export function TemasEditorialModule(props: TemasEditorialModuleProps) {
       {
         ...seedTheme,
         id: `thm-cluster-${Date.now()}-2`,
-        title: `Estudo de Caso: Como resolvemos "${seedTheme.title.slice(0, 42)}..." na prática`,
+        title: `Estudo de Caso: Como resolvemos "${seedTheme.title.slice(0, 48)}..." na prática`,
         recommendedFormat: "video_longo",
         retinaType: "Autoridade",
         consciousnessAxis: "Objeção",
@@ -1297,7 +1474,7 @@ export function TemasEditorialModule(props: TemasEditorialModuleProps) {
       {
         ...seedTheme,
         id: `thm-cluster-${Date.now()}-3`,
-        title: `A pergunta que todo comprador faz sobre: ${seedTheme.title.slice(0, 45)}...`,
+        title: `A pergunta que todo comprador faz sobre: ${seedTheme.title.slice(0, 48)}...`,
         recommendedFormat: "reel_curto",
         retinaType: "NiveisDeConsciencia",
         consciousnessAxis: "Objeção",
@@ -1310,7 +1487,7 @@ export function TemasEditorialModule(props: TemasEditorialModuleProps) {
       ...prev,
     ]);
     setBatchFeedbackBanner(
-      `+3 temas derivados gerados na mesma linha de "${seedTheme.title.slice(0, 40)}..."!`
+      `3 temas derivados gerados na mesma linha de "${seedTheme.title.slice(0, 45)}..."!`
     );
   };
 
@@ -1419,7 +1596,6 @@ export function TemasEditorialModule(props: TemasEditorialModuleProps) {
   /* HANDLERS DA SUBÁREA 3 — INTEGRAÇÃO COM CALENDÁRIO & REEQUILÍBRIO         */
   /* ======================================================================== */
 
-  /* Calcula de 1 a 3 temas recomendados da Biblioteca para cada Slot (Seção 5.1) */
   const getRecommendedThemesForSlot = useCallback(
     (slot: CalendarSlotItem): StrategicThemeRecord[] => {
       const offset = suggestionOffsetBySlot[slot.id] || 0;
@@ -1448,7 +1624,6 @@ export function TemasEditorialModule(props: TemasEditorialModuleProps) {
     [themesLibrary, suggestionOffsetBySlot]
   );
 
-  /* Aloca um tema da Biblioteca em um Slot do Calendário da Função 01 */
   const handleAssignThemeToCalendarSlot = useCallback(
     (slotId: string, theme: StrategicThemeRecord) => {
       const targetCalendar = activeCalendarRecord;
@@ -1522,7 +1697,6 @@ export function TemasEditorialModule(props: TemasEditorialModuleProps) {
     persistThemesLibrary(nextThemes);
   };
 
-  /* Botão "Reequilibrar Calendário" (Seção 5.2 da Função 02) */
   const handleAutoRebalanceCalendar = () => {
     const usedThemeIds = new Set<string>();
     const nextSlotAllocations: Record<string, StrategicThemeRecord> = {};
@@ -1530,7 +1704,6 @@ export function TemasEditorialModule(props: TemasEditorialModuleProps) {
     const updatedSlots = activeCalendarRecord.slots.map((slot) => {
       if (slot.format === "sequencia_stories") return slot;
 
-      // Se houver simulação de cenário ativa, ajusta o tipo RETINA do slot
       let targetRetina = slot.retinaType;
       if (
         simulationScenario === "more_transformation" &&
@@ -1596,7 +1769,6 @@ export function TemasEditorialModule(props: TemasEditorialModuleProps) {
     );
   };
 
-  /* Salvar Versão do Calendário com Temas (Seção 5.2 da Função 02) */
   const handleSaveCalendarThemeVersion = (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const allocatedCount = activeCalendarRecord.slots.filter(
@@ -1629,7 +1801,6 @@ export function TemasEditorialModule(props: TemasEditorialModuleProps) {
     );
   };
 
-  /* Mapa de Calor RETINA no Calendário Ativo (Seção 5.2) */
   const retinaHeatmap = useMemo(() => {
     const counts: Record<RetinaTypeKey, number> = {
       Relacionamento: 0,
@@ -1664,9 +1835,9 @@ export function TemasEditorialModule(props: TemasEditorialModuleProps) {
                 Editorial ativa.
               </h3>
               <p className="mt-0.5 font-la-sans text-[0.8125rem] text-la-text-secondary">
-                Conclua a Linha e o Calendário Editorial para que a classificação
-                por pilares ROMA, tom de voz e distribuição RETINA tenha máxima
-                precisão.
+                Conclua a Linha e o Calendário Editorial para que a
+                classificação por pilares ROMA, tom de voz e distribuição
+                RETINA tenha máxima precisão.
               </p>
             </div>
           </div>
@@ -1720,7 +1891,8 @@ export function TemasEditorialModule(props: TemasEditorialModuleProps) {
             <p className="mt-1 max-w-[56rem] font-la-sans text-[0.875rem] leading-[1.6] text-la-text-secondary">
               O motor de temas lê automaticamente a Base Estratégica, a Linha
               Editorial, o Calendário e o momento do negócio, acionando as 5
-              técnicas de conteúdo raiz e as 8 técnicas avançadas nos bastidores.
+              técnicas de conteúdo raiz e as 8 técnicas avançadas nos
+              bastidores.
             </p>
           </div>
 
@@ -1994,67 +2166,33 @@ export function TemasEditorialModule(props: TemasEditorialModuleProps) {
                 </button>
               </div>
 
-              {/* Parâmetros do Usuário (Seção 3.2.3) */}
               <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-                <div className="flex flex-col gap-1.5 rounded-la-lg border border-white/10 bg-black/50 p-4">
-                  <label className="font-la-mono text-[0.6875rem] font-semibold uppercase text-la-gold-light">
+                <div className="flex flex-col justify-between gap-2 rounded-la-lg border border-white/10 bg-black/50 p-4">
+                  <span className="font-la-mono text-[0.6875rem] font-semibold uppercase text-la-gold-light">
                     1. Volume de Temas Iniciais
-                  </label>
-                  <select
-                    value={mode1Volume}
-                    onChange={(e) => setMode1Volume(Number(e.target.value))}
-                    className="mt-1 min-h-[2.5rem] rounded-la-md border border-white/14 bg-[#0B0F19] px-3 font-la-sans text-[0.875rem] text-la-text-primary"
-                  >
-                    <option value={15}>
-                      Gerar 15 temas iniciais (~5 por área ROMA)
-                    </option>
-                    <option value={20}>
-                      Gerar 20 temas iniciais (Padrão rápido)
-                    </option>
-                    <option value={30}>
-                      Gerar 30 temas iniciais (10 por área ROMA)
-                    </option>
-                    <option value={45}>
-                      Gerar 45 temas iniciais (15 por área ROMA)
-                    </option>
-                  </select>
+                  </span>
+                  <DarkCustomSelect
+                    fullWidth
+                    value={String(mode1Volume)}
+                    options={MODE_1_VOLUME_OPTIONS}
+                    onChange={(val) => setMode1Volume(Number(val))}
+                    ariaLabel="Selecionar volume de temas iniciais"
+                  />
                 </div>
 
-                <div className="flex flex-col gap-1.5 rounded-la-lg border border-white/10 bg-black/50 p-4">
-                  <label className="font-la-mono text-[0.6875rem] font-semibold uppercase text-la-gold-light">
+                <div className="flex flex-col justify-between gap-2 rounded-la-lg border border-white/10 bg-black/50 p-4">
+                  <span className="font-la-mono text-[0.6875rem] font-semibold uppercase text-la-gold-light">
                     2. Prioridade de Tipo de Conteúdo (RETINA)
-                  </label>
-                  <select
+                  </span>
+                  <DarkCustomSelect
+                    fullWidth
                     value={mode1RetinaPriority}
-                    onChange={(e) =>
-                      setMode1RetinaPriority(
-                        e.target.value as "all" | RetinaTypeKey
-                      )
+                    options={MODE_1_RETINA_PRIORITY_OPTIONS}
+                    onChange={(val) =>
+                      setMode1RetinaPriority(val as "all" | RetinaTypeKey)
                     }
-                    className="mt-1 min-h-[2.5rem] rounded-la-md border border-white/14 bg-[#0B0F19] px-3 font-la-sans text-[0.875rem] text-la-text-primary"
-                  >
-                    <option value="all">
-                      Equilíbrio padrão — Todos os 6 tipos (Recomendado)
-                    </option>
-                    <option value="Relacionamento">
-                      Focar mais em Relacionamento (Conexão com seguidores)
-                    </option>
-                    <option value="Engajamento">
-                      Focar mais em Engajamento (Topo de funil, alcance)
-                    </option>
-                    <option value="Transformacao">
-                      Focar mais em Transformação (Educativo, salvamentos)
-                    </option>
-                    <option value="Interacao">
-                      Focar mais em Interação (Enquetes, caixinhas, Direct)
-                    </option>
-                    <option value="NiveisDeConsciencia">
-                      Focar mais em Níveis de Consciência (Conteúdo de venda)
-                    </option>
-                    <option value="Autoridade">
-                      Focar mais em Autoridade (Resultados, provas, método)
-                    </option>
-                  </select>
+                    ariaLabel="Selecionar prioridade de tipo de conteúdo RETINA"
+                  />
                 </div>
 
                 <div className="flex flex-col justify-between rounded-la-lg border border-white/10 bg-black/50 p-4">
@@ -2088,7 +2226,6 @@ export function TemasEditorialModule(props: TemasEditorialModuleProps) {
                 </div>
               </div>
 
-              {/* Seleção Múltipla de Pilares da ROMA */}
               <div className="rounded-la-lg border border-white/10 bg-black/45 p-4">
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <span className="font-la-mono text-[0.6875rem] font-semibold uppercase text-la-text-secondary">
@@ -2100,7 +2237,7 @@ export function TemasEditorialModule(props: TemasEditorialModuleProps) {
                     className={clsx(
                       "rounded-la-xs border px-2.5 py-1 font-la-mono text-[0.625rem]",
                       mode1SelectedPillars.length === 0
-                        ? "border-la-gold bg-la-gold text-la-text-inverse font-bold"
+                        ? "border-la-gold bg-la-gold font-bold text-la-text-inverse"
                         : "border-white/12 bg-black/50 text-la-text-secondary"
                     )}
                   >
@@ -2127,7 +2264,7 @@ export function TemasEditorialModule(props: TemasEditorialModuleProps) {
                         className={clsx(
                           "rounded-la-md border px-3 py-1.5 font-la-sans text-[0.75rem] transition-colors",
                           selected
-                            ? "border-la-border-gold bg-la-gold-faint text-la-gold-light font-medium"
+                            ? "border-la-border-gold bg-la-gold-faint font-medium text-la-gold-light"
                             : "border-white/10 bg-black/50 text-la-text-muted"
                         )}
                       >
@@ -2165,7 +2302,6 @@ export function TemasEditorialModule(props: TemasEditorialModuleProps) {
                 </button>
               </div>
 
-              {/* Abas dos 3 Campos do Wizard da Seção 3.3.2 */}
               <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-3">
                 {[
                   {
@@ -2229,7 +2365,8 @@ export function TemasEditorialModule(props: TemasEditorialModuleProps) {
               {mode2Step === 2 ? (
                 <div className="flex flex-col gap-2 rounded-la-lg border border-white/10 bg-black/50 p-4">
                   <label className="font-la-mono text-[0.6875rem] font-semibold uppercase text-la-gold-light">
-                    Engenharia Reversa de Comentários (&ldquo;Mas e se...?&rdquo;) e Termos Periféricos
+                    Engenharia Reversa de Comentários (&ldquo;Mas e se...?&rdquo;) e
+                    Termos Periféricos
                   </label>
                   <p className="font-la-sans text-[0.75rem] text-la-text-secondary">
                     Cole perguntas reais dos comentários que começam com
@@ -2249,7 +2386,8 @@ export function TemasEditorialModule(props: TemasEditorialModuleProps) {
               {mode2Step === 3 ? (
                 <div className="flex flex-col gap-2 rounded-la-lg border border-white/10 bg-black/50 p-4">
                   <label className="font-la-mono text-[0.6875rem] font-semibold uppercase text-la-gold-light">
-                    Reviews (1★, 2★ e 5★ de Amazon/Hotmart) e Feedbacks de Clientes
+                    Reviews (1★, 2★ e 5★ de Amazon/Hotmart) e Feedbacks de
+                    Clientes
                   </label>
                   <p className="font-la-sans text-[0.75rem] text-la-text-secondary">
                     Avaliações de 1 e 2 estrelas revelam o que frustrou ou
@@ -2268,19 +2406,19 @@ export function TemasEditorialModule(props: TemasEditorialModuleProps) {
               ) : null}
 
               <div className="flex flex-wrap items-center justify-between gap-3 border-t border-white/10 pt-4">
-                <div className="flex items-center gap-2">
+                <div className="flex flex-wrap items-center gap-3">
                   <span className="font-la-mono text-[0.6875rem] text-la-text-secondary">
                     Quantidade a extrair:
                   </span>
-                  <select
-                    value={mode2Volume}
-                    onChange={(e) => setMode2Volume(Number(e.target.value))}
-                    className="rounded-la-md border border-white/14 bg-black/70 px-3 py-1.5 font-la-mono text-[0.75rem] text-la-gold-light"
-                  >
-                    <option value={12}>12 temas avançados de mercado</option>
-                    <option value={20}>20 temas avançados de mercado</option>
-                    <option value={30}>30 temas avançados de mercado</option>
-                  </select>
+                  <div className="min-w-[16.5rem]">
+                    <DarkCustomSelect
+                      fullWidth
+                      value={String(mode2Volume)}
+                      options={MODE_2_VOLUME_OPTIONS}
+                      onChange={(val) => setMode2Volume(Number(val))}
+                      ariaLabel="Selecionar quantidade de temas de mercado"
+                    />
+                  </div>
                 </div>
 
                 <button
@@ -2323,45 +2461,52 @@ export function TemasEditorialModule(props: TemasEditorialModuleProps) {
                 </button>
               </div>
 
-              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                <div className="flex flex-col gap-1.5 rounded-la-lg border border-white/10 bg-black/50 p-4">
-                  <label className="font-la-mono text-[0.6875rem] font-semibold uppercase text-la-gold-light">
-                    1. Qual é o principal objetivo deste ciclo de conteúdo?
-                  </label>
-                  <select
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+                <div className="flex flex-col justify-between gap-2 rounded-la-lg border border-white/10 bg-black/50 p-4">
+                  <span className="font-la-mono text-[0.6875rem] font-semibold uppercase text-la-gold-light">
+                    1. Principal objetivo deste ciclo de conteúdo
+                  </span>
+                  <DarkCustomSelect
+                    fullWidth
                     value={mode3Objective}
-                    onChange={(e) => setMode3Objective(e.target.value)}
-                    className="mt-1 min-h-[2.625rem] rounded-la-md border border-white/14 bg-[#0B0F19] px-3 font-la-sans text-[0.875rem] text-la-text-primary"
-                  >
-                    {MODE_3_OBJECTIVES.map((obj) => (
-                      <option key={obj} value={obj}>
-                        {obj}
-                      </option>
-                    ))}
-                  </select>
+                    options={MODE_3_OBJECTIVE_OPTIONS}
+                    onChange={setMode3Objective}
+                    ariaLabel="Selecionar objetivo principal do ciclo"
+                  />
                 </div>
 
-                <div className="flex flex-col gap-1.5 rounded-la-lg border border-white/10 bg-black/50 p-4">
-                  <label className="font-la-mono text-[0.6875rem] font-semibold uppercase text-la-gold-light">
-                    2. Em que momento do seu negócio você está agora?
-                  </label>
-                  <select
+                <div className="flex flex-col justify-between gap-2 rounded-la-lg border border-white/10 bg-black/50 p-4">
+                  <span className="font-la-mono text-[0.6875rem] font-semibold uppercase text-la-gold-light">
+                    2. Momento atual do negócio
+                  </span>
+                  <DarkCustomSelect
+                    fullWidth
                     value={mode3Moment}
-                    onChange={(e) => setMode3Moment(e.target.value)}
-                    className="mt-1 min-h-[2.625rem] rounded-la-md border border-white/14 bg-[#0B0F19] px-3 font-la-sans text-[0.875rem] text-la-text-primary"
-                  >
-                    {MODE_3_BUSINESS_MOMENTS.map((mom) => (
-                      <option key={mom} value={mom}>
-                        {mom}
-                      </option>
-                    ))}
-                  </select>
+                    options={MODE_3_MOMENT_OPTIONS}
+                    onChange={setMode3Moment}
+                    ariaLabel="Selecionar momento atual do negócio"
+                  />
+                </div>
+
+                <div className="flex flex-col justify-between gap-2 rounded-la-lg border border-white/10 bg-black/50 p-4">
+                  <span className="font-la-mono text-[0.6875rem] font-semibold uppercase text-la-gold-light">
+                    3. Volume de Temas Priorizados
+                  </span>
+                  <DarkCustomSelect
+                    fullWidth
+                    align="right"
+                    value={String(mode3Volume)}
+                    options={MODE_3_VOLUME_OPTIONS}
+                    onChange={(val) => setMode3Volume(Number(val))}
+                    ariaLabel="Selecionar volume de temas do momento"
+                  />
                 </div>
               </div>
 
               <div className="rounded-la-lg border border-white/10 bg-black/45 p-4">
                 <span className="font-la-mono text-[0.6875rem] font-semibold uppercase text-la-text-secondary">
-                  3. Em quais plataformas vamos focar neste período? (Multi-select)
+                  4. Em quais plataformas vamos focar neste período?
+                  (Multi-select)
                 </span>
                 <div className="mt-2.5 flex flex-wrap gap-2">
                   {MODE_3_PLATFORMS.map((plat) => {
@@ -2407,14 +2552,16 @@ export function TemasEditorialModule(props: TemasEditorialModuleProps) {
                   className="inline-flex min-h-[2.625rem] items-center gap-2 rounded-la-md bg-la-gold px-5 py-2 font-la-sans text-[0.875rem] font-semibold text-la-text-inverse shadow-[var(--la-elevation-gold)] hover:bg-la-gold-light"
                 >
                   <Sparkles className="h-4 w-4" />
-                  <span>Gerar Temas Alinhados ao Período</span>
+                  <span>
+                    Gerar {mode3Volume} Temas Alinhados ao Período
+                  </span>
                 </button>
               </div>
             </section>
           ) : null}
 
           {/* --------------------------------------------------------------- */}
-          {/* TABELA DE CURADORIA E REVISÃO DO LOTE GERADO (SEÇÃO 3.2.4)      */}
+          {/* MESA DE CURADORIA E REVISÃO DO LOTE GERADO (100% VISÍVEL)       */}
           {/* --------------------------------------------------------------- */}
           {stagedBatch.length > 0 ? (
             <section className="flex flex-col gap-4 rounded-la-xl border border-la-gold bg-[#0A0E18]/98 p-6 shadow-2xl">
@@ -2464,7 +2611,8 @@ export function TemasEditorialModule(props: TemasEditorialModuleProps) {
                   >
                     <Check className="h-4 w-4" />
                     <span>
-                      Aprovar {selectedBatchIds.length} e Enviar ao Mapa de Temas
+                      Aprovar {selectedBatchIds.length} e Enviar ao Mapa de
+                      Temas
                     </span>
                   </button>
 
@@ -2479,164 +2627,165 @@ export function TemasEditorialModule(props: TemasEditorialModuleProps) {
                 </div>
               </div>
 
-              {/* Tabela de Saída Canônica (Seção 3.2.4: Tema, Pilar ROMA, Tipo RETINA, Nível Consciência, Jornada, Formato) */}
-              <div className="overflow-x-auto">
-                <table className="w-full min-w-[64rem] border-collapse text-left">
-                  <thead>
-                    <tr className="border-b border-white/10 font-la-mono text-[0.625rem] uppercase text-la-text-muted">
-                      <th className="py-2.5 pr-2">Sel.</th>
-                      <th className="px-2 py-2.5">Tema (Título Editável) & Técnica</th>
-                      <th className="px-2 py-2.5">Pilar ROMA</th>
-                      <th className="px-2 py-2.5">Tipo RETINA</th>
-                      <th className="px-2 py-2.5">Nível Consciência</th>
-                      <th className="px-2 py-2.5">Jornada (5 Passos)</th>
-                      <th className="px-2 py-2.5">Formato / Plataforma</th>
-                      <th className="py-2.5 pl-2 text-right">Ações</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-white/8 font-la-sans text-[0.8125rem]">
-                    {stagedBatch.map((item) => {
-                      const isChecked = selectedBatchIds.includes(item.id);
-                      const retMeta = RETINA_META[item.retinaType];
-                      const fmtMeta = FORMAT_META[item.recommendedFormat];
+              {/* Lista Estruturada 100% na Largura da Tela (Títulos Completos + Técnica Abaixo) */}
+              <div className="flex flex-col gap-3">
+                {stagedBatch.map((item, idx) => {
+                  const isChecked = selectedBatchIds.includes(item.id);
+                  const retMeta = RETINA_META[item.retinaType];
+                  const fmtMeta = FORMAT_META[item.recommendedFormat];
 
-                      return (
-                        <tr
-                          key={item.id}
+                  return (
+                    <article
+                      key={item.id}
+                      className={clsx(
+                        "grid grid-cols-1 gap-4 rounded-la-xl border p-4 transition-all xl:grid-cols-12 xl:items-center",
+                        isChecked
+                          ? "border-white/12 bg-[#070A12]/90 hover:border-la-border-gold/55"
+                          : "border-white/8 bg-black/40 opacity-60 hover:opacity-95"
+                      )}
+                    >
+                      {/* Bloco 1 (6/12): Checkbox + Título Completo Editável + Técnica Abaixo */}
+                      <div className="flex items-start gap-3 xl:col-span-6">
+                        <input
+                          type="checkbox"
+                          checked={isChecked}
+                          onChange={(e) =>
+                            setSelectedBatchIds((prev) =>
+                              e.target.checked
+                                ? [...prev, item.id]
+                                : prev.filter((id) => id !== item.id)
+                            )
+                          }
+                          aria-label={`Selecionar tema ${idx + 1}`}
+                          className="mt-2.5 h-4 w-4 shrink-0 cursor-pointer accent-[#CFA965]"
+                        />
+
+                        <div className="flex min-w-0 flex-1 flex-col gap-1.5">
+                          <EditableThemeTitle
+                            indexBadge={String(idx + 1).padStart(2, "0")}
+                            value={item.title}
+                            onChange={(nextVal) =>
+                              setStagedBatch((prev) =>
+                                prev.map((b) =>
+                                  b.id === item.id
+                                    ? { ...b, title: nextVal }
+                                    : b
+                                )
+                              )
+                            }
+                          />
+
+                          <div className="flex flex-wrap items-center gap-2 pl-8">
+                            <span className="inline-flex items-center gap-1.5 rounded-la-xs border border-la-border-gold/35 bg-la-gold-faint px-2 py-0.5 font-la-mono text-[0.625rem] font-semibold text-la-gold-light">
+                              <Sparkles className="h-3 w-3 text-la-gold" />
+                              <span>{item.techniqueUsed}</span>
+                            </span>
+                            <span className="font-la-mono text-[0.625rem] text-la-text-secondary">
+                              • {item.painDesireOrObjection}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Bloco 2 (4/12): Pilar ROMA, Tipo RETINA, Consciência, Jornada e Formato */}
+                      <div className="grid grid-cols-2 gap-2.5 border-t border-white/8 pt-3 sm:grid-cols-4 xl:col-span-4 xl:border-t-0 xl:border-l xl:pt-0 xl:pl-4">
+                        <div className="flex flex-col gap-0.5 sm:col-span-2">
+                          <span className="font-la-mono text-[0.5625rem] uppercase tracking-[0.06em] text-la-text-muted">
+                            Pilar ROMA
+                          </span>
+                          <span className="font-la-mono text-[0.6875rem] leading-snug text-la-text-secondary">
+                            {item.romaPillar}
+                          </span>
+                        </div>
+
+                        <div className="flex flex-col gap-1">
+                          <span className="font-la-mono text-[0.5625rem] uppercase tracking-[0.06em] text-la-text-muted">
+                            RETINA & Eixo
+                          </span>
+                          <span
+                            className={clsx(
+                              "inline-flex w-fit rounded-la-full border px-2 py-0.5 font-la-mono text-[0.5625rem] font-semibold",
+                              retMeta.badgeClass
+                            )}
+                          >
+                            {retMeta.code} · {retMeta.label}
+                          </span>
+                          <span className="font-la-mono text-[0.625rem] text-la-text-primary">
+                            Eixo: {item.consciousnessAxis}
+                          </span>
+                        </div>
+
+                        <div className="flex flex-col gap-0.5">
+                          <span className="font-la-mono text-[0.5625rem] uppercase tracking-[0.06em] text-la-text-muted">
+                            Jornada & Formato
+                          </span>
+                          <span className="font-la-mono text-[0.6875rem] font-semibold text-la-gold-light">
+                            {fmtMeta.shortLabel} ({item.recommendedPlatform})
+                          </span>
+                          <span className="font-la-mono text-[0.625rem] text-la-text-secondary">
+                            {item.journeyStage}
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Bloco 3 (2/12): Ações Rápidas */}
+                      <div className="flex items-center justify-end gap-1.5 border-t border-white/8 pt-3 xl:col-span-2 xl:border-t-0 xl:pt-0">
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setStagedBatch((prev) =>
+                              prev.map((b) =>
+                                b.id === item.id
+                                  ? {
+                                      ...b,
+                                      isFavorite: !b.isFavorite,
+                                      status: !b.isFavorite
+                                        ? "favorite"
+                                        : "active",
+                                    }
+                                  : b
+                              )
+                            )
+                          }
+                          title="Marcar como Favorito"
                           className={clsx(
-                            "transition-colors",
-                            isChecked
-                              ? "bg-white/[0.02]"
-                              : "opacity-55 hover:opacity-90"
+                            "inline-flex h-8 w-8 items-center justify-center rounded-la-xs border transition-colors",
+                            item.isFavorite
+                              ? "border-la-gold bg-la-gold text-la-text-inverse"
+                              : "border-white/12 bg-black/50 text-la-text-muted hover:text-la-gold-light"
                           )}
                         >
-                          <td className="py-3 pr-2 align-top">
-                            <input
-                              type="checkbox"
-                              checked={isChecked}
-                              onChange={(e) =>
-                                setSelectedBatchIds((prev) =>
-                                  e.target.checked
-                                    ? [...prev, item.id]
-                                    : prev.filter((id) => id !== item.id)
-                                )
-                              }
-                              className="mt-1 h-4 w-4 accent-[#CFA965]"
-                            />
-                          </td>
+                          <Star className="h-3.5 w-3.5" />
+                        </button>
 
-                          <td className="max-w-[24rem] px-2 py-3 align-top">
-                            <input
-                              type="text"
-                              value={item.title}
-                              onChange={(e) =>
-                                setStagedBatch((prev) =>
-                                  prev.map((b) =>
-                                    b.id === item.id
-                                      ? { ...b, title: e.target.value }
-                                      : b
-                                  )
-                                )
-                              }
-                              className="w-full rounded-la-xs border border-transparent bg-transparent px-1.5 py-0.5 font-la-sans text-[0.8125rem] font-semibold text-la-text-primary focus:border-la-gold focus:bg-black/70 focus:outline-none"
-                            />
-                            <span className="mt-0.5 block px-1.5 font-la-mono text-[0.625rem] text-la-gold-light">
-                              {item.techniqueUsed}
-                            </span>
-                          </td>
+                        <button
+                          type="button"
+                          onClick={() =>
+                            handleGenerateMoreLikeThisInBatch(item)
+                          }
+                          title="Gerar mais temas na mesma linha (Aprofundar cluster)"
+                          className="inline-flex h-8 items-center gap-1 rounded-la-xs border border-la-border-gold/50 bg-la-gold-faint px-2.5 font-la-mono text-[0.625rem] font-semibold text-la-gold-light transition-colors hover:bg-la-gold hover:text-la-text-inverse"
+                        >
+                          <Plus className="h-3 w-3" />
+                          <span>3 similares</span>
+                        </button>
 
-                          <td className="px-2 py-3 align-top font-la-mono text-[0.6875rem] text-la-text-secondary">
-                            {item.romaPillar}
-                          </td>
-
-                          <td className="px-2 py-3 align-top">
-                            <span
-                              className={clsx(
-                                "inline-flex rounded-la-full border px-2 py-0.5 font-la-mono text-[0.625rem] font-semibold",
-                                retMeta.badgeClass
-                              )}
-                            >
-                              {retMeta.code} · {retMeta.label}
-                            </span>
-                          </td>
-
-                          <td className="px-2 py-3 align-top font-la-mono text-[0.6875rem] text-la-text-primary">
-                            {item.consciousnessAxis}
-                          </td>
-
-                          <td className="px-2 py-3 align-top font-la-mono text-[0.6875rem] text-la-text-secondary">
-                            {item.journeyStage}
-                          </td>
-
-                          <td className="px-2 py-3 align-top">
-                            <span className="block font-la-mono text-[0.6875rem] font-semibold text-la-text-primary">
-                              {fmtMeta.shortLabel}
-                            </span>
-                            <span className="font-la-mono text-[0.625rem] text-la-text-muted">
-                              {item.recommendedPlatform}
-                            </span>
-                          </td>
-
-                          <td className="py-3 pl-2 text-right align-top">
-                            <div className="inline-flex items-center gap-1.5">
-                              <button
-                                type="button"
-                                onClick={() =>
-                                  setStagedBatch((prev) =>
-                                    prev.map((b) =>
-                                      b.id === item.id
-                                        ? {
-                                            ...b,
-                                            isFavorite: !b.isFavorite,
-                                            status: !b.isFavorite
-                                              ? "favorite"
-                                              : "active",
-                                          }
-                                        : b
-                                    )
-                                  )
-                                }
-                                title="Marcar como Favorito"
-                                className={clsx(
-                                  "inline-flex h-7 w-7 items-center justify-center rounded-la-xs border",
-                                  item.isFavorite
-                                    ? "border-la-gold bg-la-gold text-la-text-inverse"
-                                    : "border-white/10 text-la-text-muted hover:text-la-gold-light"
-                                )}
-                              >
-                                <Star className="h-3.5 w-3.5" />
-                              </button>
-
-                              <button
-                                type="button"
-                                onClick={() =>
-                                  handleGenerateMoreLikeThisInBatch(item)
-                                }
-                                title="Gerar mais temas na mesma linha (Aprofundar cluster)"
-                                className="rounded-la-xs border border-la-border-gold/50 bg-la-gold-faint px-2 py-1 font-la-mono text-[0.625rem] font-semibold text-la-gold-light hover:bg-la-gold hover:text-la-text-inverse"
-                              >
-                                +3 similares
-                              </button>
-
-                              <button
-                                type="button"
-                                onClick={() =>
-                                  setStagedBatch((prev) =>
-                                    prev.filter((b) => b.id !== item.id)
-                                  )
-                                }
-                                title="Excluir do lote"
-                                className="inline-flex h-7 w-7 items-center justify-center rounded-la-xs border border-white/10 text-la-text-muted hover:border-red-500/40 hover:text-red-300"
-                              >
-                                <Trash2 className="h-3.5 w-3.5" />
-                              </button>
-                            </div>
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setStagedBatch((prev) =>
+                              prev.filter((b) => b.id !== item.id)
+                            )
+                          }
+                          title="Excluir do lote"
+                          className="inline-flex h-8 w-8 items-center justify-center rounded-la-xs border border-white/12 bg-black/50 text-la-text-muted transition-colors hover:border-red-500/40 hover:text-red-300"
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </button>
+                      </div>
+                    </article>
+                  );
+                })}
               </div>
             </section>
           ) : null}
@@ -2644,11 +2793,11 @@ export function TemasEditorialModule(props: TemasEditorialModuleProps) {
       ) : null}
 
       {/* =================================================================== */}
-      {/* SUBÁREA 2: MAPA ESTRATÉGICO DE TEMAS / BIBLIOTECA COMPLETA          */}
+      {/* SUBÁREA 2: MAPA ESTRATÉGICO DE TEMAS (100% NA TELA, SEM SCROLL X)   */}
       {/* =================================================================== */}
       {activeSubTab === "mapa" ? (
         <section className="flex flex-col gap-5 rounded-la-xl border border-white/10 bg-[#080B12]/95 p-6">
-          {/* Barra de Busca e Filtros Multi-Coluna (Seção 4.1) */}
+          {/* Barra de Busca e Filtros Multi-Coluna com DarkCustomSelect */}
           <div className="flex flex-col gap-3.5 border-b border-white/10 pb-4">
             <div className="flex flex-col justify-between gap-3 lg:flex-row lg:items-center">
               <div className="relative flex-1 lg:max-w-[26rem]">
@@ -2658,7 +2807,7 @@ export function TemasEditorialModule(props: TemasEditorialModuleProps) {
                   placeholder="Filtrar biblioteca por tema, pilar, técnica ou objeção..."
                   value={mapSearch}
                   onChange={(e) => setMapSearch(e.target.value)}
-                  className="min-h-[2.5rem] w-full rounded-la-md border border-white/12 bg-black/60 py-1.5 pr-4 pl-10 font-la-sans text-[0.8125rem] text-la-text-primary"
+                  className="min-h-[2.625rem] w-full rounded-la-md border border-white/12 bg-black/60 py-1.5 pr-4 pl-10 font-la-sans text-[0.8125rem] text-la-text-primary"
                 />
               </div>
 
@@ -2692,330 +2841,303 @@ export function TemasEditorialModule(props: TemasEditorialModuleProps) {
               </div>
             </div>
 
-            {/* Filtros por Qualquer Coluna da Tabela (Origem, Pilar, RETINA, Consciência, Jornada, Formato) */}
-            <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3 lg:grid-cols-6">
-              <select
+            {/* 6 Seletores DarkCustomSelect para Filtrar Qualquer Coluna do Mapa de Temas */}
+            <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2 lg:grid-cols-6">
+              <DarkCustomSelect
+                fullWidth
                 value={mapOriginFilter}
-                onChange={(e) =>
-                  setMapOriginFilter(e.target.value as "all" | ThemeOriginMode)
+                options={MAP_ORIGIN_FILTER_OPTIONS}
+                onChange={(val) =>
+                  setMapOriginFilter(val as "all" | ThemeOriginMode)
                 }
-                className="rounded-la-md border border-white/12 bg-[#0B0F19] px-2.5 py-1.5 font-la-mono text-[0.6875rem] text-la-text-primary"
-              >
-                <option value="all">Origem: Todas (3)</option>
-                <option value="ROMA & Avatar">ROMA & Avatar</option>
-                <option value="Dados de Mercado">Dados de Mercado</option>
-                <option value="Objetivo & Momento">Objetivo & Momento</option>
-              </select>
+                ariaLabel="Filtrar por origem do tema"
+              />
 
-              <select
+              <DarkCustomSelect
+                fullWidth
                 value={mapPillarFilter}
-                onChange={(e) => setMapPillarFilter(e.target.value)}
-                className="rounded-la-md border border-white/12 bg-[#0B0F19] px-2.5 py-1.5 font-la-mono text-[0.6875rem] text-la-text-primary"
-              >
-                <option value="all">Pilar ROMA: Todos</option>
-                {DEFAULT_ROMA_PILLARS.map((p) => (
-                  <option key={p} value={p}>
-                    {p}
-                  </option>
-                ))}
-              </select>
+                options={MAP_PILLAR_FILTER_OPTIONS}
+                onChange={setMapPillarFilter}
+                ariaLabel="Filtrar por pilar ROMA"
+              />
 
-              <select
+              <DarkCustomSelect
+                fullWidth
                 value={mapRetinaFilter}
-                onChange={(e) =>
-                  setMapRetinaFilter(e.target.value as "all" | RetinaTypeKey)
+                options={MAP_RETINA_FILTER_OPTIONS}
+                onChange={(val) =>
+                  setMapRetinaFilter(val as "all" | RetinaTypeKey)
                 }
-                className="rounded-la-md border border-white/12 bg-[#0B0F19] px-2.5 py-1.5 font-la-mono text-[0.6875rem] text-la-text-primary"
-              >
-                <option value="all">Tipo RETINA: Todos</option>
-                {(Object.keys(RETINA_META) as RetinaTypeKey[]).map((r) => (
-                  <option key={r} value={r}>
-                    {RETINA_META[r].label}
-                  </option>
-                ))}
-              </select>
+                ariaLabel="Filtrar por tipo RETINA"
+              />
 
-              <select
+              <DarkCustomSelect
+                fullWidth
                 value={mapAxisFilter}
-                onChange={(e) =>
-                  setMapAxisFilter(e.target.value as "all" | ConsciousnessAxis)
+                options={MAP_AXIS_FILTER_OPTIONS}
+                onChange={(val) =>
+                  setMapAxisFilter(val as "all" | ConsciousnessAxis)
                 }
-                className="rounded-la-md border border-white/12 bg-[#0B0F19] px-2.5 py-1.5 font-la-mono text-[0.6875rem] text-la-text-primary"
-              >
-                <option value="all">Consciência: Todos (3)</option>
-                <option value="Sintoma">Eixo 1 · Sintoma</option>
-                <option value="Solução">Eixo 2 · Solução</option>
-                <option value="Objeção">Eixo 3 · Objeção</option>
-              </select>
+                ariaLabel="Filtrar por eixo de consciência"
+              />
 
-              <select
+              <DarkCustomSelect
+                fullWidth
+                align="right"
                 value={mapJourneyFilter}
-                onChange={(e) =>
-                  setMapJourneyFilter(
-                    e.target.value as "all" | CustomerJourneyStage
-                  )
+                options={MAP_JOURNEY_FILTER_OPTIONS}
+                onChange={(val) =>
+                  setMapJourneyFilter(val as "all" | CustomerJourneyStage)
                 }
-                className="rounded-la-md border border-white/12 bg-[#0B0F19] px-2.5 py-1.5 font-la-mono text-[0.6875rem] text-la-text-primary"
-              >
-                <option value="all">Jornada: Todas (5)</option>
-                {JOURNEY_STAGES.map((j) => (
-                  <option key={j} value={j}>
-                    {j}
-                  </option>
-                ))}
-              </select>
+                ariaLabel="Filtrar por etapa da jornada"
+              />
 
-              <select
+              <DarkCustomSelect
+                fullWidth
+                align="right"
                 value={mapFormatFilter}
-                onChange={(e) =>
-                  setMapFormatFilter(
-                    e.target.value as "all" | SlotContentFormat
-                  )
+                options={MAP_FORMAT_FILTER_OPTIONS}
+                onChange={(val) =>
+                  setMapFormatFilter(val as "all" | SlotContentFormat)
                 }
-                className="rounded-la-md border border-white/12 bg-[#0B0F19] px-2.5 py-1.5 font-la-mono text-[0.6875rem] text-la-text-primary"
-              >
-                <option value="all">Formato: Todos</option>
-                {(Object.keys(FORMAT_META) as SlotContentFormat[]).map((f) => (
-                  <option key={f} value={f}>
-                    {FORMAT_META[f].shortLabel}
-                  </option>
-                ))}
-              </select>
+                ariaLabel="Filtrar por formato recomendado"
+              />
             </div>
           </div>
 
-          {/* Tabela Completa do Mapa Estratégico de Temas */}
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[72rem] border-collapse text-left">
-              <thead>
-                <tr className="border-b border-white/10 font-la-mono text-[0.625rem] uppercase text-la-text-muted">
-                  <th className="py-2.5 pr-2">Tema & Dor/Objeção</th>
-                  <th className="px-2 py-2.5">Origem</th>
-                  <th className="px-2 py-2.5">Pilar ROMA</th>
-                  <th className="px-2 py-2.5">Tipo RETINA</th>
-                  <th className="px-2 py-2.5">Consciência</th>
-                  <th className="px-2 py-2.5">Jornada (5 Passos)</th>
-                  <th className="px-2 py-2.5">Formato</th>
-                  <th className="px-2 py-2.5">Classificação / Status</th>
-                  <th className="py-2.5 pl-2 text-right">Ações</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-white/8 font-la-sans text-[0.8125rem]">
-                {filteredMapThemes.map((theme) => {
-                  const retMeta = RETINA_META[theme.retinaType];
-                  return (
-                    <tr
-                      key={theme.id}
-                      className="transition-colors hover:bg-white/[0.02]"
-                    >
-                      <td className="max-w-[23rem] py-3.5 pr-2 align-top">
-                        <input
-                          type="text"
-                          value={theme.title}
-                          onChange={(e) =>
-                            updateLibraryTheme(theme.id, (prev) => ({
-                              ...prev,
-                              title: e.target.value,
-                            }))
-                          }
-                          className="w-full rounded-la-xs border border-transparent bg-transparent px-1 font-la-sans text-[0.8125rem] font-semibold text-la-text-primary focus:border-la-gold focus:bg-black/75 focus:outline-none"
-                        />
-                        <span className="mt-0.5 block px-1 font-la-mono text-[0.625rem] text-la-text-secondary">
-                          {theme.painDesireOrObjection}
+          {/* Lista Executiva do Mapa de Temas (Zero Scroll Horizontal, Título 100% Visível + Dor/Objeção Abaixo) */}
+          <div className="flex flex-col gap-3.5 pb-40">
+            {filteredMapThemes.map((theme, idx) => (
+              <article
+                key={theme.id}
+                className="relative flex flex-col gap-3.5 rounded-la-xl border border-white/10 bg-[#0A0E18]/95 p-4 transition-all focus-within:z-40 hover:z-30 hover:border-la-border-gold/55"
+              >
+                {/* ANDAR 1: Identidade Completa do Tema (Título Editável + Dor/Objeção Abaixo) + Status & Ações */}
+                <div className="flex flex-col justify-between gap-3.5 xl:flex-row xl:items-start">
+                  <div className="flex min-w-0 flex-1 flex-col gap-2">
+                    {/* Faixa de Metadados de Origem e Técnica */}
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="rounded-la-full border border-la-border-gold/50 bg-la-gold-faint px-2.5 py-0.5 font-la-mono text-[0.625rem] font-semibold text-la-gold-light">
+                        Origem: {theme.origin}
+                      </span>
+                      <span className="rounded-la-xs border border-white/10 bg-black/50 px-2 py-0.5 font-la-mono text-[0.625rem] text-la-text-secondary">
+                        {theme.techniqueUsed}
+                      </span>
+                      {theme.allocatedSlotIds.length > 0 ? (
+                        <span className="rounded-la-full border border-emerald-400/45 bg-emerald-500/15 px-2.5 py-0.5 font-la-mono text-[0.625rem] font-semibold text-emerald-200">
+                          ● Alocado na Agenda ({theme.allocatedSlotIds.length})
                         </span>
-                      </td>
+                      ) : null}
+                    </div>
 
-                      <td className="px-2 py-3.5 align-top font-la-mono text-[0.6875rem] text-la-gold-light">
-                        {theme.origin}
-                      </td>
+                    {/* Título Completo Editável (Auto-Expansível, Sem Corte) */}
+                    <EditableThemeTitle
+                      indexBadge={String(idx + 1).padStart(2, "0")}
+                      value={theme.title}
+                      onChange={(nextTitle) =>
+                        updateLibraryTheme(theme.id, (prev) => ({
+                          ...prev,
+                          title: nextTitle,
+                        }))
+                      }
+                      ariaLabel={`Título do tema ${idx + 1}`}
+                    />
 
-                      <td className="px-2 py-3.5 align-top">
-                        <select
-                          value={theme.romaPillar}
-                          onChange={(e) =>
-                            updateLibraryTheme(theme.id, (prev) => ({
-                              ...prev,
-                              romaPillar: e.target.value,
-                            }))
-                          }
-                          className="max-w-[11rem] rounded-la-xs border border-white/10 bg-black/60 px-2 py-1 font-la-mono text-[0.625rem] text-la-text-secondary"
-                        >
-                          {DEFAULT_ROMA_PILLARS.map((p) => (
-                            <option key={p} value={p}>
-                              {p}
-                            </option>
-                          ))}
-                        </select>
-                      </td>
+                    {/* Dor, Desejo ou Objeção Atacada (Exibida Completa Abaixo do Título) */}
+                    <div className="pl-8">
+                      <p className="font-la-mono text-[0.6875rem] leading-relaxed text-la-text-secondary">
+                        <strong className="text-la-gold-light">
+                          Dor / Objeção / Foco:
+                        </strong>{" "}
+                        {theme.painDesireOrObjection}
+                      </p>
+                    </div>
+                  </div>
 
-                      <td className="px-2 py-3.5 align-top">
-                        <select
-                          value={theme.retinaType}
-                          onChange={(e) =>
-                            updateLibraryTheme(theme.id, (prev) => ({
-                              ...prev,
-                              retinaType: e.target.value as RetinaTypeKey,
-                            }))
-                          }
-                          className={clsx(
-                            "rounded-la-full border px-2 py-0.5 font-la-mono text-[0.625rem] font-semibold",
-                            retMeta.badgeClass
-                          )}
-                        >
-                          {(Object.keys(RETINA_META) as RetinaTypeKey[]).map(
-                            (r) => (
-                              <option
-                                key={r}
-                                value={r}
-                                className="bg-[#090C14] text-white"
-                              >
-                                {RETINA_META[r].label}
-                              </option>
+                  {/* Classificação / Status + Ações Diretas (Sempre Visíveis à Direita) */}
+                  <div className="flex shrink-0 flex-wrap items-center justify-between gap-2 border-t border-white/8 pt-3 xl:flex-col xl:items-end xl:border-t-0 xl:pt-0">
+                    <div className="flex flex-wrap items-center gap-1.5">
+                      <button
+                        type="button"
+                        onClick={() =>
+                          updateLibraryTheme(theme.id, (prev) => ({
+                            ...prev,
+                            isFavorite: !prev.isFavorite,
+                          }))
+                        }
+                        title="Favoritar tema"
+                        className={clsx(
+                          "inline-flex h-7 w-7 items-center justify-center rounded-la-xs border transition-colors",
+                          theme.isFavorite
+                            ? "border-la-gold bg-la-gold text-la-text-inverse"
+                            : "border-white/12 bg-black/50 text-la-text-muted hover:text-la-gold-light"
+                        )}
+                      >
+                        <Star className="h-3.5 w-3.5" />
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() =>
+                          updateLibraryTheme(theme.id, (prev) => ({
+                            ...prev,
+                            isPriorityNextCycle: !prev.isPriorityNextCycle,
+                          }))
+                        }
+                        className={clsx(
+                          "rounded-la-xs border px-2.5 py-1 font-la-mono text-[0.625rem] transition-colors",
+                          theme.isPriorityNextCycle
+                            ? "border-sky-400/50 bg-sky-500/15 font-semibold text-sky-200"
+                            : "border-white/10 bg-black/45 text-la-text-muted hover:text-la-text-secondary"
+                        )}
+                      >
+                        Prioritário
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() =>
+                          updateLibraryTheme(theme.id, (prev) => ({
+                            ...prev,
+                            isSavedForSales: !prev.isSavedForSales,
+                          }))
+                        }
+                        className={clsx(
+                          "rounded-la-xs border px-2.5 py-1 font-la-mono text-[0.625rem] transition-colors",
+                          theme.isSavedForSales
+                            ? "border-rose-400/50 bg-rose-500/15 font-semibold text-rose-200"
+                            : "border-white/10 bg-black/45 text-la-text-muted hover:text-la-text-secondary"
+                        )}
+                      >
+                        Guardado Vendas
+                      </button>
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setActiveSubTab("integracao")}
+                        className="inline-flex min-h-[2.25rem] items-center rounded-la-md border border-la-border-gold/55 bg-la-gold-faint px-3 py-1 font-la-mono text-[0.6875rem] font-semibold text-la-gold-light transition-colors hover:bg-la-gold hover:text-la-text-inverse"
+                      >
+                        Alocar no Calendário
+                      </button>
+
+                      {props.onGoToScriptsTab ? (
+                        <button
+                          type="button"
+                          onClick={() =>
+                            props.onGoToScriptsTab?.(
+                              undefined,
+                              theme.title,
+                              theme.recommendedFormat
                             )
-                          )}
-                        </select>
-                      </td>
-
-                      <td className="px-2 py-3.5 align-top">
-                        <select
-                          value={theme.consciousnessAxis}
-                          onChange={(e) =>
-                            updateLibraryTheme(theme.id, (prev) => ({
-                              ...prev,
-                              consciousnessAxis: e.target
-                                .value as ConsciousnessAxis,
-                            }))
                           }
-                          className="rounded-la-xs border border-white/10 bg-black/60 px-2 py-1 font-la-mono text-[0.625rem] text-la-text-primary"
+                          className="inline-flex min-h-[2.25rem] items-center gap-1 rounded-la-md bg-la-gold px-3.5 py-1 font-la-mono text-[0.6875rem] font-bold text-la-text-inverse transition-colors hover:bg-la-gold-light"
                         >
-                          <option value="Sintoma">Sintoma</option>
-                          <option value="Solução">Solução</option>
-                          <option value="Objeção">Objeção</option>
-                        </select>
-                      </td>
+                          <span>Roteirizar</span>
+                          <ArrowRight className="h-3.5 w-3.5" />
+                        </button>
+                      ) : null}
+                    </div>
+                  </div>
+                </div>
 
-                      <td className="px-2 py-3.5 align-top">
-                        <select
-                          value={theme.journeyStage}
-                          onChange={(e) =>
-                            updateLibraryTheme(theme.id, (prev) => ({
-                              ...prev,
-                              journeyStage: e.target
-                                .value as CustomerJourneyStage,
-                            }))
-                          }
-                          className="rounded-la-xs border border-white/10 bg-black/60 px-2 py-1 font-la-mono text-[0.625rem] text-la-text-secondary"
-                        >
-                          {JOURNEY_STAGES.map((j) => (
-                            <option key={j} value={j}>
-                              {j}
-                            </option>
-                          ))}
-                        </select>
-                      </td>
+                {/* ANDAR 2: Grade de 5 Colunas com os Seletores DarkCustomSelect (100% Dentro da Tela) */}
+                <div className="grid grid-cols-1 gap-2.5 border-t border-white/8 pt-3 sm:grid-cols-2 lg:grid-cols-5">
+                  <div className="flex flex-col gap-1">
+                    <span className="font-la-mono text-[0.5625rem] uppercase tracking-[0.06em] text-la-text-muted">
+                      1. Pilar ROMA
+                    </span>
+                    <DarkCustomSelect
+                      fullWidth
+                      value={theme.romaPillar}
+                      options={INLINE_PILLAR_OPTIONS}
+                      onChange={(nextPillar) =>
+                        updateLibraryTheme(theme.id, (prev) => ({
+                          ...prev,
+                          romaPillar: nextPillar,
+                        }))
+                      }
+                      ariaLabel={`Pilar ROMA de ${theme.title}`}
+                    />
+                  </div>
 
-                      <td className="px-2 py-3.5 align-top">
-                        <select
-                          value={theme.recommendedFormat}
-                          onChange={(e) =>
-                            updateLibraryTheme(theme.id, (prev) => ({
-                              ...prev,
-                              recommendedFormat: e.target
-                                .value as SlotContentFormat,
-                            }))
-                          }
-                          className="rounded-la-xs border border-white/10 bg-black/60 px-2 py-1 font-la-mono text-[0.625rem] text-la-gold-light"
-                        >
-                          {(
-                            Object.keys(FORMAT_META) as SlotContentFormat[]
-                          ).map((f) => (
-                            <option key={f} value={f}>
-                              {FORMAT_META[f].shortLabel}
-                            </option>
-                          ))}
-                        </select>
-                      </td>
+                  <div className="flex flex-col gap-1">
+                    <span className="font-la-mono text-[0.5625rem] uppercase tracking-[0.06em] text-la-text-muted">
+                      2. Tipo RETINA
+                    </span>
+                    <DarkCustomSelect
+                      fullWidth
+                      value={theme.retinaType}
+                      options={INLINE_RETINA_OPTIONS}
+                      onChange={(nextRetina) =>
+                        updateLibraryTheme(theme.id, (prev) => ({
+                          ...prev,
+                          retinaType: nextRetina as RetinaTypeKey,
+                        }))
+                      }
+                      ariaLabel={`Tipo RETINA de ${theme.title}`}
+                    />
+                  </div>
 
-                      <td className="px-2 py-3.5 align-top">
-                        <div className="flex flex-wrap items-center gap-1">
-                          <button
-                            type="button"
-                            onClick={() =>
-                              updateLibraryTheme(theme.id, (prev) => ({
-                                ...prev,
-                                isPriorityNextCycle: !prev.isPriorityNextCycle,
-                              }))
-                            }
-                            className={clsx(
-                              "rounded-la-xs border px-2 py-0.5 font-la-mono text-[0.5625rem]",
-                              theme.isPriorityNextCycle
-                                ? "border-sky-400/50 bg-sky-500/15 text-sky-200 font-semibold"
-                                : "border-white/10 text-la-text-muted"
-                            )}
-                          >
-                            Prioritário
-                          </button>
+                  <div className="flex flex-col gap-1">
+                    <span className="font-la-mono text-[0.5625rem] uppercase tracking-[0.06em] text-la-text-muted">
+                      3. Nível de Consciência
+                    </span>
+                    <DarkCustomSelect
+                      fullWidth
+                      value={theme.consciousnessAxis}
+                      options={INLINE_AXIS_OPTIONS}
+                      onChange={(nextAxis) =>
+                        updateLibraryTheme(theme.id, (prev) => ({
+                          ...prev,
+                          consciousnessAxis: nextAxis as ConsciousnessAxis,
+                        }))
+                      }
+                      ariaLabel={`Eixo de consciência de ${theme.title}`}
+                    />
+                  </div>
 
-                          <button
-                            type="button"
-                            onClick={() =>
-                              updateLibraryTheme(theme.id, (prev) => ({
-                                ...prev,
-                                isSavedForSales: !prev.isSavedForSales,
-                              }))
-                            }
-                            className={clsx(
-                              "rounded-la-xs border px-2 py-0.5 font-la-mono text-[0.5625rem]",
-                              theme.isSavedForSales
-                                ? "border-rose-400/50 bg-rose-500/15 text-rose-200 font-semibold"
-                                : "border-white/10 text-la-text-muted"
-                            )}
-                          >
-                            Guardado Vendas
-                          </button>
+                  <div className="flex flex-col gap-1">
+                    <span className="font-la-mono text-[0.5625rem] uppercase tracking-[0.06em] text-la-text-muted">
+                      4. Jornada (5 Passos)
+                    </span>
+                    <DarkCustomSelect
+                      fullWidth
+                      align="right"
+                      value={theme.journeyStage}
+                      options={INLINE_JOURNEY_OPTIONS}
+                      onChange={(nextJourney) =>
+                        updateLibraryTheme(theme.id, (prev) => ({
+                          ...prev,
+                          journeyStage: nextJourney as CustomerJourneyStage,
+                        }))
+                      }
+                      ariaLabel={`Jornada de ${theme.title}`}
+                    />
+                  </div>
 
-                          {theme.allocatedSlotIds.length > 0 ? (
-                            <span className="rounded-la-xs border border-emerald-400/45 bg-emerald-500/15 px-2 py-0.5 font-la-mono text-[0.5625rem] text-emerald-200">
-                              Alocado ({theme.allocatedSlotIds.length})
-                            </span>
-                          ) : null}
-                        </div>
-                      </td>
-
-                      <td className="py-3.5 pl-2 text-right align-top">
-                        <div className="inline-flex items-center gap-1.5">
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setActiveSubTab("integracao");
-                            }}
-                            className="rounded-la-xs border border-la-border-gold/50 bg-la-gold-faint px-2.5 py-1 font-la-mono text-[0.625rem] font-semibold text-la-gold-light hover:bg-la-gold hover:text-la-text-inverse"
-                          >
-                            Alocar
-                          </button>
-
-                          {props.onGoToScriptsTab ? (
-                            <button
-                              type="button"
-                              onClick={() =>
-                                props.onGoToScriptsTab?.(
-                                  undefined,
-                                  theme.title,
-                                  theme.recommendedFormat
-                                )
-                              }
-                              className="rounded-la-xs bg-la-gold px-2.5 py-1 font-la-mono text-[0.625rem] font-semibold text-la-text-inverse hover:bg-la-gold-light"
-                            >
-                              Roteirizar →
-                            </button>
-                          ) : null}
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+                  <div className="flex flex-col gap-1">
+                    <span className="font-la-mono text-[0.5625rem] uppercase tracking-[0.06em] text-la-text-muted">
+                      5. Formato Recomendado
+                    </span>
+                    <DarkCustomSelect
+                      fullWidth
+                      align="right"
+                      value={theme.recommendedFormat}
+                      options={INLINE_FORMAT_OPTIONS}
+                      onChange={(nextFormat) =>
+                        updateLibraryTheme(theme.id, (prev) => ({
+                          ...prev,
+                          recommendedFormat: nextFormat as SlotContentFormat,
+                        }))
+                      }
+                      ariaLabel={`Formato recomendado de ${theme.title}`}
+                    />
+                  </div>
+                </div>
+              </article>
+            ))}
           </div>
         </section>
       ) : null}
@@ -3025,12 +3147,12 @@ export function TemasEditorialModule(props: TemasEditorialModuleProps) {
       {/* =================================================================== */}
       {activeSubTab === "integracao" ? (
         <div className="flex flex-col gap-6">
-          {/* Painel Superior de Equilíbrio RETINA, Simulação e Versões (Seção 5.2) */}
           <section className="rounded-la-xl border border-la-border-gold/55 bg-[#080B12]/95 p-5">
             <div className="flex flex-col justify-between gap-4 border-b border-white/10 pb-4 xl:flex-row xl:items-center">
               <div>
                 <span className="font-la-mono text-[0.625rem] font-bold uppercase tracking-[0.08em] text-la-gold-light">
-                  SUBÁREA 3 · MESA DE ENCAIXE E EQUILÍBRIO ESTRATÉGICO (SEÇÃO 5.1 E 5.2)
+                  SUBÁREA 3 · MESA DE ENCAIXE E EQUILÍBRIO ESTRATÉGICO (SEÇÃO
+                  5.1 E 5.2)
                 </span>
                 <h3 className="mt-1 font-la-sans text-[1.25rem] font-semibold text-la-text-primary">
                   Integração Direta: Slots do Calendário (F01) ↔ Biblioteca de
@@ -3038,36 +3160,24 @@ export function TemasEditorialModule(props: TemasEditorialModuleProps) {
                 </h3>
               </div>
 
-              {/* Botões Principais da Seção 5.2: Reequilibrar, Simular e Salvar Versão */}
-              <div className="flex flex-wrap items-center gap-2">
-                <select
-                  aria-label="Simular outro cenário"
-                  value={simulationScenario}
-                  onChange={(e) =>
-                    setSimulationScenario(
-                      e.target.value as typeof simulationScenario
-                    )
-                  }
-                  className="min-h-[2.375rem] rounded-la-md border border-white/14 bg-[#0B0F19] px-3 font-la-mono text-[0.75rem] text-la-gold-light"
-                >
-                  <option value="none">
-                    Simular Cenário: Distribuição Padrão
-                  </option>
-                  <option value="more_transformation">
-                    Simular: + Transformação, - Engajamento
-                  </option>
-                  <option value="sales_push">
-                    Simular: Intensificação de Vendas / Carrinho Aberto
-                  </option>
-                  <option value="top_of_funnel">
-                    Simular: Crescimento de Audiência / Topo de Funil
-                  </option>
-                </select>
+              <div className="flex flex-wrap items-center gap-2.5">
+                <div className="min-w-[19rem]">
+                  <DarkCustomSelect
+                    fullWidth
+                    align="right"
+                    value={simulationScenario}
+                    options={SIMULATION_SCENARIO_OPTIONS}
+                    onChange={(val) =>
+                      setSimulationScenario(val as SimulationScenarioKey)
+                    }
+                    ariaLabel="Simular outro cenário estratégico"
+                  />
+                </div>
 
                 <button
                   type="button"
                   onClick={handleAutoRebalanceCalendar}
-                  className="inline-flex min-h-[2.375rem] items-center gap-1.5 rounded-la-md bg-la-gold px-4 py-1.5 font-la-sans text-[0.8125rem] font-semibold text-la-text-inverse shadow-[var(--la-elevation-gold)] hover:bg-la-gold-light"
+                  className="inline-flex min-h-[2.625rem] items-center gap-1.5 rounded-la-md bg-la-gold px-4 py-1.5 font-la-sans text-[0.8125rem] font-semibold text-la-text-inverse shadow-[var(--la-elevation-gold)] hover:bg-la-gold-light"
                 >
                   <Sparkles className="h-4 w-4" />
                   <span>Reequilibrar Calendário com IA</span>
@@ -3076,7 +3186,7 @@ export function TemasEditorialModule(props: TemasEditorialModuleProps) {
                 <button
                   type="button"
                   onClick={() => setIsSaveVersionModalOpen(true)}
-                  className="inline-flex min-h-[2.375rem] items-center gap-1.5 rounded-la-md border border-la-border-gold/60 bg-la-gold-faint px-3.5 py-1.5 font-la-sans text-[0.8125rem] font-semibold text-la-gold-light hover:bg-la-gold hover:text-la-text-inverse"
+                  className="inline-flex min-h-[2.625rem] items-center gap-1.5 rounded-la-md border border-la-border-gold/60 bg-la-gold-faint px-3.5 py-1.5 font-la-sans text-[0.8125rem] font-semibold text-la-gold-light hover:bg-la-gold hover:text-la-text-inverse"
                 >
                   <Save className="h-4 w-4" />
                   <span>Salvar Versão com Temas</span>
@@ -3084,7 +3194,6 @@ export function TemasEditorialModule(props: TemasEditorialModuleProps) {
               </div>
             </div>
 
-            {/* Mapa de Calor RETINA do Período */}
             <div className="mt-4 grid grid-cols-2 gap-2.5 sm:grid-cols-3 lg:grid-cols-6">
               {(Object.keys(RETINA_META) as RetinaTypeKey[]).map((rKey) => {
                 const meta = RETINA_META[rKey];
@@ -3130,7 +3239,6 @@ export function TemasEditorialModule(props: TemasEditorialModuleProps) {
             ) : null}
           </section>
 
-          {/* MESA SPLIT-SCREEN: COLUNA ESQUERDA (SLOTS F01) | COLUNA DIREITA (BIBLIOTECA F02) */}
           <div className="grid grid-cols-1 gap-6 lg:grid-cols-12">
             {/* COLUNA ESQUERDA (7/12): SLOTS DO CALENDÁRIO EDITORIAL COM 3 SUGESTÕES DA IA */}
             <div className="flex flex-col gap-4 lg:col-span-7">
@@ -3202,7 +3310,6 @@ export function TemasEditorialModule(props: TemasEditorialModuleProps) {
                           : "border-white/10 bg-[#090D16]/95 hover:border-white/25"
                       )}
                     >
-                      {/* Cabeçalho do Slot */}
                       <div className="flex flex-wrap items-center justify-between gap-2">
                         <div className="flex flex-wrap items-center gap-2">
                           <span className="rounded-la-xs bg-white/[0.08] px-2 py-0.5 font-la-mono text-[0.6875rem] font-bold text-la-text-primary">
@@ -3231,7 +3338,6 @@ export function TemasEditorialModule(props: TemasEditorialModuleProps) {
                         </span>
                       </div>
 
-                      {/* Estado: Tema Atual Vinculado vs. Slot Aguardando Tema */}
                       {hasTheme ? (
                         <div className="mt-3 flex flex-col justify-between gap-3 rounded-la-lg border border-emerald-400/40 bg-emerald-950/20 p-3 sm:flex-row sm:items-center">
                           <div>
@@ -3309,7 +3415,10 @@ export function TemasEditorialModule(props: TemasEditorialModuleProps) {
                                   </p>
                                   <span className="font-la-mono text-[0.5625rem] text-la-text-muted">
                                     {sug.retinaType} • {sug.journeyStage} •{" "}
-                                    {FORMAT_META[sug.recommendedFormat].shortLabel}
+                                    {
+                                      FORMAT_META[sug.recommendedFormat]
+                                        .shortLabel
+                                    }
                                   </span>
                                 </div>
                                 <button
@@ -3460,7 +3569,6 @@ export function TemasEditorialModule(props: TemasEditorialModuleProps) {
             </div>
           </div>
 
-          {/* Lista de Versões Salvas do Calendário com Temas (Seção 5.2) */}
           {savedCalendarVersions.length > 0 ? (
             <section className="rounded-la-xl border border-white/10 bg-[#080B12]/95 p-5">
               <span className="font-la-mono text-[0.625rem] font-bold uppercase text-la-gold-light">

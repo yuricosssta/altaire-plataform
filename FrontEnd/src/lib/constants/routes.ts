@@ -25,12 +25,19 @@ export const PUBLIC_ROUTES = {
 } as const;
 
 /**
- * Rotas internas reais sob (main)/dashboard sincronizadas com o App Router (Commit f5c95d1)
+ * Rotas internas reais sob (main)/dashboard sincronizadas com o App Router
  */
 export const WORKSPACE_ROUTES = {
   painelDoDia: "/dashboard",
   centralEstrategica: "/dashboard/editorial",
   onboardingEditorial: "/dashboard/editorial?onboarding=true",
+  bibliotecaConteudo: "/dashboard/publicacoes",
+  assetsArquivos: "/dashboard/armazenamento",
+  configuracoes: "/dashboard/settings",
+  configuracoesAlternativa: "/dashboard/configuracoes",
+  configuracoesTab: (
+    tab: "perfil" | "plano" | "preferencias" | "membros"
+  ) => `/dashboard/settings?tab=${tab}`,
   projectWorkspace: (projectId: string) => `/dashboard/editorial/${projectId}`,
   projectTab: (
     projectId: string,
@@ -147,6 +154,10 @@ export const ROUTES = {
   primeiroProjetoEditorial: WORKSPACE_ROUTES.onboardingEditorial,
   centralEstrategica: WORKSPACE_ROUTES.centralEstrategica,
   painelDoDia: WORKSPACE_ROUTES.painelDoDia,
+  bibliotecaConteudo: WORKSPACE_ROUTES.bibliotecaConteudo,
+  assetsArquivos: WORKSPACE_ROUTES.assetsArquivos,
+  configuracoes: WORKSPACE_ROUTES.configuracoes,
+  configuracoesAlternativa: WORKSPACE_ROUTES.configuracoesAlternativa,
 } as const;
 
 /* -------------------------------------------------------------------------- */
@@ -372,6 +383,10 @@ export const NOINDEX_ROUTES = [
   ACTIVATION_ROUTES.onboarding,
   ACTIVATION_ROUTES.firstEditorialProject,
   ACTIVATION_ROUTES.strategicCenter,
+  WORKSPACE_ROUTES.bibliotecaConteudo,
+  WORKSPACE_ROUTES.assetsArquivos,
+  WORKSPACE_ROUTES.configuracoes,
+  WORKSPACE_ROUTES.configuracoesAlternativa,
   LEGACY_ROUTES.signup,
   LEGACY_ROUTES.dashboard,
 ] as const;
@@ -454,6 +469,10 @@ const INTERNAL_RETURN_TO_ALLOWLIST: ReadonlySet<string> = new Set([
   WORKSPACE_ROUTES.centralEstrategica,
   WORKSPACE_ROUTES.painelDoDia,
   WORKSPACE_ROUTES.onboardingEditorial,
+  WORKSPACE_ROUTES.bibliotecaConteudo,
+  WORKSPACE_ROUTES.assetsArquivos,
+  WORKSPACE_ROUTES.configuracoes,
+  WORKSPACE_ROUTES.configuracoesAlternativa,
   ACTIVATION_ROUTES.plans,
   ACTIVATION_ROUTES.checkoutProcessing,
   PUBLIC_ROUTES.pricing,
@@ -499,6 +518,10 @@ export function sanitizeReturnTo(
 
   if (
     pathname.startsWith("/dashboard/editorial") ||
+    pathname.startsWith("/dashboard/publicacoes") ||
+    pathname.startsWith("/dashboard/armazenamento") ||
+    pathname.startsWith("/dashboard/settings") ||
+    pathname.startsWith("/dashboard/configuracoes") ||
     pathname === "/dashboard" ||
     INTERNAL_RETURN_TO_ALLOWLIST.has(pathname)
   ) {
