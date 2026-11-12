@@ -5,6 +5,7 @@ import { registerSchema } from "@/lib/validations/auth";
 import { createAuthToken } from "@/lib/auth/token.service";
 import {
   AuthBackendError,
+  fetchUserEditorialProjects,
   registerBackendUser,
 } from "@/lib/auth/userProvision";
 import type { AuthResponse, UserSession } from "@/types/auth";
@@ -40,7 +41,7 @@ export async function POST(request: Request) {
       );
     }
 
-    // Cria o usuário real no BackEnd NestJS (MongoDB) com senha criptografada via bcrypt
+    // Realiza auto-cadastro (ou vínculo de organização) na API do Cazuá e sincroniza no MongoDB do Altaire
     const provisioned = await registerBackendUser({
       email: normalizedEmail,
       fullName: fullName.trim(),
@@ -55,14 +56,20 @@ export async function POST(request: Request) {
       role: provisioned.role,
     });
 
+    const userProjects = provisioned.isNewUser
+      ? []
+      : await fetchUserEditorialProjects(token, provisioned.id);
+    const activeProject = userProjects[0] ?? null;
+    const hasActiveProject = Boolean(activeProject);
+
     const userSession: UserSession = {
       id: provisioned.id,
       email: provisioned.email,
       fullName: provisioned.fullName,
       role: provisioned.role,
       tier: "free",
-      hasActiveProject: false,
-      activeProjectContext: null,
+      hasActiveProject,
+      activeProjectContext: activeProject,
       createdAt: new Date().toISOString(),
     };
 
@@ -79,11 +86,14 @@ export async function POST(request: Request) {
       });
     }
 
-    // No 1º acesso após cadastro, encaminha para a criação do primeiro projeto editorial
+    const redirectUrl = activeProject
+      ? `/dashboard/editorial/${activeProject.id}`
+      : "/dashboard/editorial?newProject=true&onboarding=true";
+
     const responsePayload: AuthResponse = {
       success: true,
       user: userSession,
-      redirectUrl: "/dashboard/editorial?newProject=true&onboarding=true",
+      redirectUrl,
       token,
     };
 

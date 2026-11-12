@@ -1,3 +1,19 @@
+## INTEGRAÇÃO COM A API EXTERNA DE AUTENTICAÇÃO DO CAZUÁ (E-MAIL E SENHA) - 09/11/2026 ##
+Resumo Técnico — Autenticação, Auto-Cadastro e Recuperação de Senha via API Cazuá (`https://vanguarda-eight.vercel.app`):
+
+1. Variáveis de Ambiente e Helpers Server-Side (`FrontEnd/.env`, `FrontEnd/.env.example`, `FrontEnd/src/lib/api/serverUtils.ts`):
+   - `AUTH_API_URL=https://vanguarda-eight.vercel.app` configurada como endpoint da API externa do Cazuá (`getAuthApiUrl()` normaliza barras finais).
+   - Credenciais de API Client (`X-CLIENT-ID` / `CAZUA_CLIENT_ID` e `X-CLIENT-SECRET` / `CAZUA_CLIENT_SECRET`) lidas via `getCazuaClientCredentials()` e injetadas nos headers `x-client-id` e `x-client-secret` via `getCazuaClientHeaders()`.
+
+2. Fluxos de Login, Cadastro e Validação de Perfil (`FrontEnd/src/lib/auth/userProvision.ts`, `FrontEnd/src/lib/auth/authProxy.ts`, `/api/auth/login`, `/api/auth/register`, `/api/auth/signup`):
+   - Login (`authenticateBackendUser`): realiza `POST ${AUTH_API_URL}/auth/login` com `{ email, password }`, valida o `access_token` retornado consultando `GET ${AUTH_API_URL}/auth/profile` (`Bearer <access_token>`) e trata respostas `401` (credenciais inválidas / bloqueio temporário de 60 min após 5 tentativas) e `429` (rate limit de 5 req / 10s).
+   - Auto-Cadastro (`registerBackendUser`): realiza `POST ${AUTH_API_URL}/auth/register` enviando os headers obrigatórios `x-client-id` e `x-client-secret` e `{ name, email, password }` (com vínculo de organização resolvido pelo `x-client-id`), valida o perfil via `GET /auth/profile` e trata conflitos `409 Conflict` e contas vinculadas (`linked: true`).
+   - Sincronização Local e Emissão de JWT Próprio (`syncCazuaUserWithAltaireBackend` + `createAuthToken`): após validar o usuário no Cazuá, sincroniza o registro no MongoDB local do Altaire (`POST /users/oauth` com fallback resiliente para o ObjectId `sub` do Cazuá) e emite o JWT interno do Altaire assinado com o `JWT_SECRET` local e claims de governança (`org: 'altaire'`, `role` resolvido por `ALTAIRE_OWNER_EMAILS` / `ALTAIRE_ADMIN_EMAILS`).
+
+3. Recuperação de Senha Contextualizada (`/api/auth/forgot-password`, `FrontEnd/src/app/(auth)/reset-password/page.tsx`):
+   - Rota BFF `/api/auth/forgot-password` atualizada para encaminhar `POST ${AUTH_API_URL}/users/forgot-password` com os headers `x-client-id` e `x-client-secret`.
+   - Página `/reset-password` conectada ao endpoint real `/api/auth/forgot-password`.
+
 ## ORGANIZAÇÃO PADRÃO "ALTAIRE", GOVERNANÇA POR .ENV (OWNER/ADMIN/MEMBER) E ISOLAMENTO DE USUÁRIOS - 02/11/2026 ##
 Resumo Técnico — Vínculo Automático na Organização "Altaire", Remoção do OrgSwitcher e Isolamento de Dados entre Membros:
 

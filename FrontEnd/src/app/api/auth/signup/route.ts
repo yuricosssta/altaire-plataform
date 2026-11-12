@@ -1,5 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getBackendApiUrl } from '@/lib/api/serverUtils';
+import {
+  AuthBackendError,
+  registerBackendUser,
+} from '@/lib/auth/userProvision';
 import { success, error, ERROR_CODES } from '@/lib/api/response';
 
 export async function POST(request: NextRequest) {
@@ -12,26 +15,22 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    const backendUrl = getBackendApiUrl();
-    const response = await fetch(`${backendUrl}/users`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body),
+    const provisioned = await registerBackendUser({
+      email: String(body.email),
+      fullName: String(body.name || body.fullName || body.email.split('@')[0]),
+      password: String(body.password),
     });
 
-    const data = await response.json().catch(() => null);
-
-    if (!response.ok) {
-      const message = data?.message || 'Erro ao criar conta';
+    return NextResponse.json(success(provisioned), { status: 201 });
+  } catch (err: unknown) {
+    if (err instanceof AuthBackendError) {
       return NextResponse.json(
-        error(ERROR_CODES.EXTERNAL_ERROR, message),
-        { status: response.status },
+        error(ERROR_CODES.EXTERNAL_ERROR, err.message),
+        { status: err.statusCode },
       );
     }
-
-    return NextResponse.json(success(data || null), { status: 201 });
-  } catch (err: unknown) {
-    const message = err instanceof Error ? err.message : 'Erro ao conectar com o servidor';
+    const message =
+      err instanceof Error ? err.message : 'Erro ao conectar com o servidor';
     return NextResponse.json(
       error(ERROR_CODES.INTERNAL_ERROR, message),
       { status: 502 },

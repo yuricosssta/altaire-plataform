@@ -32,7 +32,7 @@ export async function POST(request: Request) {
       );
     }
 
-    // Autentica o usuário validando a existência e o hash bcrypt da senha no MongoDB (BackEnd NestJS)
+    // Autentica o usuário na API do Cazuá (POST /auth/login + GET /auth/profile) e sincroniza no MongoDB do Altaire
     const provisioned = await authenticateBackendUser({
       email: normalizedEmail,
       password,
