@@ -47,9 +47,30 @@ export default function ResetPasswordPage() {
     }
 
     setIsSubmitting(true);
-    await new Promise((resolve) => setTimeout(resolve, 600));
-    setIsSubmitting(false);
-    setIsSubmitted(true);
+    try {
+      const res = await fetch("/api/auth/forgot-password", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: emailTrimmed }),
+      });
+
+      if (!res.ok && res.status >= 500) {
+        const body = await res.json().catch(() => null);
+        setEmailError(
+          body?.error?.message ||
+            "Não foi possível processar a solicitação no momento. Tente novamente."
+        );
+        return;
+      }
+
+      setIsSubmitted(true);
+    } catch {
+      setEmailError(
+        "Falha de comunicação com o servidor. Verifique sua conexão e tente novamente."
+      );
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
