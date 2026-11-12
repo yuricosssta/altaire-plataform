@@ -42,12 +42,26 @@ export const registerSchema = z
 
 export type RegisterFormData = z.infer<typeof registerSchema>;
 
+/**
+ * Schema de Qualificação Operacional no Cadastro (Ponto 01):
+ * Captura apenas Perfil da Operação, WhatsApp, Nicho e Segmento Principal.
+ * A criação do 1º Projeto Editorial ocorre dentro da plataforma pós-login.
+ */
 export const onboardingSchema = z.object({
-  niche: z.string().min(2, "O nicho de atuação é obrigatório."),
-  mainOffer: z.string().min(5, "Descreva sua oferta principal brevemente."),
-  firstProjectName: z
+  operationProfile: z
     .string()
-    .min(3, "Dê um nome para o seu primeiro Projeto Editorial."),
+    .min(2, "Selecione o perfil da sua operação."),
+  whatsapp: z
+    .string()
+    .min(8, "Informe um número de WhatsApp válido para contato."),
+  niche: z
+    .string()
+    .min(2, "Informe seu nicho principal de atuação."),
+  mainSegment: z
+    .string()
+    .min(2, "Informe seu segmento de atuação principal."),
+  mainOffer: z.string().optional(),
+  firstProjectName: z.string().optional(),
 });
 
 export type OnboardingFormData = z.infer<typeof onboardingSchema>;

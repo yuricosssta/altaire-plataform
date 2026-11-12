@@ -3,16 +3,10 @@
  * Fonte canônica de verdade para URLs públicas, âncoras da landing page,
  * itens de navegação (Header, Dropdown Recursos, Mobile Nav, Footer),
  * rotas de ativação/checkout, aliases legados e guardas de redirecionamento.
- *
- * Referências de autoridade:
- * - docs/ROUTES-PUBLIC.md
- * - docs/CONTENT-LANDING.md
- * - docs/DESIGN-LEGION-PUBLIC.md
- * - PLANO-OPERACIONAL-ETAPA-3-LANDING.md
  */
 
 /* -------------------------------------------------------------------------- */
-/* 1. Rotas Públicas e de Autenticação Canônicas (ROUTES-PUBLIC.md §6 & §23)  */
+/* 1. Rotas Públicas e de Autenticação Canônicas                              */
 /* -------------------------------------------------------------------------- */
 
 export const PUBLIC_ROUTES = {
@@ -22,27 +16,49 @@ export const PUBLIC_ROUTES = {
   contact: "/contato",
   login: "/login",
   signup: "/cadastro",
-  forgotPassword: "/recuperar-senha",
-  resetPassword: "/redefinir-senha",
+  forgotPassword: "/forgot-password",
+  resetPassword: "/reset-password",
   verifyEmail: "/verificar-email",
   terms: "/termos-de-uso",
   privacy: "/politica-de-privacidade",
   cookies: "/politica-de-cookies",
 } as const;
 
+/**
+ * Rotas internas reais sob (main)/dashboard sincronizadas com o App Router
+ */
+export const WORKSPACE_ROUTES = {
+  painelDoDia: "/dashboard",
+  centralEstrategica: "/dashboard/editorial",
+  onboardingEditorial: "/dashboard/editorial?onboarding=true",
+  bibliotecaConteudo: "/dashboard/publicacoes",
+  assetsArquivos: "/dashboard/armazenamento",
+  configuracoes: "/dashboard/settings",
+  configuracoesAlternativa: "/dashboard/configuracoes",
+  configuracoesTab: (
+    tab: "perfil" | "plano" | "preferencias" | "membros"
+  ) => `/dashboard/settings?tab=${tab}`,
+  projectWorkspace: (projectId: string) => `/dashboard/editorial/${projectId}`,
+  projectTab: (
+    projectId: string,
+    tab: "dashboard" | "linha-editorial" | "calendario" | "temas" | "roteiros"
+  ) => `/dashboard/editorial/${projectId}?aba=${tab}`,
+} as const;
+
 export const ACTIVATION_ROUTES = {
-  plans: "/planos",
+  plans: "/precos",
   checkoutProcessing: "/checkout/processando",
   checkoutCanceled: "/checkout/cancelado",
   checkoutExpired: "/checkout/expirado",
   checkoutError: "/checkout/erro",
-  onboarding: "/onboarding",
-  firstEditorialProject: "/onboarding/primeiro-projeto-editorial",
-  strategicCenter: "/central-estrategica",
+  onboarding: WORKSPACE_ROUTES.onboardingEditorial,
+  firstEditorialProject: WORKSPACE_ROUTES.onboardingEditorial,
+  strategicCenter: WORKSPACE_ROUTES.centralEstrategica,
+  dailyPanel: WORKSPACE_ROUTES.painelDoDia,
 } as const;
 
 /* -------------------------------------------------------------------------- */
-/* 2. Âncoras e IDs Oficiais das 15 Seções da Landing (ROUTES-PUBLIC.md §7)   */
+/* 2. Âncoras e IDs Oficiais das 15 Seções da Landing                         */
 /* -------------------------------------------------------------------------- */
 
 export const LANDING_SECTION_IDS = {
@@ -63,9 +79,6 @@ export const LANDING_SECTION_IDS = {
   footer: "rodape",
 } as const;
 
-/**
- * IDs estruturais de landmark definidos em CONTENT-LANDING.md (§01 e §15)
- */
 export const LANDING_DOM_IDS = {
   siteHeader: "site-header",
   siteFooter: "site-footer",
@@ -73,9 +86,6 @@ export const LANDING_DOM_IDS = {
   mobileNavDrawer: "mobile-navigation-drawer",
 } as const;
 
-/**
- * Mapa semântico de âncoras conforme ROUTES-PUBLIC.md §23.1
- */
 export const LANDING_ANCHORS = {
   top: LANDING_SECTION_IDS.header,
   hero: LANDING_SECTION_IDS.hero,
@@ -140,27 +150,38 @@ export const ROUTES = {
   checkoutExpirado: ACTIVATION_ROUTES.checkoutExpired,
   checkoutErro: ACTIVATION_ROUTES.checkoutError,
 
-  onboarding: ACTIVATION_ROUTES.onboarding,
-  primeiroProjetoEditorial: ACTIVATION_ROUTES.firstEditorialProject,
-  centralEstrategica: ACTIVATION_ROUTES.strategicCenter,
+  onboarding: WORKSPACE_ROUTES.onboardingEditorial,
+  primeiroProjetoEditorial: WORKSPACE_ROUTES.onboardingEditorial,
+  centralEstrategica: WORKSPACE_ROUTES.centralEstrategica,
+  painelDoDia: WORKSPACE_ROUTES.painelDoDia,
+  bibliotecaConteudo: WORKSPACE_ROUTES.bibliotecaConteudo,
+  assetsArquivos: WORKSPACE_ROUTES.assetsArquivos,
+  configuracoes: WORKSPACE_ROUTES.configuracoes,
+  configuracoesAlternativa: WORKSPACE_ROUTES.configuracoesAlternativa,
 } as const;
 
 /* -------------------------------------------------------------------------- */
-/* 4. Rotas Legadas e Aliases de Migração (ROUTES-PUBLIC.md §13 & §25)        */
+/* 4. Rotas Legadas e Aliases de Migração                                     */
 /* -------------------------------------------------------------------------- */
 
 export const LEGACY_ROUTES = {
   signup: "/signup",
   dashboard: "/dashboard",
+  editorialBase: "/editorial/base",
+  centralEstrategicaAlias: "/central-estrategica",
+  onboardingAlias: "/onboarding",
 } as const;
 
 export const ROUTE_ALIASES = {
   [LEGACY_ROUTES.signup]: ROUTES.cadastro,
-  [LEGACY_ROUTES.dashboard]: ROUTES.centralEstrategica,
+  [LEGACY_ROUTES.dashboard]: ROUTES.painelDoDia,
+  [LEGACY_ROUTES.editorialBase]: ROUTES.centralEstrategica,
+  [LEGACY_ROUTES.centralEstrategicaAlias]: ROUTES.centralEstrategica,
+  [LEGACY_ROUTES.onboardingAlias]: ROUTES.onboarding,
 } as const;
 
 /* -------------------------------------------------------------------------- */
-/* 5. Navegação Canônica: Header, Recursos e Footer (ROUTES-PUBLIC.md §8-§10) */
+/* 5. Navegação Canônica: Header, Recursos e Footer                           */
 /* -------------------------------------------------------------------------- */
 
 export const HEADER_NAV_ROUTES = {
@@ -192,10 +213,6 @@ export const FOOTER_NAV_ROUTES = {
   criarConta: ROUTES.cadastro,
 } as const;
 
-/**
- * Itens ordenados de primeiro nível do Header (Ordem canônica: ROUTES-PUBLIC.md §8.1)
- * Nota: "Recursos" é um controle expansível (<button>), não possui href próprio.
- */
 export const HEADER_NAV_ITEMS = [
   {
     key: "produto",
@@ -229,9 +246,6 @@ export const HEADER_NAV_ITEMS = [
   },
 ] as const;
 
-/**
- * Itens do dropdown compacto "Recursos" (ROUTES-PUBLIC.md §8.2 & CONTENT-LANDING.md §01)
- */
 export const RESOURCE_MENU_ITEMS = [
   {
     key: "perguntas-frequentes",
@@ -262,9 +276,6 @@ export const HEADER_ACTION_ITEMS = {
   },
 } as const;
 
-/**
- * Ação local de interface para abrir o painel de preferências de cookies (sem URL própria)
- */
 export const COOKIE_PREFERENCES_ACTION = {
   key: "preferencias-de-cookies",
   label: "Preferências de Cookies",
@@ -272,9 +283,6 @@ export const COOKIE_PREFERENCES_ACTION = {
   type: "action",
 } as const;
 
-/**
- * Grupos canônicos do Footer (CONTENT-LANDING.md §15 & ROUTES-PUBLIC.md §10)
- */
 export const FOOTER_LINK_GROUPS = {
   produto: {
     title: "Produto",
@@ -340,10 +348,6 @@ export const CHECKOUT_QUERY_KEYS = {
   token: "token",
 } as const;
 
-/**
- * Parâmetros seguros que podem ser preservados em redirects públicos (/signup -> /cadastro)
- * Nunca incluir token, CPF, cartão ou dados pessoais (ROUTES-PUBLIC.md §13.3).
- */
 export const ALLOWED_PUBLIC_QUERY_KEYS = [
   CHECKOUT_QUERY_KEYS.utmSource,
   CHECKOUT_QUERY_KEYS.utmMedium,
@@ -379,6 +383,10 @@ export const NOINDEX_ROUTES = [
   ACTIVATION_ROUTES.onboarding,
   ACTIVATION_ROUTES.firstEditorialProject,
   ACTIVATION_ROUTES.strategicCenter,
+  WORKSPACE_ROUTES.bibliotecaConteudo,
+  WORKSPACE_ROUTES.assetsArquivos,
+  WORKSPACE_ROUTES.configuracoes,
+  WORKSPACE_ROUTES.configuracoesAlternativa,
   LEGACY_ROUTES.signup,
   LEGACY_ROUTES.dashboard,
 ] as const;
@@ -400,7 +408,7 @@ export const NAVIGATION_ANALYTICS_EVENTS = {
 } as const;
 
 /* -------------------------------------------------------------------------- */
-/* 7. Helpers Tipados de Navegação e Segurança (ROUTES-PUBLIC.md §12, §14, §23)*/
+/* 7. Helpers Tipados de Navegação e Segurança                                */
 /* -------------------------------------------------------------------------- */
 
 export type AppRoute = (typeof ROUTES)[keyof typeof ROUTES];
@@ -431,43 +439,40 @@ export type FooterActionItem = {
   readonly type: "action";
 };
 
-/**
- * Helper oficial recomendado em ROUTES-PUBLIC.md §23.1
- * Retorna sempre o hash com prefixo "/#" para funcionar tanto na landing quanto em páginas auxiliares.
- */
 export function landingHref<K extends LandingAnchorKey>(
   anchor: K
 ): `/#${(typeof LANDING_ANCHORS)[K]}` {
   return `/#${LANDING_ANCHORS[anchor]}`;
 }
 
-/**
- * Helper exigido pelo PLANO-OPERACIONAL-ETAPA-3-LANDING.md §8.2
- */
 export function toLandingSection<ID extends LandingSectionId>(
   sectionId: ID
 ): `/#${ID}` {
   return `/#${sectionId}`;
 }
 
-/**
- * Verifica se um pathname corresponde a um alias legado (/signup ou /dashboard)
- */
 export function isLegacyPublicAlias(pathname: string): pathname is LegacyRoute {
-  return pathname === LEGACY_ROUTES.signup || pathname === LEGACY_ROUTES.dashboard;
+  return (
+    pathname === LEGACY_ROUTES.signup ||
+    pathname === LEGACY_ROUTES.dashboard ||
+    pathname === LEGACY_ROUTES.editorialBase ||
+    pathname === LEGACY_ROUTES.centralEstrategicaAlias ||
+    pathname === LEGACY_ROUTES.onboardingAlias
+  );
 }
 
-/**
- * Resolve o destino canônico para um alias legado
- */
 export function resolveLegacyAlias(pathname: LegacyRoute): string {
   return ROUTE_ALIASES[pathname];
 }
 
 const INTERNAL_RETURN_TO_ALLOWLIST: ReadonlySet<string> = new Set([
-  ACTIVATION_ROUTES.strategicCenter,
-  ACTIVATION_ROUTES.onboarding,
-  ACTIVATION_ROUTES.firstEditorialProject,
+  WORKSPACE_ROUTES.centralEstrategica,
+  WORKSPACE_ROUTES.painelDoDia,
+  WORKSPACE_ROUTES.onboardingEditorial,
+  WORKSPACE_ROUTES.bibliotecaConteudo,
+  WORKSPACE_ROUTES.assetsArquivos,
+  WORKSPACE_ROUTES.configuracoes,
+  WORKSPACE_ROUTES.configuracoesAlternativa,
   ACTIVATION_ROUTES.plans,
   ACTIVATION_ROUTES.checkoutProcessing,
   PUBLIC_ROUTES.pricing,
@@ -476,14 +481,9 @@ const INTERNAL_RETURN_TO_ALLOWLIST: ReadonlySet<string> = new Set([
   PUBLIC_ROUTES.home,
 ]);
 
-/**
- * Valida e sanitiza o parâmetro `returnTo` contra Open Redirect (ROUTES-PUBLIC.md §12.2):
- * - Aceita apenas caminhos internos iniciados por `/`
- * - Rejeita `//`, URLs absolutas, esquemas (`javascript:`, `http:`, `https:`) e rotas fora da allowlist.
- */
 export function sanitizeReturnTo(
   rawReturnTo: string | null | undefined,
-  fallback: string = ACTIVATION_ROUTES.strategicCenter
+  fallback: string = WORKSPACE_ROUTES.centralEstrategica
 ): string {
   if (!rawReturnTo || typeof rawReturnTo !== "string") {
     return fallback;
@@ -500,27 +500,37 @@ export function sanitizeReturnTo(
     return fallback;
   }
 
-  const [pathname] = trimmed.split("?");
+  const [pathname, query] = trimmed.split("?");
 
-  if (pathname === LEGACY_ROUTES.dashboard) {
-    return ACTIVATION_ROUTES.strategicCenter;
+  if (
+    pathname === "/editorial/base" ||
+    pathname === "/central-estrategica" ||
+    pathname === "/onboarding"
+  ) {
+    return query?.includes("onboarding=true") || pathname === "/onboarding"
+      ? WORKSPACE_ROUTES.onboardingEditorial
+      : WORKSPACE_ROUTES.centralEstrategica;
   }
 
   if (pathname === LEGACY_ROUTES.signup) {
     return PUBLIC_ROUTES.signup;
   }
 
-  if (!INTERNAL_RETURN_TO_ALLOWLIST.has(pathname)) {
-    return fallback;
+  if (
+    pathname.startsWith("/dashboard/editorial") ||
+    pathname.startsWith("/dashboard/publicacoes") ||
+    pathname.startsWith("/dashboard/armazenamento") ||
+    pathname.startsWith("/dashboard/settings") ||
+    pathname.startsWith("/dashboard/configuracoes") ||
+    pathname === "/dashboard" ||
+    INTERNAL_RETURN_TO_ALLOWLIST.has(pathname)
+  ) {
+    return trimmed;
   }
 
-  return pathname;
+  return fallback;
 }
 
-/**
- * Filtra uma query string preservando apenas parâmetros públicos permitidos (UTM, ref, plano, returnTo).
- * Remove qualquer chave sensível ou desconhecida (ROUTES-PUBLIC.md §13.3).
- */
 export function filterAllowedQueryParams(
   params: URLSearchParams | Record<string, string | string[] | undefined>
 ): URLSearchParams {
@@ -560,11 +570,14 @@ export type AccountAccessState = {
   readonly hasActiveOrTrialingPlan: boolean;
   readonly isCheckoutProcessing?: boolean;
   readonly isOnboardingCompleted: boolean;
+  readonly preferredStartRoute?: string | null;
 };
 
 /**
- * Resolve o destino canônico pós-autenticação com base no estado real da conta,
- * substituindo o redirecionamento legado fixo para `/dashboard` (ROUTES-PUBLIC.md §12.1 & §14.2).
+ * Resolve o destino canônico pós-autenticação com base no estado real da conta:
+ * - Sem projetos (isOnboardingCompleted = false) -> /dashboard/editorial?onboarding=true (Onboarding Editorial Inicial)
+ * - Com projetos (isOnboardingCompleted = true) -> /dashboard/editorial (Central Estratégica — Projetos Editoriais)
+ * - Com preferência salva -> Rota preferida (/dashboard ou /dashboard/editorial/[projectId])
  */
 export function resolvePostAuthDestination(
   state: AccountAccessState,
@@ -583,13 +596,13 @@ export function resolvePostAuthDestination(
   }
 
   if (!state.isOnboardingCompleted) {
-    return ACTIVATION_ROUTES.onboarding;
+    return WORKSPACE_ROUTES.onboardingEditorial;
   }
 
   if (requestedReturnTo) {
     const safeTarget = sanitizeReturnTo(
       requestedReturnTo,
-      ACTIVATION_ROUTES.strategicCenter
+      WORKSPACE_ROUTES.centralEstrategica
     );
     if (
       safeTarget !== PUBLIC_ROUTES.login &&
@@ -599,5 +612,12 @@ export function resolvePostAuthDestination(
     }
   }
 
-  return ACTIVATION_ROUTES.strategicCenter;
+  if (state.preferredStartRoute) {
+    return sanitizeReturnTo(
+      state.preferredStartRoute,
+      WORKSPACE_ROUTES.centralEstrategica
+    );
+  }
+
+  return WORKSPACE_ROUTES.centralEstrategica;
 }

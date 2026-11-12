@@ -1,25 +1,18 @@
-//src/app/(main)/dashboard/layout.tsx
-import { Header } from "@/components/layout/Header";
-import { Sidebar } from "@/components/layout/Sidebar";
+// FrontEnd/src/app/(main)/dashboard/layout.tsx
+import type { ReactNode } from "react";
 
-export default function DashboardLayout({
+/**
+ * Sub-layout de `/dashboard/*`.
+ *
+ * O Shell Global (Sidebar + Header + Micro-mensagem de continuidade) já é
+ * renderizado pelo layout pai em `src/app/(main)/layout.tsx`.
+ * Este arquivo atua exclusivamente como pass-through para evitar duplicação
+ * de Sidebar e Header nas rotas filhas.
+ */
+export default function DashboardSubLayout({
   children,
 }: {
-  children: React.ReactNode;
+  readonly children: ReactNode;
 }) {
-  return (
-    // O Container mestre: Tela cheia, flexível, com fundo base
-    <div className="flex h-screen w-full bg-background text-foreground overflow-hidden">
-      <Sidebar />
-      {/* Área Principal (Onde vai o Header e o Conteúdo da Página) */}
-      <main className="flex-1 flex flex-col min-w-0 overflow-hidden">
-        <Header />
-        {/* Área de Conteúdo Rolável (O page.tsx é renderizado aqui dentro) */}
-        <div className="flex-1 overflow-auto p-4">
-          {children}
-        </div>
-        
-      </main>
-    </div>
-  );
+  return <>{children}</>;
 }

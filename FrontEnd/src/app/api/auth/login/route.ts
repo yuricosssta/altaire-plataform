@@ -23,8 +23,9 @@ export async function POST(request: Request) {
     }
 
     const { email, password, rememberMe } = result.data;
+    const normalizedEmail = email.trim().toLowerCase();
 
-    if (email === "erro@legionaltaire.com.br") {
+    if (normalizedEmail === "erro@legionaltaire.com.br") {
       return NextResponse.json(
         { success: false, message: "E-mail ou senha incorretos." },
         { status: 401 }
@@ -33,7 +34,7 @@ export async function POST(request: Request) {
 
     // Autentica o usuário na API do Cazuá (POST /auth/login + GET /auth/profile) e sincroniza no MongoDB do Altaire
     const provisioned = await authenticateBackendUser({
-      email,
+      email: normalizedEmail,
       password,
     });
 
@@ -48,7 +49,7 @@ export async function POST(request: Request) {
 
     // Verifica se o usuário já possui projetos editoriais ativos no BackEnd
     const userProjects =
-      email === "novo@legionaltaire.com.br"
+      normalizedEmail === "novo@legionaltaire.com.br"
         ? []
         : await fetchUserEditorialProjects(token, provisioned.id);
 
@@ -68,6 +69,7 @@ export async function POST(request: Request) {
 
     const maxAge = rememberMe ? 60 * 60 * 24 * 30 : 60 * 60 * 24;
     const cookieStore = await cookies();
+
     for (const cookieName of ["auth_token", "access_token", "la_session_token"]) {
       cookieStore.set({
         name: cookieName,
@@ -84,7 +86,7 @@ export async function POST(request: Request) {
     // Se for o 1º login sem projeto -> vai para a Central Estratégica abrindo a criação de projeto
     const redirectUrl = activeProject
       ? `/dashboard/editorial/${activeProject.id}`
-      : "/dashboard/editorial?newProject=true";
+      : "/dashboard/editorial?newProject=true&onboarding=true";
 
     const responsePayload: AuthResponse = {
       success: true,
@@ -94,7 +96,7 @@ export async function POST(request: Request) {
     };
 
     return NextResponse.json(responsePayload, { status: 200 });
-  } catch (error) {
+  } catch (error: unknown) {
     if (error instanceof AuthBackendError) {
       return NextResponse.json(
         { success: false, message: error.message },
@@ -103,7 +105,13 @@ export async function POST(request: Request) {
     }
     console.error("[LOGIN_ERROR]", error);
     return NextResponse.json(
-      { success: false, message: "Falha interna no servidor de autenticação." },
+      {
+        success: false,
+        message:
+          error instanceof Error
+            ? error.message
+            : "Falha interna no servidor de autenticação.",
+      },
       { status: 500 }
     );
   }
