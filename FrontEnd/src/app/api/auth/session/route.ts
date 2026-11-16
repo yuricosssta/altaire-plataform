@@ -74,15 +74,32 @@ export async function GET(request: Request) {
       );
     }
 
-    const projects = await fetchUserEditorialProjects(token, payload.sub);
+    const resolvedRole = resolveAltaireRoleByEmail(
+      payload.email,
+      payload.role,
+    );
+    const allowedProjects = Array.isArray(payload.allowedProjects)
+      ? payload.allowedProjects.map(String)
+      : [];
+    const permissions = Array.isArray(payload.permissions)
+      ? payload.permissions.map(String)
+      : [];
+
+    const projects = await fetchUserEditorialProjects(
+      token,
+      payload.sub,
+      resolvedRole,
+      allowedProjects,
+    );
     const activeProject = projects[0] ?? null;
-    const resolvedRole = resolveAltaireRoleByEmail(payload.email);
 
     const session: UserSession = {
       id: payload.sub,
       email: payload.email,
       fullName: payload.name || payload.email.split("@")[0],
       role: resolvedRole,
+      allowedProjects,
+      permissions,
       tier: "pro",
       hasActiveProject: Boolean(activeProject),
       activeProjectContext: activeProject,

@@ -7,6 +7,7 @@ import {
   AuthBackendError,
   authenticateBackendUser,
   fetchUserEditorialProjects,
+  resolvePostLoginRedirectByRole,
 } from "@/lib/auth/userProvision";
 import type { AuthResponse, UserSession } from "@/types/auth";
 
@@ -32,7 +33,7 @@ export async function POST(request: Request) {
       );
     }
 
-    // Autentica o usuário na API do Cazuá (POST /auth/login + GET /auth/profile) e sincroniza no MongoDB do Altaire
+    // Autentica o usuário na API do Cazuá (ou banco local Altaire) e sincroniza no MongoDB do Altaire
     const provisioned = await authenticateBackendUser({
       email: normalizedEmail,
       password,
@@ -45,13 +46,20 @@ export async function POST(request: Request) {
       name: provisioned.fullName,
       org: "altaire",
       role: provisioned.role,
+      allowedProjects: provisioned.allowedProjects || [],
+      permissions: provisioned.permissions || [],
     });
 
-    // Verifica se o usuário já possui projetos editoriais ativos no BackEnd
+    // Verifica se o usuário já possui projetos editoriais ativos/permitidos no BackEnd
     const userProjects =
       normalizedEmail === "novo@legionaltaire.com.br"
         ? []
-        : await fetchUserEditorialProjects(token, provisioned.id);
+        : await fetchUserEditorialProjects(
+            token,
+            provisioned.id,
+            provisioned.role,
+            provisioned.allowedProjects
+          );
 
     const activeProject = userProjects[0] ?? null;
     const hasActiveProject = Boolean(activeProject);
@@ -61,6 +69,9 @@ export async function POST(request: Request) {
       email: provisioned.email,
       fullName: provisioned.fullName,
       role: provisioned.role,
+      allowedProjects: provisioned.allowedProjects || [],
+      permissions: provisioned.permissions || [],
+      invitedBy: provisioned.invitedBy,
       tier: "pro",
       hasActiveProject,
       activeProjectContext: activeProject,
@@ -82,11 +93,12 @@ export async function POST(request: Request) {
       });
     }
 
-    // Se já tiver projeto ativo -> vai direto para o Workspace do projeto
-    // Se for o 1º login sem projeto -> vai para a Central Estratégica abrindo a criação de projeto
-    const redirectUrl = activeProject
-      ? `/dashboard/editorial/${activeProject.id}`
-      : "/dashboard/editorial?newProject=true&onboarding=true";
+    // Redireciona CLIENT -> /dashboard/cliente, EXTERNAL -> /dashboard/externo, demais -> Workspace Editorial
+    const redirectUrl = resolvePostLoginRedirectByRole(
+      provisioned.role,
+      activeProject?.id,
+      true
+    );
 
     const responsePayload: AuthResponse = {
       success: true,

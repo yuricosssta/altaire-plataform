@@ -11,13 +11,21 @@ import {
   type TokenPayload,
 } from '@/lib/auth/token.service';
 
-export type AltaireUserRole = 'owner' | 'admin' | 'member';
+export type AltaireUserRole =
+  | 'owner'
+  | 'admin'
+  | 'member'
+  | 'client'
+  | 'external';
 
 export interface ProvisionedUser {
   id: string;
   email: string;
   fullName: string;
   role: AltaireUserRole;
+  allowedProjects?: string[];
+  permissions?: string[];
+  invitedBy?: string;
   avatarUrl?: string;
   isNewUser: boolean;
 }
@@ -140,7 +148,7 @@ async function syncCazuaUserWithAltaireBackend(params: {
 }): Promise<ProvisionedUser> {
   const email = params.email.trim().toLowerCase();
   const fullName = params.fullName.trim() || formatDefaultNameFromEmail(email);
-  const role = resolveAltaireRoleByEmail(email);
+  const fallbackRole = resolveAltaireRoleByEmail(email);
   const backendUrl = getBackendApiUrl();
   const fallbackId = isValidMongoObjectId(params.cazuaSub)
     ? String(params.cazuaSub).trim()
@@ -164,15 +172,27 @@ async function syncCazuaUserWithAltaireBackend(params: {
         id?: string;
         email?: string;
         name?: string;
+        role?: string;
+        allowedProjects?: string[];
+        permissions?: string[];
+        invitedBy?: string;
         avatarUrl?: string;
       };
       const localId = String(localUser?._id || localUser?.id || '');
+      const resolvedRole = resolveAltaireRoleByEmail(email, localUser?.role);
       if (isValidMongoObjectId(localId)) {
         return {
           id: localId,
           email: localUser.email || email,
           fullName: localUser.name || fullName,
-          role,
+          role: resolvedRole,
+          allowedProjects: Array.isArray(localUser.allowedProjects)
+            ? localUser.allowedProjects.map(String)
+            : [],
+          permissions: Array.isArray(localUser.permissions)
+            ? localUser.permissions.map(String)
+            : [],
+          invitedBy: localUser.invitedBy ? String(localUser.invitedBy) : undefined,
           avatarUrl: localUser.avatarUrl || params.avatarUrl,
           isNewUser: params.isNewUser,
         };
@@ -189,7 +209,9 @@ async function syncCazuaUserWithAltaireBackend(params: {
     id: fallbackId,
     email,
     fullName,
-    role,
+    role: fallbackRole,
+    allowedProjects: [],
+    permissions: [],
     avatarUrl: params.avatarUrl,
     isNewUser: params.isNewUser,
   };
@@ -204,22 +226,54 @@ function parseEmailList(envValue?: string): string[] {
 }
 
 /**
- * Resolve o papel do usuário na organização padrão "Altaire" a partir das variáveis de ambiente:
+ * Resolve o papel do usuário na organização padrão "Altaire":
  * - ALTAIRE_OWNER_EMAILS -> 'owner'
  * - ALTAIRE_ADMIN_EMAILS -> 'admin'
+ * - Se não estiver no .env como owner/admin, respeita o papel persistido no banco ('client', 'external', 'member')
  * - Demais usuários -> 'member' (isolado por padrão)
  */
-export function resolveAltaireRoleByEmail(email?: string | null): AltaireUserRole {
-  if (!email) return 'member';
-  const normalized = email.trim().toLowerCase();
+export function resolveAltaireRoleByEmail(
+  email?: string | null,
+  persistedRole?: string | null,
+): AltaireUserRole {
+  if (email) {
+    const normalized = email.trim().toLowerCase();
 
-  const ownerEmails = new Set(parseEmailList(process.env.ALTAIRE_OWNER_EMAILS));
-  if (ownerEmails.has(normalized)) return 'owner';
+    const ownerEmails = new Set(parseEmailList(process.env.ALTAIRE_OWNER_EMAILS));
+    if (ownerEmails.has(normalized)) return 'owner';
 
-  const adminEmails = new Set(parseEmailList(process.env.ALTAIRE_ADMIN_EMAILS));
-  if (adminEmails.has(normalized)) return 'admin';
+    const adminEmails = new Set(parseEmailList(process.env.ALTAIRE_ADMIN_EMAILS));
+    if (adminEmails.has(normalized)) return 'admin';
+  }
+
+  if (persistedRole) {
+    const lower = persistedRole.trim().toLowerCase();
+    if (lower === 'client' || lower === 'external' || lower === 'member') {
+      return lower;
+    }
+  }
 
   return 'member';
+}
+
+export function resolvePostLoginRedirectByRole(
+  role?: string | null,
+  activeProjectId?: string | null,
+  includeOnboardingParam = true,
+): string {
+  const normalizedRole = role?.trim().toLowerCase();
+  if (normalizedRole === 'client') {
+    return '/dashboard/cliente';
+  }
+  if (normalizedRole === 'external') {
+    return '/dashboard/externo';
+  }
+  if (activeProjectId) {
+    return `/dashboard/editorial/${activeProjectId}`;
+  }
+  return includeOnboardingParam
+    ? '/dashboard/editorial?newProject=true&onboarding=true'
+    : '/dashboard/editorial?newProject=true';
 }
 
 export class AuthBackendError extends Error {
@@ -270,6 +324,53 @@ export async function authenticateBackendUser(params: {
   const body = (await res.json().catch(() => ({}))) as CazuaAuthResponse;
 
   if (!res.ok) {
+    // Fallback para autenticação no banco local do Altaire (usuários CLIENT/EXTERNAL/MEMBER criados via Gestão de Equipe)
+    try {
+      const backendUrl = getBackendApiUrl();
+      const localAuthRes = await fetch(`${backendUrl}/users/authenticate`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email,
+          password: params.password,
+        }),
+        cache: 'no-store',
+      });
+
+      if (localAuthRes.ok) {
+        const localUser = (await localAuthRes.json()) as {
+          _id?: string;
+          id?: string;
+          email?: string;
+          name?: string;
+          role?: string;
+          allowedProjects?: string[];
+          permissions?: string[];
+          invitedBy?: string;
+          avatarUrl?: string;
+        };
+        const localId = String(localUser._id || localUser.id || deterministicObjectIdFromEmail(email));
+        const resolvedRole = resolveAltaireRoleByEmail(email, localUser.role);
+        return {
+          id: localId,
+          email: localUser.email || email,
+          fullName: localUser.name || formatDefaultNameFromEmail(email),
+          role: resolvedRole,
+          allowedProjects: Array.isArray(localUser.allowedProjects)
+            ? localUser.allowedProjects.map(String)
+            : [],
+          permissions: Array.isArray(localUser.permissions)
+            ? localUser.permissions.map(String)
+            : [],
+          invitedBy: localUser.invitedBy ? String(localUser.invitedBy) : undefined,
+          avatarUrl: localUser.avatarUrl,
+          isNewUser: false,
+        };
+      }
+    } catch {
+      // Segue para erro original caso o fallback local também falhe
+    }
+
     const defaultMsg =
       res.status === 429
         ? 'Muitas tentativas de login. Aguarde alguns segundos e tente novamente.'
@@ -445,6 +546,10 @@ export async function upsertOAuthBackendUser(params: {
         id?: string;
         email?: string;
         name?: string;
+        role?: string;
+        allowedProjects?: string[];
+        permissions?: string[];
+        invitedBy?: string;
         avatarUrl?: string;
       };
       if (user && (user._id || user.id)) {
@@ -452,7 +557,14 @@ export async function upsertOAuthBackendUser(params: {
           id: String(user._id || user.id),
           email: user.email || email,
           fullName: user.name || defaultName,
-          role: targetRole,
+          role: resolveAltaireRoleByEmail(email, user.role),
+          allowedProjects: Array.isArray(user.allowedProjects)
+            ? user.allowedProjects.map(String)
+            : [],
+          permissions: Array.isArray(user.permissions)
+            ? user.permissions.map(String)
+            : [],
+          invitedBy: user.invitedBy ? String(user.invitedBy) : undefined,
           avatarUrl: user.avatarUrl,
           isNewUser: false,
         };
@@ -602,6 +714,8 @@ export async function findOrCreateBackendUser(params: {
 export async function fetchUserEditorialProjects(
   token: string,
   userId: string,
+  role?: string | null,
+  allowedProjects?: string[],
 ): Promise<
   Array<{
     id: string;
@@ -612,6 +726,10 @@ export async function fetchUserEditorialProjects(
   }>
 > {
   const backendUrl = getBackendApiUrl();
+  const normalizedRole = (role || 'member').toLowerCase();
+  const isClientOrExternal =
+    normalizedRole === 'client' || normalizedRole === 'external';
+
   try {
     const res = await fetch(`${backendUrl}/editorial/projects`, {
       method: 'GET',
@@ -619,7 +737,7 @@ export async function fetchUserEditorialProjects(
         Authorization: `Bearer ${token}`,
         'Content-Type': 'application/json',
         'x-org-id': 'altaire',
-        'x-org-role': 'member',
+        'x-org-role': normalizedRole,
       },
       cache: 'no-store',
     });
@@ -629,8 +747,16 @@ export async function fetchUserEditorialProjects(
     const rawProjects = (await res.json()) as Array<Record<string, any>>;
     if (!Array.isArray(rawProjects)) return [];
 
+    const allowedSet = new Set((allowedProjects || []).map(String));
+
     return rawProjects
-      .filter((p) => !p.createdBy || String(p.createdBy) === String(userId))
+      .filter((p) => {
+        const pid = String(p.id || p._id || '');
+        if (isClientOrExternal) {
+          return allowedSet.has(pid);
+        }
+        return !p.createdBy || String(p.createdBy) === String(userId);
+      })
       .map((p) => ({
         id: String(p.id || p._id),
         name: String(p.name || 'Projeto Editorial'),

@@ -1,8 +1,8 @@
 // src/users/schemas/user.schema.ts
 
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
-import { Document } from 'mongoose';
-import { UserRule } from './models/user.interface';
+import { Document, Types } from 'mongoose';
+import { UserRoleType, UserRule } from './models/user.interface';
 
 @Schema({ timestamps: true })
 export class User extends Document {
@@ -26,6 +26,34 @@ export class User extends Document {
 
   @Prop({ required: true, default: 1 })
   rule: UserRule;
+
+  @Prop({
+    type: String,
+    enum: ['OWNER', 'ADMIN', 'MEMBER', 'CLIENT', 'EXTERNAL'],
+    default: 'MEMBER',
+    required: true,
+  })
+  role: UserRoleType;
+
+  @Prop({
+    type: [{ type: Types.ObjectId, ref: 'EditorialProject' }],
+    default: [],
+  })
+  allowedProjects: Types.ObjectId[];
+
+  @Prop({ type: [String], default: [] })
+  permissions: string[];
+
+  @Prop({ type: Types.ObjectId, ref: 'User', required: false, index: true })
+  invitedBy?: Types.ObjectId;
+
+  @Prop({
+    type: Types.ObjectId,
+    ref: 'OrganizationFunction',
+    required: false,
+    default: null,
+  })
+  functionId?: Types.ObjectId | null;
 
   @Prop({ required: false })
   avatarUrl?: string;

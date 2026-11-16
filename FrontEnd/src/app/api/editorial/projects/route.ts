@@ -12,8 +12,22 @@ export async function GET(request: NextRequest) {
     const payload = token ? await verifyInternalToken(token) : null;
     const rawList = (result.data as any[]) || [];
 
+    const role = String(payload?.role || 'member').toLowerCase();
+    const isClientOrExternal = role === 'client' || role === 'external';
+    const allowedSet = new Set(
+      Array.isArray(payload?.allowedProjects)
+        ? payload.allowedProjects.map(String)
+        : [],
+    );
+
     const filtered = payload?.sub
-      ? rawList.filter((p: any) => !p.createdBy || String(p.createdBy) === String(payload.sub))
+      ? rawList.filter((p: any) => {
+          const pid = String(p.id || p._id || '');
+          if (isClientOrExternal) {
+            return allowedSet.has(pid);
+          }
+          return !p.createdBy || String(p.createdBy) === String(payload.sub);
+        })
       : rawList;
 
     const projects = filtered.map((p: any) => ({
@@ -28,6 +42,18 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
+  const token = await getAuthTokenFromRequest(request);
+  const payload = token ? await verifyInternalToken(token) : null;
+  const role = String(payload?.role || 'member').toLowerCase();
+  if (role === 'client' || role === 'external') {
+    return NextResponse.json(
+      error(
+        ERROR_CODES.FORBIDDEN,
+        'Usuários clientes ou externos não têm permissão para criar projetos.',
+      ),
+      { status: 403 },
+    );
+  }
   const body = await request.json().catch(() => null);
   const parsed = ProjectCreateSchema.safeParse(body);
   if (!parsed.success) {

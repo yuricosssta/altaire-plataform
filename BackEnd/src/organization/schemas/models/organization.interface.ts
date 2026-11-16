@@ -1,6 +1,6 @@
 //src/organization/schemas/models/organization.interface.ts
 export type PlanType = 'FREE' | 'PRO' | 'ENTERPRISE';
-export type RoleType = 'OWNER' | 'ADMIN' | 'MEMBER' | 'VIEWER';
+export type RoleType = 'OWNER' | 'ADMIN' | 'MEMBER' | 'CLIENT' | 'EXTERNAL';
 
 export interface IOrganization {
   _id: string;
@@ -19,6 +19,15 @@ export interface IMembership {
   organizationId: IOrganization;
   userId: string;
   role: RoleType;
+  allowedProjects?: string[];
+  permissions?: string[];
+  invitedBy?: string;
+  functionId?: string | null;
+  customFunction?: {
+    _id: string;
+    name: string;
+    description: string;
+  } | null;
   createdAt?: string;
 }
 
@@ -27,7 +36,8 @@ export const RoleLabels: Record<RoleType, string> = {
   OWNER: 'Proprietário',
   ADMIN: 'Administrador',
   MEMBER: 'Membro',
-  VIEWER: 'Visualizador',
+  CLIENT: 'Cliente',
+  EXTERNAL: 'Membro Externo',
 };
 
 export const PlanLabels: Record<PlanType, string> = {

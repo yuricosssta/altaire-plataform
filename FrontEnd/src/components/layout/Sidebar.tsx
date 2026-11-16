@@ -208,12 +208,65 @@ export function Sidebar({
     authUser?.email ||
     userEmail;
 
+  const normalizedRole = String(
+    currentOrg?.role || authUser?.role || "member"
+  ).toUpperCase();
+
+  const isClientRole = normalizedRole === "CLIENT";
+  const isExternalRole = normalizedRole === "EXTERNAL";
+  const isRestrictedRole = isClientRole || isExternalRole;
+
   const isManager =
-    currentOrg?.role === "OWNER" ||
-    currentOrg?.role === "ADMIN" ||
-    authUser?.role === "owner" ||
-    authUser?.role === "admin" ||
+    normalizedRole === "OWNER" ||
+    normalizedRole === "ADMIN" ||
+    normalizedRole === "MEMBER" ||
     Boolean(profileRecord?.isAdmin);
+
+  const visibleSidebarGroups = useMemo((): readonly SidebarSectionGroup[] => {
+    if (isClientRole) {
+      return [
+        {
+          groupId: "portal-cliente",
+          groupLabel: "ÁREA DO CLIENTE",
+          items: [
+            {
+              id: "painel-do-dia",
+              label: "Portal do Cliente",
+              shortLabel: "Cliente",
+              description: "Visualização exclusiva dos projetos liberados",
+              href: WORKSPACE_ROUTES.portalCliente,
+              matchPrefixes: ["/dashboard/cliente"],
+              icon: LayoutDashboard,
+              badge: "Exclusivo",
+            },
+          ],
+        },
+      ];
+    }
+
+    if (isExternalRole) {
+      return [
+        {
+          groupId: "portal-externo",
+          groupLabel: "WORKSPACE EXTERNO",
+          items: [
+            {
+              id: "painel-do-dia",
+              label: "Painel do Editor / Externo",
+              shortLabel: "Externo",
+              description: "Demandas e roteiros liberados para sua execução",
+              href: WORKSPACE_ROUTES.portalExterno,
+              matchPrefixes: ["/dashboard/externo"],
+              icon: FileText,
+              badge: "Exclusivo",
+            },
+          ],
+        },
+      ];
+    }
+
+    return SIDEBAR_GROUPS;
+  }, [isClientRole, isExternalRole]);
 
   const [isAccountMenuOpen, setIsAccountMenuOpen] = useState<boolean>(false);
   const [isHelpModalOpen, setIsHelpModalOpen] = useState<boolean>(false);
@@ -409,9 +462,9 @@ export function Sidebar({
                       />
                     </div>
 
-                    {isManager ? (
+                    {isManager && !isRestrictedRole ? (
                       <Link
-                        href={WORKSPACE_ROUTES.configuracoesTab("membros")}
+                        href="/dashboard/people"
                         onClick={() => {
                           setIsAccountMenuOpen(false);
                           if (mobileMode && onCloseMobile) onCloseMobile();
@@ -426,20 +479,22 @@ export function Sidebar({
                       </Link>
                     ) : null}
 
-                    <Link
-                      href={WORKSPACE_ROUTES.configuracoes}
-                      onClick={() => {
-                        setIsAccountMenuOpen(false);
-                        if (mobileMode && onCloseMobile) onCloseMobile();
-                      }}
-                      className="flex items-center gap-2.5 rounded-la-md px-2.5 py-2 font-la-sans text-[0.75rem] text-la-text-secondary transition-colors hover:bg-white/[0.05] hover:text-la-text-primary"
-                    >
-                      <Settings
-                        aria-hidden="true"
-                        className="h-3.5 w-3.5 text-la-gold"
-                      />
-                      <span>Configurações da Conta</span>
-                    </Link>
+                    {!isRestrictedRole ? (
+                      <Link
+                        href={WORKSPACE_ROUTES.configuracoes}
+                        onClick={() => {
+                          setIsAccountMenuOpen(false);
+                          if (mobileMode && onCloseMobile) onCloseMobile();
+                        }}
+                        className="flex items-center gap-2.5 rounded-la-md px-2.5 py-2 font-la-sans text-[0.75rem] text-la-text-secondary transition-colors hover:bg-white/[0.05] hover:text-la-text-primary"
+                      >
+                        <Settings
+                          aria-hidden="true"
+                          className="h-3.5 w-3.5 text-la-gold"
+                        />
+                        <span>Configurações da Conta</span>
+                      </Link>
+                    ) : null}
                   </div>
 
                   <div className="mt-1.5 border-t border-white/10 pt-1.5">
@@ -462,7 +517,7 @@ export function Sidebar({
             aria-label="Navegação Global do Sistema Operacional Editorial"
             className="mt-1 flex flex-col gap-5"
           >
-            {SIDEBAR_GROUPS.map((group) => (
+            {visibleSidebarGroups.map((group) => (
               <div key={group.groupId} className="flex flex-col gap-1.5">
                 {!collapsed ? (
                   <span className="px-2.5 font-la-mono text-[0.625rem] font-semibold uppercase tracking-[0.1em] text-la-text-muted">

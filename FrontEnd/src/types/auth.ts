@@ -4,9 +4,8 @@ export type UserRole =
   | "owner"
   | "admin"
   | "member"
-  | "strategist"
-  | "editor"
-  | "viewer";
+  | "client"
+  | "external";
 export type SubscriptionTier = "free" | "individual" | "pro" | "agency";
 
 export interface ActiveProjectContext {
@@ -22,6 +21,9 @@ export interface UserSession {
   email: string;
   fullName: string;
   role: UserRole;
+  allowedProjects?: string[];
+  permissions?: string[];
+  invitedBy?: string;
   tier: SubscriptionTier;
   avatarUrl?: string;
   hasActiveProject: boolean;

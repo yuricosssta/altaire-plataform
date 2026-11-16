@@ -2,6 +2,7 @@ import {
   Body,
   Controller,
   Delete,
+  ForbiddenException,
   Get,
   Param,
   Post,
@@ -24,6 +25,7 @@ import {
   OnboardingInput,
 } from '../validations/onboarding.zod';
 import { ICreateEditorialProject } from '../schemas/models/editorial-project.interface';
+import { isClientOrExternalRole } from '../../shared/utils/org-role.util';
 
 @UseGuards(AuthGuard)
 @Controller('editorial/projects')
@@ -34,20 +36,40 @@ export class EditorialProjectController {
   ) {}
 
   @Get()
-  async findAll(@GetUser('sub') userId: string) {
+  async findAll(@GetUser() user: any) {
+    const userId = typeof user === 'string' ? user : user?.sub;
+    if (isClientOrExternalRole(user?.role)) {
+      const allowedProjects = Array.isArray(user?.allowedProjects)
+        ? user.allowedProjects.map(String)
+        : [];
+      return this.projectService.findAll('altaire', undefined, allowedProjects);
+    }
     return this.projectService.findAll('altaire', userId);
   }
 
   @Get(':id')
-  async findById(@Param('id') id: string, @GetUser('sub') userId: string) {
+  async findById(@Param('id') id: string, @GetUser() user: any) {
+    const userId = typeof user === 'string' ? user : user?.sub;
+    if (isClientOrExternalRole(user?.role)) {
+      const allowedProjects = Array.isArray(user?.allowedProjects)
+        ? user.allowedProjects.map(String)
+        : [];
+      return this.projectService.findById(id, userId, allowedProjects);
+    }
     return this.projectService.findById(id, userId);
   }
 
   @Post()
   async create(
     @Body(new ZodValidationPipe(createProjectSchema)) data: CreateProject,
-    @GetUser('sub') userId: string,
+    @GetUser() user: any,
   ) {
+    if (isClientOrExternalRole(user?.role)) {
+      throw new ForbiddenException(
+        'Usuários clientes ou externos não têm permissão para criar projetos.',
+      );
+    }
+    const userId = typeof user === 'string' ? user : user?.sub;
     return this.projectService.create({
       ...data,
       createdBy: userId,
@@ -58,12 +80,23 @@ export class EditorialProjectController {
   async update(
     @Param('id') id: string,
     @Body(new ZodValidationPipe(updateProjectSchema)) data: UpdateProject,
+    @GetUser() user: any,
   ) {
+    if (isClientOrExternalRole(user?.role)) {
+      throw new ForbiddenException(
+        'Usuários clientes ou externos não têm permissão para editar configurações do projeto.',
+      );
+    }
     return this.projectService.update(id, data);
   }
 
   @Delete(':id')
-  async delete(@Param('id') id: string) {
+  async delete(@Param('id') id: string, @GetUser() user: any) {
+    if (isClientOrExternalRole(user?.role)) {
+      throw new ForbiddenException(
+        'Usuários clientes ou externos não têm permissão para excluir projetos.',
+      );
+    }
     return this.projectService.delete(id);
   }
 
@@ -71,8 +104,14 @@ export class EditorialProjectController {
   async submitOnboarding(
     @Param('projectId') projectId: string,
     @Body(new ZodValidationPipe(onboardingSchema)) data: OnboardingInput,
-    @GetUser('sub') userId: string,
+    @GetUser() user: any,
   ) {
+    if (isClientOrExternalRole(user?.role)) {
+      throw new ForbiddenException(
+        'Usuários clientes ou externos não têm permissão para alterar o onboarding do projeto.',
+      );
+    }
+    const userId = typeof user === 'string' ? user : user?.sub;
     return this.versionService.createFromOnboarding(projectId, data, userId);
   }
 

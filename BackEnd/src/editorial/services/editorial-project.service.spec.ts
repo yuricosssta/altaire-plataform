@@ -1,7 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { EditorialProjectService } from './editorial-project.service';
 import { EditorialProjectRepository } from '../repositories/editorial-project.repository';
-import { NotFoundException } from '@nestjs/common';
+import { ForbiddenException, NotFoundException } from '@nestjs/common';
 
 describe('EditorialProjectService', () => {
   let service: EditorialProjectService;
@@ -49,6 +49,23 @@ describe('EditorialProjectService', () => {
       expect(result).toEqual([mockProject]);
       expect(repository.findAll).toHaveBeenCalledWith('altaire');
     });
+
+    it('should return empty array when CLIENT/EXTERNAL has empty allowedProjectIds', async () => {
+      const result = await service.findAll('altaire', undefined, []);
+      expect(result).toEqual([]);
+      expect(repository.findAll).not.toHaveBeenCalled();
+    });
+
+    it('should filter by allowedProjectIds when provided for CLIENT/EXTERNAL', async () => {
+      const allowed = [mockProject._id];
+      const result = await service.findAll('altaire', undefined, allowed);
+      expect(result).toEqual([mockProject]);
+      expect(repository.findAll).toHaveBeenCalledWith(
+        'altaire',
+        undefined,
+        allowed,
+      );
+    });
   });
 
   describe('findById', () => {
@@ -63,6 +80,19 @@ describe('EditorialProjectService', () => {
       await expect(service.findById('nonexistent')).rejects.toThrow(
         NotFoundException,
       );
+    });
+
+    it('should throw ForbiddenException when CLIENT/EXTERNAL is not allowed to view the project', async () => {
+      await expect(
+        service.findById(mockProject._id, 'other-user', ['507f1f77bcf86cd799439099']),
+      ).rejects.toThrow(ForbiddenException);
+    });
+
+    it('should return project when CLIENT/EXTERNAL has project in allowedProjectIds', async () => {
+      const result = await service.findById(mockProject._id, 'other-user', [
+        mockProject._id,
+      ]);
+      expect(result).toEqual(mockProject);
     });
   });
 

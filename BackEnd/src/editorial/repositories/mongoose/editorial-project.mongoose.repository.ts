@@ -22,12 +22,21 @@ export class EditorialProjectMongooseRepository implements EditorialProjectRepos
   async findAll(
     orgId: string,
     createdBy?: string,
+    allowedProjectIds?: string[],
   ): Promise<IEditorialProject[]> {
     const query: Record<string, any> = {
       orgId,
       isActive: { $ne: false },
     };
-    if (createdBy && (Types.ObjectId as any).isValid(createdBy)) {
+    if (Array.isArray(allowedProjectIds)) {
+      const validIds = allowedProjectIds
+        .filter((pid) => (Types.ObjectId as any).isValid(pid))
+        .map((pid) => new (Types.ObjectId as any)(pid));
+      if (validIds.length === 0) {
+        return [];
+      }
+      query._id = { $in: validIds };
+    } else if (createdBy && (Types.ObjectId as any).isValid(createdBy)) {
       query.createdBy = new (Types.ObjectId as any)(createdBy);
     }
     const projects = await this.projectModel

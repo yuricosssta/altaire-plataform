@@ -1,3 +1,45 @@
+## CATÁLOGO DE FUNÇÕES / CARGOS CUSTOMIZADOS POR ORGANIZAÇÃO (`OrganizationFunction`) - 16/11/2026 ##
+Resumo Técnico — Designações de Funções Livres Desacopladas da `role` de Sistema:
+
+1. Separação entre Papel de Sistema (`role`) e Função Operacional (`functionId`):
+   - Criada a coleção `organization_functions` (`BackEnd/src/organization/schemas/organization-function.schema.ts`) com `{ organizationId, name, description, createdBy, isActive }`, seguindo estritamente o padrão Service/Repository (`OrganizationFunctionRepository` / `OrganizationFunctionMongooseRepository`) e validação Zod (`organization-function.zod.ts`).
+   - Adicionado `functionId?: Types.ObjectId | null` (`ref: 'OrganizationFunction'`) nos schemas `User` e `OrganizationMember`, opcional (1 função por usuário), sem interferir na `role` (`OWNER`, `ADMIN`, `MEMBER`, `CLIENT`, `EXTERNAL`) nem nas permissões nominais (`allowedProjects`, `permissions`).
+
+2. Governança, Isolamento e Integridade Referencial (`OrganizationService` / `OrganizationController`):
+   - Endpoints REST em `/organizations/:orgId/functions` (`GET`, `POST`, `PATCH /:functionId`, `DELETE /:functionId`), bloqueados para `CLIENT` e `EXTERNAL` (`403 Forbidden`).
+   - Isolamento: `OWNER` e `ADMIN` visualizam e gerenciam todas as funções ativas da organização; `MEMBER` visualiza e gerencia exclusivamente as funções cadastradas por ele (`createdBy === userId`).
+   - Soft Delete (`isActive: false`) com validação de dependência: `deleteFunction` bloqueia com `400 Bad Request` caso haja usuários (`OrganizationMember`) vinculados ao `functionId`.
+   - `findMembersByOrganization`, `addMemberToOrganization` e `updateMemberRole` populam e sincronizam `functionId` + `customFunction: { _id, name, description }`.
+
+3. Interface e BFF (`FrontEnd`):
+   - Rotas BFF em `FrontEnd/src/app/api/organizations/[orgId]/functions/route.ts` e `[functionId]/route.ts`, além dos helpers em `organizationService.ts`.
+   - `OrganizationPeople.tsx` atualizado com modal **"Gerenciar Funções / Cargos"** (CRUD completo com exibição de erros de dependência), seletor opcional de função ao cadastrar/editar usuário exibindo a descrição das atividades e coluna dedicada na tabela de membros.
+
+## EXPANSÃO DOS SCHEMAS DE USUÁRIO E PERMISSÕES (OWNER, ADMIN, MEMBER, CLIENT, EXTERNAL) - 16/11/2026 ##
+Resumo Técnico — Novos Perfis `CLIENT` (Cliente) e `EXTERNAL` (Membro Externo / Editor), Escopo de Projetos (`allowedProjects`), Permissões Abertas (`permissions`) e Isolamento de Rotas:
+
+1. Padronização dos Enums de Papel (`OWNER`, `ADMIN`, `MEMBER`, `CLIENT`, `EXTERNAL`):
+   - `BackEnd/src/shared/utils/org-role.util.ts`: `AltaireOrgRole` expandido para incluir `'CLIENT'` e `'EXTERNAL'`. `resolveAltaireRoleByEmail(email, persistedRole)` mantém `.env` (`ALTAIRE_OWNER_EMAILS` / `ALTAIRE_ADMIN_EMAILS`) para forçar `OWNER` e `ADMIN`, mas respeita o `persistedRole` salvo no MongoDB (`CLIENT`, `EXTERNAL` ou `MEMBER`).
+   - `FrontEnd/src/types/auth.ts`, `user.ts` e `organization.ts`: `UserRole` (`"owner" | "admin" | "member" | "client" | "external"`) e `RoleType` (`'OWNER' | 'ADMIN' | 'MEMBER' | 'CLIENT' | 'EXTERNAL'`) unificados, substituindo `VIEWER`/`STRATEGIST` legados.
+
+2. Evolução dos Schemas (`User` e `OrganizationMember`) e Validações Zod:
+   - `BackEnd/src/users/schemas/user.schema.ts` e `BackEnd/src/organization/schemas/organization-member.schema.ts`:
+     - `role`: enum `['OWNER', 'ADMIN', 'MEMBER', 'CLIENT', 'EXTERNAL']`, default `'MEMBER'`.
+     - `allowedProjects`: `Types.ObjectId[]` (`ref: 'EditorialProject'`, default `[]`) — lista de projetos que `CLIENT` ou `EXTERNAL` têm permissão para visualizar.
+     - `permissions`: `string[]` (default `[]`, aberto para escopos granulares das futuras telas exclusivas).
+     - `invitedBy`: `Types.ObjectId` (`ref: 'User'`, opcional, indexado) — registra qual `OWNER`, `ADMIN` ou `MEMBER` convidou o usuário.
+
+3. Governança de Convites e Isolamento de Dados no BackEnd/BFF:
+   - `OrganizationController` / `OrganizationService`: `OWNER` e `ADMIN` gerenciam todos os cargos; `MEMBER` pode cadastrar, listar, editar permissões/projetos e remover convidados com papel `CLIENT` ou `EXTERNAL` vinculados por `invitedBy`.
+   - `EditorialProjectController` / `EditorialProjectService` / `EditorialProjectMongooseRepository` e `/api/editorial/projects`: usuários `CLIENT` e `EXTERNAL` listam e acessam exclusivamente os projetos contidos em `allowedProjects` e são bloqueados (`403 Forbidden`) em criação, edição ou exclusão de projetos.
+
+4. Roteamento Pós-Login e Isolamento de Páginas no FrontEnd:
+   - `userProvision.ts`, `/api/auth/login`, `/api/auth/session` e `/api/auth/oauth-success`: propagam `role`, `allowedProjects` e `permissions` no JWT interno e na sessão, com fallback de autenticação local para contas criadas via Gestão de Equipe.
+   - Redirecionamento automático pós-login e guarda em `(main)/layout.tsx` + `Sidebar.tsx`:
+     - `CLIENT` é direcionado e restrito exclusivamente a `/dashboard/cliente` (`FrontEnd/src/app/(main)/dashboard/cliente/page.tsx`).
+     - `EXTERNAL` é direcionado e restrito exclusivamente a `/dashboard/externo` (`FrontEnd/src/app/(main)/dashboard/externo/page.tsx`).
+   - `OrganizationPeople.tsx` atualizado para permitir seleção de `CLIENT` e `EXTERNAL` e vinculação de `allowedProjects`.
+
 ## INTEGRAÇÃO COM A API EXTERNA DE AUTENTICAÇÃO DO CAZUÁ (E-MAIL E SENHA) - 09/11/2026 ##
 Resumo Técnico — Autenticação, Auto-Cadastro e Recuperação de Senha via API Cazuá (`https://vanguarda-eight.vercel.app`):
 
