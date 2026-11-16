@@ -35,6 +35,8 @@ export const WORKSPACE_ROUTES = {
   assetsArquivos: "/dashboard/armazenamento",
   configuracoes: "/dashboard/settings",
   configuracoesAlternativa: "/dashboard/configuracoes",
+  portalCliente: "/dashboard/cliente",
+  portalExterno: "/dashboard/externo",
   configuracoesTab: (
     tab: "perfil" | "plano" | "preferencias" | "membros"
   ) => `/dashboard/settings?tab=${tab}`,
@@ -158,6 +160,8 @@ export const ROUTES = {
   assetsArquivos: WORKSPACE_ROUTES.assetsArquivos,
   configuracoes: WORKSPACE_ROUTES.configuracoes,
   configuracoesAlternativa: WORKSPACE_ROUTES.configuracoesAlternativa,
+  portalCliente: WORKSPACE_ROUTES.portalCliente,
+  portalExterno: WORKSPACE_ROUTES.portalExterno,
 } as const;
 
 /* -------------------------------------------------------------------------- */
@@ -473,6 +477,8 @@ const INTERNAL_RETURN_TO_ALLOWLIST: ReadonlySet<string> = new Set([
   WORKSPACE_ROUTES.assetsArquivos,
   WORKSPACE_ROUTES.configuracoes,
   WORKSPACE_ROUTES.configuracoesAlternativa,
+  WORKSPACE_ROUTES.portalCliente,
+  WORKSPACE_ROUTES.portalExterno,
   ACTIVATION_ROUTES.plans,
   ACTIVATION_ROUTES.checkoutProcessing,
   PUBLIC_ROUTES.pricing,

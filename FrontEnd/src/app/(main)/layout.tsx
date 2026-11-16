@@ -18,7 +18,10 @@ import {
   setAuthState,
 } from "@/lib/redux/slices/authSlice";
 import { fetchUserProfile } from "@/lib/redux/slices/userSlice";
-import { fetchMyOrganizations } from "@/lib/redux/slices/organizationSlice";
+import {
+  fetchMyOrganizations,
+  selectCurrentOrg,
+} from "@/lib/redux/slices/organizationSlice";
 import { AppDispatch, RootState } from "@/lib/redux/store";
 
 const SIDEBAR_COLLAPSED_STORAGE_KEY = "la-sidebar-collapsed";
@@ -30,8 +33,26 @@ function MainDashboardShellInner({
   readonly children: ReactNode;
 }) {
   const pathname = usePathname() || "/dashboard";
+  const router = useRouter();
+  const authUser = useSelector((state: RootState) => state.auth?.user);
+  const currentOrg = useSelector(selectCurrentOrg);
   const { workspaceName, userFullName, userEmail, topPriorityProject } =
     useEditorialWorkspace();
+
+  const normalizedRole = String(
+    currentOrg?.role || authUser?.role || "member"
+  ).toLowerCase();
+  const isClientRole = normalizedRole === "client";
+  const isExternalRole = normalizedRole === "external";
+  const isRestrictedRole = isClientRole || isExternalRole;
+
+  useEffect(() => {
+    if (isClientRole && !pathname.startsWith("/dashboard/cliente")) {
+      router.replace("/dashboard/cliente");
+    } else if (isExternalRole && !pathname.startsWith("/dashboard/externo")) {
+      router.replace("/dashboard/externo");
+    }
+  }, [isClientRole, isExternalRole, pathname, router]);
 
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState<boolean>(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState<boolean>(false);
@@ -119,7 +140,7 @@ function MainDashboardShellInner({
 
         {/* Micro-mensagem de Boas-Vindas Contextual Sincronizada com o Projeto Real do Cliente (Seção 3.7) */}
         <AnimatePresence initial={false}>
-          {showWelcomeMicroBanner ? (
+          {showWelcomeMicroBanner && !isRestrictedRole ? (
             <motion.div
               initial={{ opacity: 0, height: 0 }}
               animate={{ opacity: 1, height: "auto" }}

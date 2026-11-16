@@ -8,6 +8,7 @@ export abstract class EditorialProjectRepository {
   abstract findAll(
     orgId: string,
     createdBy?: string,
+    allowedProjectIds?: string[],
   ): Promise<IEditorialProject[]>;
   abstract findById(id: string): Promise<IEditorialProject | null>;
   abstract create(data: ICreateEditorialProject): Promise<IEditorialProject>;

@@ -1,14 +1,23 @@
 //BackEnd/src/users/validations/users.zod.ts
 import { z } from 'zod';
 
+export const userRoleEnum = z.enum([
+  'OWNER',
+  'ADMIN',
+  'MEMBER',
+  'CLIENT',
+  'EXTERNAL',
+]);
+
 export const createUserSchema = z.object({
   email: z.string().email('E-mail inválido'),
   name: z.string().min(1, 'Nome é obrigatório'),
   password: z.string().min(8, 'A senha deve ter no mínimo 8 caracteres'),
-  role: z
-    .enum(['OWNER', 'ADMIN', 'MEMBER', 'VIEWER'])
-    .optional()
-    .default('MEMBER'),
+  role: userRoleEnum.optional().default('MEMBER'),
+  allowedProjects: z.array(z.string()).optional().default([]),
+  permissions: z.array(z.string()).optional().default([]),
+  invitedBy: z.string().optional(),
+  functionId: z.string().nullable().optional(),
   memberships: z
     .array(
       z.object({
@@ -21,6 +30,11 @@ export const createUserSchema = z.object({
 
 export const updateUserSchema = z.object({
   name: z.string().optional(),
+  role: userRoleEnum.optional(),
+  allowedProjects: z.array(z.string()).optional(),
+  permissions: z.array(z.string()).optional(),
+  invitedBy: z.string().optional(),
+  functionId: z.string().nullable().optional(),
   memberships: z
     .array(
       z.object({

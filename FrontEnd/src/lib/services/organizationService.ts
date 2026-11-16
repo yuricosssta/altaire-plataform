@@ -71,12 +71,70 @@ export const apiCreateOrgMember = async (orgId: string, memberData: any) => {
   return response.data;
 };
 
-export const apiUpdateOrgMemberRole = async (orgId: string, memberId: string, role: string) => {
-  const response = await localClient.patch(`/organizations/${orgId}/members/${memberId}/role`, { role });
+export const apiUpdateOrgMemberRole = async (
+  orgId: string,
+  memberId: string,
+  role: string,
+  extra?: {
+    allowedProjects?: string[];
+    permissions?: string[];
+    functionId?: string | null;
+  },
+) => {
+  const response = await localClient.patch(
+    `/organizations/${orgId}/members/${memberId}/role`,
+    {
+      role,
+      ...(extra?.allowedProjects !== undefined
+        ? { allowedProjects: extra.allowedProjects }
+        : {}),
+      ...(extra?.permissions !== undefined
+        ? { permissions: extra.permissions }
+        : {}),
+      ...(extra?.functionId !== undefined
+        ? { functionId: extra.functionId }
+        : {}),
+    },
+  );
   return response.data;
 };
 
 export const apiRemoveOrgMember = async (orgId: string, memberId: string) => {
   const response = await localClient.delete(`/organizations/${orgId}/members/${memberId}`);
+  return response.data;
+};
+
+export const apiGetOrgFunctions = async (orgId: string) => {
+  const response = await localClient.get(`/organizations/${orgId}/functions`);
+  return response.data;
+};
+
+export const apiCreateOrgFunction = async (
+  orgId: string,
+  data: { name: string; description: string },
+) => {
+  const response = await localClient.post(`/organizations/${orgId}/functions`, data);
+  return response.data;
+};
+
+export const apiUpdateOrgFunction = async (
+  orgId: string,
+  functionId: string,
+  data: { name?: string; description?: string },
+) => {
+  const response = await localClient.patch(
+    `/organizations/${orgId}/functions/${functionId}`,
+    data,
+  );
+  return response.data;
+};
+
+export const apiDeleteOrgFunction = async (
+  orgId: string,
+  functionId: string,
+) => {
+  const response = await localClient.delete(
+    `/organizations/${orgId}/functions/${functionId}`,
+  );
   return response.data;
 };

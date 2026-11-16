@@ -99,9 +99,9 @@ export class UsersController {
   @Put(':userId')
   async updateUser(
     @Param('userId') userId: string,
-    @Body(new ZodValidationPipe(updateUserSchema)) { name }: UpdateUser,
+    @Body(new ZodValidationPipe(updateUserSchema)) body: UpdateUser,
   ) {
-    return this.userService.updateUser(userId, { name });
+    return this.userService.updateUser(userId, body);
   }
 
   @UseGuards(AuthGuard)

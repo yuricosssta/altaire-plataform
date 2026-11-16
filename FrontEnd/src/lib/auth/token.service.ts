@@ -17,6 +17,8 @@ export interface TokenPayload {
   name?: string;
   org?: string;
   role?: string;
+  allowedProjects?: string[];
+  permissions?: string[];
   [key: string]: unknown;
 }
 

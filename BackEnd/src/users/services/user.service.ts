@@ -16,9 +16,27 @@ import {
 } from '../validations/users.zod';
 import * as bcrypt from 'bcrypt';
 import * as crypto from 'crypto';
-import { IUser, UserRule } from '../schemas/models/user.interface';
+import { IUser, UserRoleType, UserRule } from '../schemas/models/user.interface';
 import { MailService } from '../../shared/services/mail.service';
-import { resolveAltaireRoleByEmail } from '../../shared/utils/org-role.util';
+import {
+  AltaireOrgRole,
+  resolveAltaireRoleByEmail,
+} from '../../shared/utils/org-role.util';
+
+function mapRoleToUserRule(role: AltaireOrgRole): UserRule {
+  switch (role) {
+    case 'OWNER':
+    case 'ADMIN':
+      return UserRule.Admin;
+    case 'CLIENT':
+      return UserRule.Client;
+    case 'EXTERNAL':
+      return UserRule.External;
+    case 'MEMBER':
+    default:
+      return UserRule.Organization;
+  }
+}
 
 @Injectable()
 export class UsersService {
@@ -38,9 +56,13 @@ export class UsersService {
       throw new ConflictException('Este e-mail já está em uso.');
     }
 
-    const orgRole = resolveAltaireRoleByEmail(normalizedEmail);
+    const orgRole = resolveAltaireRoleByEmail(normalizedEmail, user.role);
     const isAdmin = orgRole === 'OWNER' || orgRole === 'ADMIN';
     const hashedPassword = await bcrypt.hash(user.password, 10);
+    const validFunctionId =
+      user.functionId && /^[a-f\d]{24}$/i.test(String(user.functionId))
+        ? String(user.functionId)
+        : null;
     try {
       const created = await this.userRepository.createUser({
         ...user,
@@ -48,7 +70,12 @@ export class UsersService {
         password: hashedPassword,
         authProvider: 'local',
         isAdmin,
-        rule: isAdmin ? UserRule.Admin : UserRule.Organization,
+        role: orgRole as UserRoleType,
+        rule: mapRoleToUserRule(orgRole),
+        allowedProjects: user.allowedProjects || [],
+        permissions: user.permissions || [],
+        invitedBy: user.invitedBy,
+        functionId: validFunctionId,
       } as Partial<IUser>);
       const { password: _, ...safeUser } = created;
       return { ...safeUser, role: orgRole.toLowerCase() };
@@ -80,7 +107,7 @@ export class UsersService {
       throw new UnauthorizedException('E-mail ou senha incorretos.');
     }
 
-    const orgRole = resolveAltaireRoleByEmail(normalizedEmail);
+    const orgRole = resolveAltaireRoleByEmail(normalizedEmail, user.role);
     const isAdmin = orgRole === 'OWNER' || orgRole === 'ADMIN';
     const { password: _, ...safeUser } = user;
     return { ...safeUser, isAdmin, role: orgRole.toLowerCase() };
@@ -88,23 +115,28 @@ export class UsersService {
 
   async upsertOAuthUser(data: OAuthUser) {
     const normalizedEmail = data.email.trim().toLowerCase();
-    const orgRole = resolveAltaireRoleByEmail(normalizedEmail);
-    const isAdmin = orgRole === 'OWNER' || orgRole === 'ADMIN';
     const existing = await this.userRepository.findOneByEmail(normalizedEmail);
+    const orgRole = resolveAltaireRoleByEmail(
+      normalizedEmail,
+      existing?.role,
+    );
+    const isAdmin = orgRole === 'OWNER' || orgRole === 'ADMIN';
 
     if (existing) {
       const userId = String(existing._id || existing.id);
       const shouldUpdate =
         (data.googleId && existing.googleId !== data.googleId) ||
         (data.avatarUrl && !existing.avatarUrl) ||
-        existing.isAdmin !== isAdmin;
+        existing.isAdmin !== isAdmin ||
+        existing.role !== orgRole;
 
       if (shouldUpdate) {
         const updated = await this.userRepository.updateUser(userId, {
           googleId: data.googleId || existing.googleId,
           avatarUrl: existing.avatarUrl || data.avatarUrl,
           isAdmin,
-          rule: isAdmin ? UserRule.Admin : UserRule.Organization,
+          role: orgRole as UserRoleType,
+          rule: mapRoleToUserRule(orgRole),
         });
         if (updated) {
           return { ...updated, isAdmin, role: orgRole.toLowerCase() };
@@ -123,7 +155,10 @@ export class UsersService {
         avatarUrl: data.avatarUrl,
         authProvider: 'google',
         isAdmin,
-        rule: isAdmin ? UserRule.Admin : UserRule.Organization,
+        role: orgRole as UserRoleType,
+        rule: mapRoleToUserRule(orgRole),
+        allowedProjects: [],
+        permissions: [],
       } as Partial<IUser>);
       const { password: _, ...safeCreated } = created;
       return { ...safeCreated, isAdmin, role: orgRole.toLowerCase() };
@@ -161,10 +196,14 @@ export class UsersService {
   }
 
   async updateUser(userId: string, user: UpdateUser) {
-    const updateUser = await this.userRepository.updateUser(
-      userId,
-      user as Partial<IUser>,
-    );
+    const payload = { ...user } as Partial<IUser>;
+    if (payload.functionId !== undefined) {
+      payload.functionId =
+        payload.functionId && /^[a-f\d]{24}$/i.test(String(payload.functionId))
+          ? String(payload.functionId)
+          : null;
+    }
+    const updateUser = await this.userRepository.updateUser(userId, payload);
     if (!updateUser) throw new NotFoundException('Usuário não encontrado');
     return updateUser;
   }

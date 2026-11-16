@@ -1,5 +1,5 @@
 //src/types/IUser.ts
-export type RoleType = 'OWNER' | 'ADMIN' | 'MEMBER' | 'VIEWER';
+export type RoleType = 'OWNER' | 'ADMIN' | 'MEMBER' | 'CLIENT' | 'EXTERNAL';
 
 export interface IUser {
   _id: string; 
@@ -9,6 +9,10 @@ export interface IUser {
   password?: string; 
   isAdmin: boolean;
   role: RoleType;
+  allowedProjects?: string[];
+  permissions?: string[];
+  invitedBy?: string;
+  functionId?: string | null;
   avatarUrl?: string; 
   created_at?: Date;
   modified_at?: Date;

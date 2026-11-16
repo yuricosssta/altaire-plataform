@@ -25,11 +25,35 @@ export class OrganizationMember {
   // O "Cargo" neste contexto específico
   @Prop({
     type: String,
-    enum: ['OWNER', 'ADMIN', 'MEMBER', 'VIEWER'],
+    enum: ['OWNER', 'ADMIN', 'MEMBER', 'CLIENT', 'EXTERNAL'],
     default: 'MEMBER',
     required: true,
   })
   role: string;
+
+  // Projetos aos quais CLIENT ou EXTERNAL têm acesso permitido
+  @Prop({
+    type: [{ type: Types.ObjectId, ref: 'EditorialProject' }],
+    default: [],
+  })
+  allowedProjects: Types.ObjectId[];
+
+  // Escopos granulares de permissão (abertos para expansão nas telas exclusivas)
+  @Prop({ type: [String], default: [] })
+  permissions: string[];
+
+  // Usuário (OWNER, ADMIN ou MEMBER) que convidou este membro/cliente/externo
+  @Prop({ type: Types.ObjectId, ref: 'User', required: false, index: true })
+  invitedBy?: Types.ObjectId;
+
+  // Função / Cargo customizado atribuído ao usuário (não interfere na role de sistema)
+  @Prop({
+    type: Types.ObjectId,
+    ref: 'OrganizationFunction',
+    required: false,
+    default: null,
+  })
+  functionId?: Types.ObjectId | null;
 
   @Prop({ required: false })
   function: string;

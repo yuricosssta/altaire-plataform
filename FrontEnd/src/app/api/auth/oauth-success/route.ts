@@ -3,6 +3,7 @@ import { auth } from "@/auth";
 import { createAuthToken } from "@/lib/auth/token.service";
 import {
   fetchUserEditorialProjects,
+  resolvePostLoginRedirectByRole,
   upsertOAuthBackendUser,
 } from "@/lib/auth/userProvision";
 
@@ -38,6 +39,9 @@ export async function GET(request: Request) {
     const email = session.user.email;
     const fullName = session.user.name || email.split("@")[0];
 
+    let userRole = "member";
+    let allowedProjects: string[] = [];
+
     if (!userId || !internalToken) {
       const provisioned = await upsertOAuthBackendUser({
         email,
@@ -45,21 +49,32 @@ export async function GET(request: Request) {
         avatarUrl: session.user.image,
       });
       userId = provisioned.id;
+      userRole = provisioned.role;
+      allowedProjects = provisioned.allowedProjects || [];
       internalToken = await createAuthToken({
         sub: provisioned.id,
         email: provisioned.email,
         name: provisioned.fullName,
         org: "altaire",
         role: provisioned.role,
+        allowedProjects,
+        permissions: provisioned.permissions || [],
       });
     }
 
-    const userProjects = await fetchUserEditorialProjects(internalToken, userId);
+    const userProjects = await fetchUserEditorialProjects(
+      internalToken,
+      userId,
+      userRole,
+      allowedProjects,
+    );
     const activeProject = userProjects[0] ?? null;
 
-    const redirectPath = activeProject
-      ? `/dashboard/editorial/${activeProject.id}`
-      : "/dashboard/editorial?newProject=true";
+    const redirectPath = resolvePostLoginRedirectByRole(
+      userRole,
+      activeProject?.id,
+      false,
+    );
 
     const response = NextResponse.redirect(new URL(redirectPath, origin));
     const maxAge = 60 * 60 * 24 * 30; // 30 dias
