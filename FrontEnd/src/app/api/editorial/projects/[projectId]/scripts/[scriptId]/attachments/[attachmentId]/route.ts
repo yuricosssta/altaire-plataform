@@ -19,9 +19,8 @@ export async function DELETE(
     `/projects/${projectId}/scripts/${scriptId}/attachments/${attachmentId}`,
     { method: 'DELETE' },
   );
-
   if ('ok' in result) {
     return NextResponse.json(result.data);
   }
-  return NextResponse.json(result, { status: 502 });
+  return NextResponse.json(result, { status: (result as any)?.status || 502 });
 }

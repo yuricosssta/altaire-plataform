@@ -8,6 +8,9 @@ import {
 
 export abstract class EditorialCalendarRepository {
   abstract findAllByProject(projectId: string): Promise<IEditorialCalendar[]>;
+  abstract findAllByProjects(
+    projectIds: string[],
+  ): Promise<IEditorialCalendar[]>;
   abstract findById(id: string): Promise<IEditorialCalendar | null>;
   abstract create(data: ICreateEditorialCalendar): Promise<IEditorialCalendar>;
   abstract update(
@@ -15,10 +18,18 @@ export abstract class EditorialCalendarRepository {
     data: IUpdateEditorialCalendar,
   ): Promise<IEditorialCalendar | null>;
   abstract softDelete(id: string): Promise<IEditorialCalendar | null>;
+  abstract addSlot(
+    calendarId: string,
+    slot: Record<string, unknown>,
+  ): Promise<IEditorialCalendar | null>;
   abstract updateItem(
     calendarId: string,
     itemId: string,
     data: ICalendarItemUpdate,
+  ): Promise<IEditorialCalendar | null>;
+  abstract deleteItem(
+    calendarId: string,
+    itemId: string,
   ): Promise<IEditorialCalendar | null>;
   abstract addReviewSuggestions(
     calendarId: string,

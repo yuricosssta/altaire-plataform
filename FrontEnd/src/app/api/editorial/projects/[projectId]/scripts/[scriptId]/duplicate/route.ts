@@ -9,11 +9,10 @@ export async function POST(
   const result = await proxyEditorialRequest(
     request,
     `/projects/${projectId}/scripts/${scriptId}/duplicate`,
-    { method: 'POST' },
+    { method: 'POST', body: {} },
   );
-
   if ('ok' in result) {
     return NextResponse.json(result.data, { status: 201 });
   }
-  return NextResponse.json(result, { status: 502 });
+  return NextResponse.json(result, { status: (result as any)?.status || 502 });
 }

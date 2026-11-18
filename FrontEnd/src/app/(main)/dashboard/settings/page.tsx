@@ -1,7 +1,7 @@
 // FrontEnd/src/app/(main)/dashboard/settings/page.tsx
 "use client";
 
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useDispatch, useSelector } from "react-redux";
 import {
@@ -9,7 +9,6 @@ import {
   Building2,
   Check,
   CreditCard,
-  Download,
   KeyRound,
   LogOut,
   Mail,
@@ -37,6 +36,17 @@ import {
   DarkCustomSelect,
   type CustomSelectOption,
 } from "@/components/ui/DarkCustomSelect";
+import { userService } from "@/lib/services/userService";
+import {
+  apiCreateOrgMember,
+  apiGetOrgMembers,
+  apiRemoveOrgMember,
+  apiUpdateOrganizationProfile,
+  apiUpdateOrgMemberRole,
+} from "@/lib/services/organizationService";
+import { editorialService } from "@/lib/services/editorialService";
+import { scriptsService } from "@/lib/services/scriptsService";
+import { storageService } from "@/lib/services/storageService";
 
 /* -------------------------------------------------------------------------- */
 /* Tipos e Constantes Canônicas                                               */
@@ -46,10 +56,10 @@ export type SettingsTabId = "perfil" | "plano" | "preferencias" | "membros";
 
 export type EditorialRoleId =
   | "OWNER"
-  | "ESTRATEGISTA"
-  | "ROTEIRISTA"
-  | "DESIGNER"
-  | "REVISOR";
+  | "ADMIN"
+  | "MEMBER"
+  | "CLIENT"
+  | "EXTERNAL";
 
 type TeamMemberItem = {
   readonly id: string;
@@ -58,6 +68,7 @@ type TeamMemberItem = {
   readonly role: EditorialRoleId;
   readonly status: "Ativo" | "Convite Pendente";
   readonly projectsAccess: string;
+  readonly functionName?: string;
 };
 
 const SETTINGS_TABS: readonly {
@@ -67,7 +78,7 @@ const SETTINGS_TABS: readonly {
   readonly icon: typeof User;
 }[] = [
   { id: "perfil", label: "Meu Perfil", icon: User },
-  { id: "plano", label: "Conta & Plano", badge: "Pro", icon: CreditCard },
+  { id: "plano", label: "Conta & Plano", icon: CreditCard },
   { id: "preferencias", label: "Preferências", icon: Sparkles },
   { id: "membros", label: "Membros & Permissões", icon: Users },
 ] as const;
@@ -77,66 +88,38 @@ const EDITORIAL_ROLES: Record<
   { readonly label: string; readonly description: string }
 > = {
   OWNER: {
-    label: "Proprietário · Estrategista-Chefe",
+    label: "Proprietário (OWNER)",
     description:
-      "Acesso total à conta, faturamento, projetos e aprovação final.",
+      "Acesso total à organização, faturamento, projetos e permissões.",
   },
-  ESTRATEGISTA: {
-    label: "Estrategista Editorial",
+  ADMIN: {
+    label: "Administrador (ADMIN)",
     description:
-      "Gerencia Base Estratégica, Linha Editorial, Calendário e Temas.",
+      "Gerencia projetos, equipe e configurações operacionais da organização.",
   },
-  ROTEIRISTA: {
-    label: "Copywriter & Roteirista",
+  MEMBER: {
+    label: "Membro Editorial (MEMBER)",
     description:
-      "Opera o Motor de Temas e os Studios de Roteirização (Função 03).",
+      "Opera a Linha Editorial, Calendário, Temas e Roteiros e gerencia convidados.",
   },
-  DESIGNER: {
-    label: "Designer / Vídeo & B-Roll",
+  CLIENT: {
+    label: "Cliente / Aprovador (CLIENT)",
     description:
-      "Acessa roteiros aprovados, prompts de capa, carrosséis e Assets.",
+      "Visualiza e aprova entregas nos projetos atribuídos sem alterar a base.",
   },
-  REVISOR: {
-    label: "Revisor / Cliente",
+  EXTERNAL: {
+    label: "Colaborador Externo (EXTERNAL)",
     description:
-      "Visualiza calendário e aprova ou comenta entregas sem alterar a base.",
+      "Acesso restrito a projetos editoriais autorizados.",
   },
 };
 
-const INITIAL_TEAM_MEMBERS: readonly TeamMemberItem[] = [
-  {
-    id: "mem-1",
-    name: "Roberto Zane",
-    email: "admin@legionaltaire.com.br",
-    role: "OWNER",
-    status: "Ativo",
-    projectsAccess: "Todos os projetos (Acesso Mestre)",
-  },
-  {
-    id: "mem-2",
-    name: "Camila Fontes",
-    email: "camila.estrategia@legionaltaire.com.br",
-    role: "ESTRATEGISTA",
-    status: "Ativo",
-    projectsAccess: "Legion Altaire SaaS · Mentoria High-Ticket",
-  },
-  {
-    id: "mem-3",
-    name: "Lucas Andrade",
-    email: "lucas.copy@legionaltaire.com.br",
-    role: "ROTEIRISTA",
-    status: "Ativo",
-    projectsAccess: "Legion Altaire SaaS",
-  },
-  {
-    id: "mem-4",
-    name: "Marina Viana",
-    email: "marina.motion@legionaltaire.com.br",
-    role: "DESIGNER",
-    status: "Convite Pendente",
-    projectsAccess: "Assets de Marca & B-Roll",
-  },
-];
+function formatStorageBytes(bytes: number): string {
+  if (!Number.isFinite(bytes) || bytes <= 0) return "0 KB";
+  if (bytes < 1024 * 1024) return `${Math.max(1, Math.round(bytes / 1024))} KB`;
+  if (bytes < 1024 * 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  return `${(bytes / (1024 * 1024 * 1024)).toFixed(2)} GB`;
+}
 
 /* -------------------------------------------------------------------------- */
 /* Componente Principal: GeneralSettingsPage                                  */
@@ -149,6 +132,16 @@ export default function GeneralSettingsPage() {
   const profile = useSelector((state: RootState) => state.user?.profile);
   const profileRecord = profile as Record<string, unknown> | null;
 
+  const orgObject =
+    currentOrg?.organizationId && typeof currentOrg.organizationId === "object"
+      ? (currentOrg.organizationId as unknown as Record<string, any>)
+      : null;
+  const activeOrgId =
+    typeof currentOrg?.organizationId === "string"
+      ? currentOrg.organizationId
+      : String(orgObject?._id || orgObject?.id || "");
+  const activeOrgPlan = String(orgObject?.plan || "FREE");
+
   /* 1. Estado de Navegação das 4 Sub-Abas */
   const [activeTab, setActiveTab] = useState<SettingsTabId>("perfil");
   const [saveStatus, setSaveStatus] = useState<"idle" | "saving" | "saved">(
@@ -159,31 +152,42 @@ export default function GeneralSettingsPage() {
   const [fullName, setFullName] = useState<string>(
     (typeof profileRecord?.fullName === "string" && profileRecord.fullName) ||
       authUser?.fullName ||
-      "Roberto Zane"
+      ""
   );
   const [displayRole, setDisplayRole] = useState<string>(
-    "Fundador & Estrategista-Chefe"
+    typeof profileRecord?.displayRole === "string"
+      ? profileRecord.displayRole
+      : ""
   );
   const [email, setEmail] = useState<string>(
     (typeof profileRecord?.email === "string" && profileRecord.email) ||
       authUser?.email ||
-      "admin@legionaltaire.com.br"
+      ""
   );
   const [editorialBio, setEditorialBio] = useState<string>(
-    "Especialista em posicionamento de alto valor, sistemas editoriais orientados a conversão e construção de autoridade."
+    typeof profileRecord?.editorialBio === "string"
+      ? profileRecord.editorialBio
+      : ""
   );
-  const [twoFactorEnabled, setTwoFactorEnabled] = useState<boolean>(true);
+  const [twoFactorEnabled, setTwoFactorEnabled] = useState<boolean>(
+    typeof profileRecord?.twoFactorEnabled === "boolean"
+      ? profileRecord.twoFactorEnabled
+      : false
+  );
   const [currentPassword, setCurrentPassword] = useState<string>("");
   const [newPassword, setNewPassword] = useState<string>("");
   const [passwordFeedback, setPasswordFeedback] = useState<string | null>(null);
 
   /* 3. Estados: Aba 2 — Conta & Plano */
   const [workspaceTitle, setWorkspaceTitle] = useState<string>(
-    "Ecossistema Roberto Zane · Altaire"
+    String(orgObject?.name || "")
   );
   const [billingDocument, setBillingDocument] = useState<string>(
-    "48.921.304/0001-19"
+    String(orgObject?.billingDocument || "")
   );
+  const [projectsCount, setProjectsCount] = useState<number>(0);
+  const [publicationsCount, setPublicationsCount] = useState<number>(0);
+  const [storageUsedBytes, setStorageUsedBytes] = useState<number>(0);
   const [isBrandingModalOpen, setIsBrandingModalOpen] =
     useState<boolean>(false);
   const [isArchiveModalOpen, setIsArchiveModalOpen] = useState<boolean>(false);
@@ -203,18 +207,20 @@ export default function GeneralSettingsPage() {
   const [notifyAiSuggestions, setNotifyAiSuggestions] = useState<boolean>(true);
 
   /* 5. Estados: Aba 4 — Membros & Permissões */
-  const [members, setMembers] =
-    useState<readonly TeamMemberItem[]>(INITIAL_TEAM_MEMBERS);
+  const [members, setMembers] = useState<readonly TeamMemberItem[]>([]);
+  const [isLoadingMembers, setIsLoadingMembers] = useState<boolean>(false);
+  const [membersFeedback, setMembersFeedback] = useState<string | null>(null);
   const [roleFilter, setRoleFilter] = useState<EditorialRoleId | "TODOS">(
     "TODOS"
   );
   const [isInviteModalOpen, setIsInviteModalOpen] = useState<boolean>(false);
   const [inviteName, setInviteName] = useState<string>("");
   const [inviteEmail, setInviteEmail] = useState<string>("");
-  const [inviteRole, setInviteRole] = useState<EditorialRoleId>("ESTRATEGISTA");
-  const [inviteProjects, setInviteProjects] = useState<string>(
-    "Todos os projetos ativos"
-  );
+  const [invitePassword, setInvitePassword] = useState<string>("");
+  const [inviteRole, setInviteRole] = useState<EditorialRoleId>("MEMBER");
+  const [inviteProjects, setInviteProjects] = useState<string>("");
+
+  const autosaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   /* Opções tipadas para o componente DarkCustomSelect */
   const roleFilterOptions = useMemo((): readonly CustomSelectOption<
@@ -265,6 +271,111 @@ export default function GeneralSettingsPage() {
       }));
   }, []);
 
+  const loadMembersData = useCallback(async () => {
+    if (!activeOrgId) return;
+    setIsLoadingMembers(true);
+    try {
+      const rawMembers = await apiGetOrgMembers(activeOrgId);
+      const validRoles: EditorialRoleId[] = [
+        "OWNER",
+        "ADMIN",
+        "MEMBER",
+        "CLIENT",
+        "EXTERNAL",
+      ];
+      const mapped: TeamMemberItem[] = Array.isArray(rawMembers)
+        ? rawMembers.map((m: any) => {
+            const roleRaw = String(m?.membership?.role || "MEMBER").toUpperCase();
+            const role: EditorialRoleId = validRoles.includes(
+              roleRaw as EditorialRoleId
+            )
+              ? (roleRaw as EditorialRoleId)
+              : "MEMBER";
+            const allowedCount = Array.isArray(m?.membership?.allowedProjects)
+              ? m.membership.allowedProjects.length
+              : 0;
+            const fnName = m?.membership?.customFunction?.name;
+            return {
+              id: String(m._id || m.id || ""),
+              name: String(m.name || m.email || "Membro"),
+              email: String(m.email || ""),
+              role,
+              status: "Ativo",
+              projectsAccess: fnName
+                ? `${fnName}${allowedCount > 0 ? ` · ${allowedCount} projeto(s)` : ""}`
+                : allowedCount > 0
+                  ? `${allowedCount} projeto(s) liberado(s)`
+                  : role === "OWNER" || role === "ADMIN"
+                    ? "Todos os projetos"
+                    : "Projetos autorizados",
+              functionName: fnName,
+            };
+          })
+        : [];
+      setMembers(mapped);
+    } catch {
+      setMembers([]);
+    } finally {
+      setIsLoadingMembers(false);
+    }
+  }, [activeOrgId]);
+
+  useEffect(() => {
+    let cancelled = false;
+    Promise.all([
+      userService.getProfile().catch(() => null),
+      editorialService.listProjects().catch(() => []),
+      scriptsService.listPublications().catch(() => []),
+      storageService.getAssets().catch(() => ({ storageUsed: 0 })),
+    ]).then(([prof, projs, pubs, storage]) => {
+      if (cancelled) return;
+      if (prof) {
+        if (prof.name || prof.fullName) setFullName(String(prof.name || prof.fullName));
+        if (prof.email) setEmail(String(prof.email));
+        if (typeof prof.displayRole === "string") setDisplayRole(prof.displayRole);
+        if (typeof prof.editorialBio === "string") setEditorialBio(prof.editorialBio);
+        if (typeof prof.twoFactorEnabled === "boolean") {
+          setTwoFactorEnabled(prof.twoFactorEnabled);
+        }
+        const prefs = prof.preferences as Record<string, unknown> | undefined;
+        if (prefs) {
+          if (prefs.preferredStartRoute === "/dashboard" || prefs.preferredStartRoute === "/dashboard/editorial") {
+            setPreferredStartRoute(prefs.preferredStartRoute);
+          }
+          if (prefs.defaultScriptMode === "TECNICO" || prefs.defaultScriptMode === "CONEXAO") {
+            setDefaultScriptMode(prefs.defaultScriptMode);
+          }
+          if (typeof prefs.defaultRetinaBalance === "boolean") {
+            setDefaultRetinaBalance(prefs.defaultRetinaBalance);
+          }
+          if (typeof prefs.notifyDailyBriefing === "boolean") {
+            setNotifyDailyBriefing(prefs.notifyDailyBriefing);
+          }
+          if (typeof prefs.notifySlotGaps === "boolean") {
+            setNotifySlotGaps(prefs.notifySlotGaps);
+          }
+          if (typeof prefs.notifyAiSuggestions === "boolean") {
+            setNotifyAiSuggestions(prefs.notifyAiSuggestions);
+          }
+        }
+      }
+      setProjectsCount(Array.isArray(projs) ? projs.length : 0);
+      setPublicationsCount(Array.isArray(pubs) ? pubs.length : 0);
+      setStorageUsedBytes(Number(storage?.storageUsed || 0));
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (orgObject?.name) setWorkspaceTitle(String(orgObject.name));
+    if (orgObject?.billingDocument !== undefined) {
+      setBillingDocument(String(orgObject.billingDocument || ""));
+    }
+    void loadMembersData();
+  }, [orgObject?.name, orgObject?.billingDocument, loadMembersData]);
+
   /* Sincroniza a aba inicial com ?tab= na URL (compatível com Sidebar.tsx) */
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -287,13 +398,83 @@ export default function GeneralSettingsPage() {
     }
   };
 
-  /* Dispara feedback visual de Autosave */
-  const triggerAutosave = () => {
-    setSaveStatus("saving");
-    window.setTimeout(() => {
-      setSaveStatus("saved");
-    }, 650);
-  };
+  /* Persiste alterações de Perfil/Workspace/Preferências no servidor via BFF (com debounce) */
+  const triggerAutosave = useCallback(
+    (overrides?: {
+      fullName?: string;
+      displayRole?: string;
+      email?: string;
+      editorialBio?: string;
+      twoFactorEnabled?: boolean;
+      workspaceTitle?: string;
+      billingDocument?: string;
+      preferredStartRoute?: "/dashboard/editorial" | "/dashboard";
+      defaultScriptMode?: "TECNICO" | "CONEXAO";
+      defaultRetinaBalance?: boolean;
+      notifyDailyBriefing?: boolean;
+      notifySlotGaps?: boolean;
+      notifyAiSuggestions?: boolean;
+    }) => {
+      setSaveStatus("saving");
+      if (autosaveTimerRef.current) clearTimeout(autosaveTimerRef.current);
+
+      autosaveTimerRef.current = setTimeout(async () => {
+        try {
+          await userService.updateProfile({
+            name: overrides?.fullName ?? fullName,
+            email: overrides?.email ?? email,
+            displayRole: overrides?.displayRole ?? displayRole,
+            editorialBio: overrides?.editorialBio ?? editorialBio,
+            twoFactorEnabled: overrides?.twoFactorEnabled ?? twoFactorEnabled,
+            preferences: {
+              preferredStartRoute:
+                overrides?.preferredStartRoute ?? preferredStartRoute,
+              defaultScriptMode:
+                overrides?.defaultScriptMode ?? defaultScriptMode,
+              defaultRetinaBalance:
+                overrides?.defaultRetinaBalance ?? defaultRetinaBalance,
+              notifyDailyBriefing:
+                overrides?.notifyDailyBriefing ?? notifyDailyBriefing,
+              notifySlotGaps: overrides?.notifySlotGaps ?? notifySlotGaps,
+              notifyAiSuggestions:
+                overrides?.notifyAiSuggestions ?? notifyAiSuggestions,
+            },
+          });
+
+          if (
+            activeOrgId &&
+            (overrides?.workspaceTitle !== undefined ||
+              overrides?.billingDocument !== undefined)
+          ) {
+            await apiUpdateOrganizationProfile(activeOrgId, {
+              name: (overrides.workspaceTitle ?? workspaceTitle).trim() || undefined,
+              billingDocument: overrides.billingDocument ?? billingDocument,
+            });
+          }
+
+          setSaveStatus("saved");
+        } catch {
+          setSaveStatus("idle");
+        }
+      }, 650);
+    },
+    [
+      fullName,
+      email,
+      displayRole,
+      editorialBio,
+      twoFactorEnabled,
+      preferredStartRoute,
+      defaultScriptMode,
+      defaultRetinaBalance,
+      notifyDailyBriefing,
+      notifySlotGaps,
+      notifyAiSuggestions,
+      activeOrgId,
+      workspaceTitle,
+      billingDocument,
+    ]
+  );
 
   const handleLogout = () => {
     dispatch(logout());
@@ -307,7 +488,7 @@ export default function GeneralSettingsPage() {
     window.location.replace(ROUTES.login);
   };
 
-  const handlePasswordUpdate = (e: React.FormEvent) => {
+  const handlePasswordUpdate = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!currentPassword.trim() || newPassword.trim().length < 8) {
       setPasswordFeedback(
@@ -315,44 +496,84 @@ export default function GeneralSettingsPage() {
       );
       return;
     }
-    setCurrentPassword("");
-    setNewPassword("");
-    triggerAutosave();
-    setPasswordFeedback("Credenciais de segurança atualizadas com sucesso.");
-    window.setTimeout(() => setPasswordFeedback(null), 4000);
+    setSaveStatus("saving");
+    try {
+      await userService.changePassword({
+        currentPassword,
+        newPassword,
+      });
+      setCurrentPassword("");
+      setNewPassword("");
+      setSaveStatus("saved");
+      setPasswordFeedback("Credenciais de segurança atualizadas com sucesso.");
+      window.setTimeout(() => setPasswordFeedback(null), 4000);
+    } catch (err: unknown) {
+      setSaveStatus("idle");
+      const msg =
+        (err as { response?: { data?: { message?: string } } })?.response?.data
+          ?.message || "Erro ao atualizar senha. Verifique a senha atual.";
+      setPasswordFeedback(msg);
+    }
   };
 
-  const handleInviteMember = (e: React.FormEvent) => {
+  const handleInviteMember = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!inviteName.trim() || !inviteEmail.trim()) return;
+    if (!inviteName.trim() || !inviteEmail.trim() || !activeOrgId) return;
 
-    const created: TeamMemberItem = {
-      id: `mem-${Date.now()}`,
-      name: inviteName.trim(),
-      email: inviteEmail.trim().toLowerCase(),
-      role: inviteRole,
-      status: "Convite Pendente",
-      projectsAccess: inviteProjects.trim() || "Projetos selecionados",
-    };
+    setSaveStatus("saving");
+    setMembersFeedback(null);
+    try {
+      await apiCreateOrgMember(activeOrgId, {
+        name: inviteName.trim(),
+        email: inviteEmail.trim().toLowerCase(),
+        password: invitePassword.trim() || undefined,
+        role: inviteRole,
+      });
 
-    setMembers((prev) => [created, ...prev]);
-    setInviteName("");
-    setInviteEmail("");
-    setInviteRole("ESTRATEGISTA");
-    setIsInviteModalOpen(false);
-    triggerAutosave();
+      setInviteName("");
+      setInviteEmail("");
+      setInvitePassword("");
+      setInviteRole("MEMBER");
+      setIsInviteModalOpen(false);
+      await loadMembersData();
+      setSaveStatus("saved");
+      setMembersFeedback("Membro adicionado à organização.");
+    } catch (err: unknown) {
+      setSaveStatus("idle");
+      const msg =
+        (err as { response?: { data?: { message?: string } } })?.response?.data
+          ?.message ||
+        "Não foi possível adicionar o membro. Para contas novas, informe uma senha temporária.";
+      setMembersFeedback(msg);
+    }
   };
 
-  const handleRoleChange = (memberId: string, nextRole: EditorialRoleId) => {
+  const handleRoleChange = async (memberId: string, nextRole: EditorialRoleId) => {
+    if (!activeOrgId) return;
     setMembers((prev) =>
       prev.map((m) => (m.id === memberId ? { ...m, role: nextRole } : m))
     );
-    triggerAutosave();
+    setSaveStatus("saving");
+    try {
+      await apiUpdateOrgMemberRole(activeOrgId, memberId, nextRole);
+      setSaveStatus("saved");
+    } catch {
+      setSaveStatus("idle");
+      void loadMembersData();
+    }
   };
 
-  const handleRemoveMember = (memberId: string) => {
+  const handleRemoveMember = async (memberId: string) => {
+    if (!activeOrgId) return;
     setMembers((prev) => prev.filter((m) => m.id !== memberId));
-    triggerAutosave();
+    setSaveStatus("saving");
+    try {
+      await apiRemoveOrgMember(activeOrgId, memberId);
+      setSaveStatus("saved");
+    } catch {
+      setSaveStatus("idle");
+      void loadMembersData();
+    }
   };
 
   const filteredMembers = useMemo(() => {
@@ -361,9 +582,11 @@ export default function GeneralSettingsPage() {
   }, [members, roleFilter]);
 
   const userInitials = useMemo(() => {
-    const parts = fullName.trim().split(/\s+/);
+    const clean = fullName.trim();
+    if (!clean) return "AL";
+    const parts = clean.split(/\s+/);
     if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
-    return `${parts[0][0] ?? "R"}${parts[parts.length - 1][0] ?? "Z"}`.toUpperCase();
+    return `${parts[0][0] ?? "A"}${parts[parts.length - 1][0] ?? "L"}`.toUpperCase();
   }, [fullName]);
 
   return (
@@ -505,8 +728,9 @@ export default function GeneralSettingsPage() {
                   type="text"
                   value={fullName}
                   onChange={(e) => {
-                    setFullName(e.target.value);
-                    triggerAutosave();
+                    const val = e.target.value;
+                    setFullName(val);
+                    triggerAutosave({ fullName: val });
                   }}
                   className="min-h-[2.75rem] rounded-la-md border border-white/12 bg-black/50 px-3.5 font-la-sans text-sm text-la-text-primary focus:border-la-gold focus:outline-none"
                 />
@@ -520,8 +744,9 @@ export default function GeneralSettingsPage() {
                   type="text"
                   value={displayRole}
                   onChange={(e) => {
-                    setDisplayRole(e.target.value);
-                    triggerAutosave();
+                    const val = e.target.value;
+                    setDisplayRole(val);
+                    triggerAutosave({ displayRole: val });
                   }}
                   className="min-h-[2.75rem] rounded-la-md border border-white/12 bg-black/50 px-3.5 font-la-sans text-sm text-la-text-primary focus:border-la-gold focus:outline-none"
                 />
@@ -538,8 +763,9 @@ export default function GeneralSettingsPage() {
                   type="email"
                   value={email}
                   onChange={(e) => {
-                    setEmail(e.target.value);
-                    triggerAutosave();
+                    const val = e.target.value;
+                    setEmail(val);
+                    triggerAutosave({ email: val });
                   }}
                   className="min-h-[2.75rem] w-full bg-transparent font-la-sans text-sm text-la-text-primary focus:outline-none"
                 />
@@ -554,8 +780,9 @@ export default function GeneralSettingsPage() {
                 rows={4}
                 value={editorialBio}
                 onChange={(e) => {
-                  setEditorialBio(e.target.value);
-                  triggerAutosave();
+                  const val = e.target.value;
+                  setEditorialBio(val);
+                  triggerAutosave({ editorialBio: val });
                 }}
                 className="rounded-la-md border border-white/12 bg-black/50 p-3.5 font-la-sans text-sm leading-relaxed text-la-text-primary focus:border-la-gold focus:outline-none"
               />
@@ -635,8 +862,9 @@ export default function GeneralSettingsPage() {
                   role="switch"
                   aria-checked={twoFactorEnabled}
                   onClick={() => {
-                    setTwoFactorEnabled((prev) => !prev);
-                    triggerAutosave();
+                    const nextVal = !twoFactorEnabled;
+                    setTwoFactorEnabled(nextVal);
+                    triggerAutosave({ twoFactorEnabled: nextVal });
                   }}
                   className={clsx(
                     "relative inline-flex h-6 w-11 shrink-0 cursor-pointer items-center rounded-la-full border transition-colors",
@@ -671,18 +899,18 @@ export default function GeneralSettingsPage() {
               <div>
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <span className="rounded-la-full border border-la-gold/60 bg-la-gold/20 px-3 py-0.5 font-la-mono text-[0.6875rem] font-semibold uppercase text-la-gold-light">
-                    Plano Pro · Operação Editorial Ativa
+                    Plano {activeOrgPlan} · Operação Editorial Ativa
                   </span>
                   <span className="font-la-mono text-xs text-emerald-400">
-                    ● Assinatura em dia · Renovação em 15/12/2026
+                    ● Organização ativa
                   </span>
                 </div>
 
                 <h2 className="mt-3 font-la-sans text-xl font-bold text-la-text-primary">
-                  {workspaceTitle}
+                  {workspaceTitle || "Minha Organização Editorial"}
                 </h2>
                 <p className="mt-1 text-justify [text-align-last:left] hyphens-auto font-la-sans text-sm text-la-text-secondary">
-                  Acesso liberado às Funções 01 (Linha & Calendário), 02 (Motor e
+                  Acesso às Funções 01 (Linha & Calendário), 02 (Motor e
                   Mapa de Temas) e 03 (Studios de Roteiros, Carrosséis, Stories e
                   Materiais Complementares).
                 </p>
@@ -691,18 +919,23 @@ export default function GeneralSettingsPage() {
                   {[
                     {
                       label: "Projetos Editoriais",
-                      used: "4 de 10",
-                      pct: "w-[40%]",
+                      used: `${projectsCount} ativo(s)`,
+                      pctWidth: `${Math.min(100, projectsCount * 10)}%`,
                     },
                     {
-                      label: "Roteiros & Ativos / mês",
-                      used: "142 · Ilimitado",
-                      pct: "w-[68%]",
+                      label: "Roteiros & Ativos",
+                      used: `${publicationsCount} registrado(s)`,
+                      pctWidth: `${Math.min(100, publicationsCount * 5)}%`,
                     },
                     {
                       label: "Acervo de Marca (Assets)",
-                      used: "3.4 GB de 25 GB",
-                      pct: "w-[18%]",
+                      used: `${formatStorageBytes(storageUsedBytes)} / 25 GB`,
+                      pctWidth: `${Math.min(
+                        100,
+                        Math.round(
+                          (storageUsedBytes / (25 * 1024 * 1024 * 1024)) * 100
+                        )
+                      )}%`,
                     },
                   ].map((meter) => (
                     <div
@@ -716,7 +949,10 @@ export default function GeneralSettingsPage() {
                         {meter.used}
                       </p>
                       <div className="mt-2 h-1.5 w-full overflow-hidden rounded-la-full bg-white/10">
-                        <div className={clsx("h-full bg-la-gold", meter.pct)} />
+                        <div
+                          className="h-full bg-la-gold transition-all"
+                          style={{ width: meter.pctWidth }}
+                        />
                       </div>
                     </div>
                   ))}
@@ -733,8 +969,9 @@ export default function GeneralSettingsPage() {
                       type="text"
                       value={workspaceTitle}
                       onChange={(e) => {
-                        setWorkspaceTitle(e.target.value);
-                        triggerAutosave();
+                        const val = e.target.value;
+                        setWorkspaceTitle(val);
+                        triggerAutosave({ workspaceTitle: val });
                       }}
                       className="min-h-[2.5rem] rounded-la-md border border-white/12 bg-black/50 px-3 font-la-sans text-xs text-la-text-primary focus:border-la-gold focus:outline-none"
                     />
@@ -747,9 +984,11 @@ export default function GeneralSettingsPage() {
                       type="text"
                       value={billingDocument}
                       onChange={(e) => {
-                        setBillingDocument(e.target.value);
-                        triggerAutosave();
+                        const val = e.target.value;
+                        setBillingDocument(val);
+                        triggerAutosave({ billingDocument: val });
                       }}
+                      placeholder="Informe CPF ou CNPJ"
                       className="min-h-[2.5rem] rounded-la-md border border-white/12 bg-black/50 px-3 font-la-mono text-xs text-la-text-primary focus:border-la-gold focus:outline-none"
                     />
                   </label>
@@ -765,59 +1004,25 @@ export default function GeneralSettingsPage() {
               </div>
             </section>
 
-            {/* Histórico de Faturas Recentes */}
+            {/* Status de Faturamento */}
             <section className="flex flex-col justify-between rounded-la-xl border border-white/10 bg-[#0B0F18]/90 p-6 lg:col-span-5">
               <div>
                 <h3 className="font-la-sans text-base font-bold text-la-text-primary">
                   Histórico de Faturamento
                 </h3>
                 <p className="mt-1 font-la-sans text-xs text-la-text-secondary">
-                  Recibos fiscais emitidos para {billingDocument}.
+                  {billingDocument
+                    ? `Recibos fiscais emitidos para ${billingDocument}.`
+                    : "Nenhum documento fiscal cadastrado para faturamento."}
                 </p>
 
-                <div className="mt-4 flex flex-col gap-2.5">
-                  {[
-                    {
-                      id: "INV-2026-11",
-                      date: "15/11/2026",
-                      amount: "R$ 197,00",
-                      status: "Pago",
-                    },
-                    {
-                      id: "INV-2026-10",
-                      date: "15/10/2026",
-                      amount: "R$ 197,00",
-                      status: "Pago",
-                    },
-                    {
-                      id: "INV-2026-09",
-                      date: "15/09/2026",
-                      amount: "R$ 197,00",
-                      status: "Pago",
-                    },
-                  ].map((inv) => (
-                    <div
-                      key={inv.id}
-                      className="flex items-center justify-between rounded-la-md border border-white/10 bg-black/40 px-3.5 py-2.5"
-                    >
-                      <div>
-                        <span className="font-la-mono text-xs font-semibold text-la-text-primary">
-                          {inv.id} · {inv.date}
-                        </span>
-                        <span className="block font-la-mono text-[0.6875rem] text-emerald-400">
-                          {inv.status} · {inv.amount}
-                        </span>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => triggerAutosave()}
-                        className="inline-flex h-8 items-center gap-1.5 rounded-la-xs border border-white/12 bg-white/[0.03] px-2.5 font-la-mono text-[0.6875rem] text-la-gold-light hover:border-la-gold"
-                      >
-                        <Download className="h-3.5 w-3.5" />
-                        <span>PDF</span>
-                      </button>
-                    </div>
-                  ))}
+                <div className="mt-4 rounded-la-lg border border-white/10 bg-black/40 p-4">
+                  <span className="font-la-mono text-xs font-semibold text-la-gold-light">
+                    Plano Atual: {activeOrgPlan}
+                  </span>
+                  <p className="mt-1 font-la-sans text-xs text-la-text-secondary">
+                    Nenhuma fatura pendente registrada neste workspace no momento.
+                  </p>
                 </div>
               </div>
 
@@ -897,7 +1102,7 @@ export default function GeneralSettingsPage() {
                       type="button"
                       onClick={() => {
                         setPreferredStartRoute(opt.route);
-                        triggerAutosave();
+                        triggerAutosave({ preferredStartRoute: opt.route });
                       }}
                       className={clsx(
                         "flex flex-col items-start rounded-la-lg border p-4 text-left transition-all",
@@ -942,7 +1147,7 @@ export default function GeneralSettingsPage() {
                       type="button"
                       onClick={() => {
                         setDefaultScriptMode(opt.mode);
-                        triggerAutosave();
+                        triggerAutosave({ defaultScriptMode: opt.mode });
                       }}
                       className={clsx(
                         "flex flex-col items-start rounded-la-lg border p-4 text-left transition-all",
@@ -975,32 +1180,48 @@ export default function GeneralSettingsPage() {
 
             {[
               {
-                id: "retina",
+                id: "retina" as const,
                 title: "Auditoria Automática de Equilíbrio RETINA",
                 desc: "Sinaliza quando o calendário acumula muitos conteúdos de vendas sem base de relacionamento/autoridade.",
                 checked: defaultRetinaBalance,
-                toggle: () => setDefaultRetinaBalance((p) => !p),
+                toggle: () => {
+                  const nextVal = !defaultRetinaBalance;
+                  setDefaultRetinaBalance(nextVal);
+                  triggerAutosave({ defaultRetinaBalance: nextVal });
+                },
               },
               {
-                id: "briefing",
+                id: "briefing" as const,
                 title: "Resumo Diário do Painel do Dia",
                 desc: "Destaca logo cedo os slots agendados para gravação ou publicação nas próximas 48 horas.",
                 checked: notifyDailyBriefing,
-                toggle: () => setNotifyDailyBriefing((p) => !p),
+                toggle: () => {
+                  const nextVal = !notifyDailyBriefing;
+                  setNotifyDailyBriefing(nextVal);
+                  triggerAutosave({ notifyDailyBriefing: nextVal });
+                },
               },
               {
-                id: "gaps",
+                id: "gaps" as const,
                 title: "Alerta de Slots Sem Tema Vinculado",
                 desc: "Notifica quando houver janelas abertas na semana sem pauta ou roteiro pronto.",
                 checked: notifySlotGaps,
-                toggle: () => setNotifySlotGaps((p) => !p),
+                toggle: () => {
+                  const nextVal = !notifySlotGaps;
+                  setNotifySlotGaps(nextVal);
+                  triggerAutosave({ notifySlotGaps: nextVal });
+                },
               },
               {
-                id: "ai",
+                id: "ai" as const,
                 title: "Sugestões Explicáveis de Reaproveitamento",
                 desc: "Permite que a IA sugira duplicar e adaptar roteiros campeões entre projetos.",
                 checked: notifyAiSuggestions,
-                toggle: () => setNotifyAiSuggestions((p) => !p),
+                toggle: () => {
+                  const nextVal = !notifyAiSuggestions;
+                  setNotifyAiSuggestions(nextVal);
+                  triggerAutosave({ notifyAiSuggestions: nextVal });
+                },
               },
             ].map((item) => (
               <div
@@ -1019,10 +1240,7 @@ export default function GeneralSettingsPage() {
                   type="button"
                   role="switch"
                   aria-checked={item.checked}
-                  onClick={() => {
-                    item.toggle();
-                    triggerAutosave();
-                  }}
+                  onClick={() => item.toggle()}
                   className={clsx(
                     "relative mt-0.5 inline-flex h-6 w-11 shrink-0 cursor-pointer items-center rounded-la-full border transition-colors",
                     item.checked
@@ -1083,7 +1301,23 @@ export default function GeneralSettingsPage() {
           </div>
 
           {/* Lista de Membros com proteção de empilhamento (z-index) para os dropdowns */}
+          {membersFeedback ? (
+            <p className="rounded-la-md border border-la-border-gold/40 bg-la-gold-faint px-3.5 py-2 font-la-mono text-xs text-la-gold-light">
+              {membersFeedback}
+            </p>
+          ) : null}
+
           <div className="grid grid-cols-1 gap-3">
+            {isLoadingMembers ? (
+              <div className="rounded-la-lg border border-white/10 bg-black/40 p-6 text-center font-la-mono text-xs text-la-text-muted">
+                Carregando membros da organização...
+              </div>
+            ) : filteredMembers.length === 0 ? (
+              <div className="rounded-la-lg border border-dashed border-white/15 bg-black/40 p-6 text-center font-la-sans text-xs text-la-text-muted">
+                Nenhum membro encontrado para este filtro na organização atual.
+              </div>
+            ) : null}
+
             {filteredMembers.map((member) => (
               <div
                 key={member.id}
@@ -1220,12 +1454,13 @@ export default function GeneralSettingsPage() {
 
               <label className="flex flex-col gap-1">
                 <span className="font-la-mono text-[0.6875rem] uppercase text-la-text-secondary">
-                  Projetos Editoriais Liberados
+                  Senha Temporária (caso usuário ainda não exista)
                 </span>
                 <input
-                  type="text"
-                  value={inviteProjects}
-                  onChange={(e) => setInviteProjects(e.target.value)}
+                  type="password"
+                  placeholder="Opcional se conta já existir (mín. 6 caracteres)"
+                  value={invitePassword}
+                  onChange={(e) => setInvitePassword(e.target.value)}
                   className="min-h-[2.625rem] rounded-la-md border border-white/12 bg-black/50 px-3 font-la-sans text-sm text-la-text-primary focus:border-la-gold focus:outline-none"
                 />
               </label>

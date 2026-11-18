@@ -1,4 +1,5 @@
-export type VersionStatus = 'active' | 'archived';
+export type VersionStatus =
+  'active' | 'draft' | 'review_recommended' | 'archived';
 
 export interface IEditorialVersion {
   _id?: string;
@@ -7,6 +8,9 @@ export interface IEditorialVersion {
   versionNumber: number;
   name: string;
   status: VersionStatus;
+  phaseTag?: string;
+  reviewReason?: string;
+  strategicBase?: Record<string, unknown>;
   createdBy: string;
   isActive: boolean;
   createdAt?: Date;
@@ -17,10 +21,17 @@ export interface ICreateEditorialVersion {
   projectId: string;
   versionNumber: number;
   name: string;
+  status?: VersionStatus;
+  phaseTag?: string;
+  reviewReason?: string;
+  strategicBase?: Record<string, unknown>;
   createdBy: string;
 }
 
 export interface IUpdateEditorialVersion {
   name?: string;
   status?: VersionStatus;
+  phaseTag?: string;
+  reviewReason?: string;
+  strategicBase?: Record<string, unknown>;
 }

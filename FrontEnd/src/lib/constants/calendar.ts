@@ -141,6 +141,10 @@ export const STATUS_META: Record<CalendarStatus, { label: string; badgeClass: st
     label: 'Em Produção',
     badgeClass: 'border-sky-500/30 bg-sky-500/10 text-sky-400',
   },
+  script_ready: {
+    label: 'Roteiro Pronto',
+    badgeClass: 'border-primary/30 bg-primary/10 text-primary',
+  },
   recorded: {
     label: 'Gravado',
     badgeClass: 'border-violet-500/30 bg-violet-500/10 text-violet-400',

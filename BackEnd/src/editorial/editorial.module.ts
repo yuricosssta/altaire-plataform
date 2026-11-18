@@ -36,6 +36,14 @@ import {
   EditorialBrandStory,
   EditorialBrandStorySchema,
 } from './schemas/editorial-brand-story.schema';
+import {
+  EditorialTask,
+  EditorialTaskSchema,
+} from './schemas/editorial-task.schema';
+import {
+  EditorialActivityLog,
+  EditorialActivityLogSchema,
+} from './schemas/editorial-activity.schema';
 
 import { EditorialProjectService } from './services/editorial-project.service';
 import { EditorialVersionService } from './services/editorial-version.service';
@@ -43,6 +51,7 @@ import { EditorialCalendarService } from './services/editorial-calendar.service'
 import { EditorialThemeService } from './services/editorial-theme.service';
 import { EditorialScriptService } from './services/editorial-script.service';
 import { EditorialBrandStoryService } from './services/editorial-brand-story.service';
+import { EditorialWorkspaceService } from './services/editorial-workspace.service';
 import { EditorialEventListener } from './services/editorial-event.listener';
 
 import { EditorialProjectMongooseRepository } from './repositories/mongoose/editorial-project.mongoose.repository';
@@ -63,17 +72,28 @@ import { EditorialScriptVersionMongooseRepository } from './repositories/mongoos
 import { EditorialScriptVersionRepository } from './repositories/editorial-script-version.repository';
 import { EditorialBrandStoryMongooseRepository } from './repositories/mongoose/editorial-brand-story.mongoose.repository';
 import { EditorialBrandStoryRepository } from './repositories/editorial-brand-story.repository';
+import { EditorialTaskMongooseRepository } from './repositories/mongoose/editorial-task.mongoose.repository';
+import { EditorialTaskRepository } from './repositories/editorial-task.repository';
+import { EditorialActivityMongooseRepository } from './repositories/mongoose/editorial-activity.mongoose.repository';
+import { EditorialActivityRepository } from './repositories/editorial-activity.repository';
 
 import { ThemeGenerator } from './generators/theme-generator';
 import { StubThemeGenerator } from './generators/stub-theme.generator';
 import { ScriptGenerator } from './generators/script-generator';
 import { StubScriptGenerator } from './generators/stub-script.generator';
+import { MapaGenerator } from './generators/mapa-generator';
+import { StubMapaGenerator } from './generators/stub-mapa.generator';
+import { CalendarGenerator } from './generators/calendar-generator';
+import { StubCalendarGenerator } from './generators/stub-calendar.generator';
+import { WorkspaceAdvisorGenerator } from './generators/workspace-advisor.generator';
+import { StubWorkspaceAdvisorGenerator } from './generators/stub-workspace-advisor.generator';
 
 import { EditorialProjectController } from './controllers/editorial-project.controller';
 import { EditorialVersionController } from './controllers/editorial-version.controller';
 import { EditorialCalendarController } from './controllers/editorial-calendar.controller';
 import { EditorialThemeController } from './controllers/editorial-theme.controller';
 import { EditorialScriptController } from './controllers/editorial-script.controller';
+import { EditorialWorkspaceController } from './controllers/editorial-workspace.controller';
 
 @Module({
   imports: [
@@ -93,6 +113,11 @@ import { EditorialScriptController } from './controllers/editorial-script.contro
         schema: EditorialScriptVersionSchema,
       },
       { name: EditorialBrandStory.name, schema: EditorialBrandStorySchema },
+      { name: EditorialTask.name, schema: EditorialTaskSchema },
+      {
+        name: EditorialActivityLog.name,
+        schema: EditorialActivityLogSchema,
+      },
     ]),
   ],
   controllers: [
@@ -101,6 +126,7 @@ import { EditorialScriptController } from './controllers/editorial-script.contro
     EditorialCalendarController,
     EditorialThemeController,
     EditorialScriptController,
+    EditorialWorkspaceController,
   ],
   providers: [
     EditorialProjectService,
@@ -109,6 +135,7 @@ import { EditorialScriptController } from './controllers/editorial-script.contro
     EditorialThemeService,
     EditorialScriptService,
     EditorialBrandStoryService,
+    EditorialWorkspaceService,
     EditorialEventListener,
     {
       provide: ThemeGenerator,
@@ -117,6 +144,18 @@ import { EditorialScriptController } from './controllers/editorial-script.contro
     {
       provide: ScriptGenerator,
       useClass: StubScriptGenerator,
+    },
+    {
+      provide: MapaGenerator,
+      useClass: StubMapaGenerator,
+    },
+    {
+      provide: CalendarGenerator,
+      useClass: StubCalendarGenerator,
+    },
+    {
+      provide: WorkspaceAdvisorGenerator,
+      useClass: StubWorkspaceAdvisorGenerator,
     },
     {
       provide: EditorialProjectRepository,
@@ -154,6 +193,14 @@ import { EditorialScriptController } from './controllers/editorial-script.contro
       provide: EditorialBrandStoryRepository,
       useClass: EditorialBrandStoryMongooseRepository,
     },
+    {
+      provide: EditorialTaskRepository,
+      useClass: EditorialTaskMongooseRepository,
+    },
+    {
+      provide: EditorialActivityRepository,
+      useClass: EditorialActivityMongooseRepository,
+    },
   ],
   exports: [
     EditorialProjectService,
@@ -162,6 +209,7 @@ import { EditorialScriptController } from './controllers/editorial-script.contro
     EditorialThemeService,
     EditorialScriptService,
     EditorialBrandStoryService,
+    EditorialWorkspaceService,
   ],
 })
 export class EditorialModule {}

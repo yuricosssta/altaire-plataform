@@ -8,7 +8,7 @@ import {
 } from "lucide-react";
 import { useSelector } from "react-redux";
 import { selectCurrentOrg } from "@/lib/redux/slices/organizationSlice";
-import http from "@/lib/http";
+import { storageService } from "@/lib/services/storageService";
 
 // Limites fixos em Bytes
 const LIMITS = {
@@ -52,15 +52,14 @@ export function StorageManagement() {
 
     const storageLimit = LIMITS[orgPlan] || LIMITS.FREE;
 
-    // Busca os arquivos e o uso total no Back-end
+    // Busca os arquivos e o uso total via BFF
     const fetchStorageData = useCallback(async () => {
         if (!orgId) return;
         try {
             setIsLoading(true);
-            // Esta rota ainda vamos criar no NestJS no próximo passo!
-            const response = await http.get(`/storage/assets`);
-            setAssets(response.data.assets);
-            setStorageUsed(response.data.storageUsed);
+            const data = await storageService.getAssets();
+            setAssets(Array.isArray(data?.assets) ? data.assets : []);
+            setStorageUsed(Number(data?.storageUsed || 0));
         } catch (error) {
             console.error("Erro ao buscar dados de armazenamento:", error);
         } finally {
@@ -110,7 +109,7 @@ export function StorageManagement() {
 
         const confirmDelete = window.confirm(
             `ATENÇÃO: Você está prestes a excluir definitivamente o arquivo "${asset.fileName}".\n\n` +
-            `Se este arquivo estiver anexado a algum Parecer Técnico ou Diário de Obra, o link será quebrado e ele deixará de aparecer no sistema para todos os usuários.\n\n` +
+            `Se este arquivo estiver anexado a algum roteiro ou projeto editorial, o link será removido do sistema para todos os usuários.\n\n` +
             `Deseja realmente continuar?`
         );
 
@@ -118,9 +117,7 @@ export function StorageManagement() {
 
         try {
             setIsDeleting(asset._id);
-            await http.delete(`/storage/assets/${asset._id}`, {
-                headers: { 'x-org-role': orgRole }
-            });
+            await storageService.deleteAsset(asset._id);
 
             // Atualiza a tela instantaneamente
             setAssets(prev => prev.filter(item => item._id !== asset._id));

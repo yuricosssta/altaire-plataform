@@ -20,6 +20,8 @@ import {
   BulkStatusInput,
   calendarSuggestionsRequestSchema,
   CalendarSuggestionsRequestInput,
+  createThemesBatchSchema,
+  CreateThemesBatchInput,
   generateMoreSchema,
   GenerateMoreInput,
   generationRequestSchema,
@@ -61,9 +63,21 @@ export class EditorialThemeController {
     @Param('projectId') projectId: string,
     @Body(new ZodValidationPipe(generationRequestSchema))
     data: GenerationRequestInput,
-    @GetUser() userId: string,
+    @GetUser() user: any,
   ) {
+    const userId = typeof user === 'string' ? user : user?.sub || 'system';
     return this.themeService.generate(projectId, data as any, userId);
+  }
+
+  @Post('projects/:projectId/themes/batch')
+  async createBatch(
+    @Param('projectId') projectId: string,
+    @Body(new ZodValidationPipe(createThemesBatchSchema))
+    data: CreateThemesBatchInput,
+    @GetUser() user: any,
+  ) {
+    const userId = typeof user === 'string' ? user : user?.sub || 'system';
+    return this.themeService.createBatch(projectId, data, userId);
   }
 
   @Get('projects/:projectId/themes/pillars')

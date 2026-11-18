@@ -5,6 +5,7 @@ import {
   ForbiddenException,
   Get,
   Param,
+  Patch,
   Post,
   Put,
   UseGuards,
@@ -16,10 +17,18 @@ import { EditorialProjectService } from '../services/editorial-project.service';
 import { EditorialVersionService } from '../services/editorial-version.service';
 import {
   createProjectSchema,
+  duplicateProjectSchema,
   updateProjectSchema,
   CreateProject,
+  DuplicateProject,
   UpdateProject,
 } from '../validations/editorial-project.zod';
+import {
+  createVersionSchema,
+  extractIcpSchema,
+  CreateVersion,
+  ExtractIcpInput,
+} from '../validations/editorial-version.zod';
 import {
   onboardingSchema,
   OnboardingInput,
@@ -90,6 +99,36 @@ export class EditorialProjectController {
     return this.projectService.update(id, data);
   }
 
+  @Patch(':id')
+  async patchUpdate(
+    @Param('id') id: string,
+    @Body(new ZodValidationPipe(updateProjectSchema)) data: UpdateProject,
+    @GetUser() user: any,
+  ) {
+    if (isClientOrExternalRole(user?.role)) {
+      throw new ForbiddenException(
+        'Usuários clientes ou externos não têm permissão para editar configurações do projeto.',
+      );
+    }
+    return this.projectService.update(id, data);
+  }
+
+  @Post(':id/duplicate')
+  async duplicate(
+    @Param('id') id: string,
+    @Body(new ZodValidationPipe(duplicateProjectSchema))
+    data: DuplicateProject,
+    @GetUser() user: any,
+  ) {
+    if (isClientOrExternalRole(user?.role)) {
+      throw new ForbiddenException(
+        'Usuários clientes ou externos não têm permissão para duplicar projetos.',
+      );
+    }
+    const userId = typeof user === 'string' ? user : user?.sub;
+    return this.projectService.duplicate(id, userId, data);
+  }
+
   @Delete(':id')
   async delete(@Param('id') id: string, @GetUser() user: any) {
     if (isClientOrExternalRole(user?.role)) {
@@ -118,5 +157,34 @@ export class EditorialProjectController {
   @Get(':projectId/versions')
   async listVersions(@Param('projectId') projectId: string) {
     return this.versionService.findByProjectId(projectId);
+  }
+
+  @Post(':projectId/versions')
+  async createVersion(
+    @Param('projectId') projectId: string,
+    @Body(new ZodValidationPipe(createVersionSchema)) data: CreateVersion,
+    @GetUser() user: any,
+  ) {
+    if (isClientOrExternalRole(user?.role)) {
+      throw new ForbiddenException(
+        'Usuários clientes ou externos não têm permissão para criar versões da linha editorial.',
+      );
+    }
+    const userId = typeof user === 'string' ? user : user?.sub;
+    return this.versionService.createVersion(projectId, userId, data);
+  }
+
+  @Post(':projectId/extract-icp')
+  async extractIcp(
+    @Param('projectId') projectId: string,
+    @Body(new ZodValidationPipe(extractIcpSchema)) data: ExtractIcpInput,
+    @GetUser() user: any,
+  ) {
+    if (isClientOrExternalRole(user?.role)) {
+      throw new ForbiddenException(
+        'Usuários clientes ou externos não têm permissão para executar extração de ICP.',
+      );
+    }
+    return this.versionService.extractIcp(projectId, data);
   }
 }

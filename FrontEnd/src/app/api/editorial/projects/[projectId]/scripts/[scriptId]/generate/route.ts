@@ -7,18 +7,13 @@ export async function POST(
 ) {
   const { projectId, scriptId } = await params;
   const body = await request.json().catch(() => ({}));
-
   const result = await proxyEditorialRequest(
     request,
     `/projects/${projectId}/scripts/${scriptId}/generate`,
-    {
-      method: 'POST',
-      body,
-    },
+    { method: 'POST', body },
   );
-
   if ('ok' in result) {
     return NextResponse.json(result.data);
   }
-  return NextResponse.json(result, { status: 502 });
+  return NextResponse.json(result, { status: (result as any)?.status || 502 });
 }

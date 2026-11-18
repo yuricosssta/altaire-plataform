@@ -8,6 +8,7 @@ import {
   ForbiddenException,
   Get,
   Param,
+  Patch,
   Post,
   Put,
   Query,
@@ -63,6 +64,24 @@ export class UsersController {
   @Get('profile')
   async getProfile(@GetUser('sub') userId: string) {
     return this.userService.getUser(userId);
+  }
+
+  @UseGuards(AuthGuard)
+  @Patch('profile')
+  async patchProfile(
+    @GetUser('sub') userId: string,
+    @Body(new ZodValidationPipe(updateUserSchema)) body: UpdateUser,
+  ) {
+    return this.userService.updateUser(userId, body);
+  }
+
+  @UseGuards(AuthGuard)
+  @Put('profile')
+  async putProfile(
+    @GetUser('sub') userId: string,
+    @Body(new ZodValidationPipe(updateUserSchema)) body: UpdateUser,
+  ) {
+    return this.userService.updateUser(userId, body);
   }
 
   @UseGuards(AuthGuard)

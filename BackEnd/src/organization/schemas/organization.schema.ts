@@ -27,6 +27,9 @@ export class Organization {
   @Prop({ required: false, unique: true })
   cnpj: string;
 
+  @Prop({ required: false })
+  billingDocument?: string;
+
   @Prop({ required: true, uppercase: true, trim: true, maxlength: 4 })
   acronym: string;
 

@@ -6,8 +6,8 @@ import React, { useState } from "react";
 import { UploadCloud, Loader2, CheckCircle } from "lucide-react";
 import { useSelector, useDispatch } from "react-redux";
 import { RootState } from "@/lib/redux/store";
-import http from "@/lib/http";
 import { updateCurrentOrgSettings } from "@/lib/redux/slices/organizationSlice";
+import { apiUpdateOrganizationSettings } from "@/lib/services/organizationService";
 import { uploadFileToR2 } from "@/lib/services/storageService"; // IMPORT NOVO
 
 export function BrandingSettings() {
@@ -42,9 +42,7 @@ export function BrandingSettings() {
         [fieldName]: fileUrl
       };
 
-      await http.patch(`/organizations/${orgId}/settings`, {
-        settings: updatedSettings
-      });
+      await apiUpdateOrganizationSettings(orgId, updatedSettings);
 
       setImages(updatedSettings);
       dispatch(updateCurrentOrgSettings(updatedSettings));

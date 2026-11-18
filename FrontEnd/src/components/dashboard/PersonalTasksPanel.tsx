@@ -1,11 +1,11 @@
 //src/components/dashboard/PersonalTasksPanel.tsx
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { Trash2, Plus, ListTodo, CalendarClock, CheckSquare, Square } from "lucide-react";
 import { useSelector } from "react-redux";
 import { RootState } from "@/lib/redux/store";
-import { selectCurrentOrg } from "@/lib/redux/slices/organizationSlice";
+import { editorialService } from "@/lib/services/editorialService";
 
 interface Task {
   id: string;
@@ -14,78 +14,101 @@ interface Task {
   createdAt: number;
 }
 
+const TASK_ID_RE = /^[0-9a-fA-F]{24}$/;
+
 export function PersonalTasksPanel() {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [newTaskText, setNewTaskText] = useState("");
   const [isLoaded, setIsLoaded] = useState(false);
 
-  // 1. Buscando a identidade de quem está logado via Redux
-  const currentOrg = useSelector(selectCurrentOrg);
-  const user = useSelector((state: RootState) => state.auth.user);
+  const token = useSelector((state: RootState) => state.auth.token);
 
-  const userId = user?.sub || (user as any)?._id || (user as any)?.id || "unknown_user";
-  const orgId = typeof currentOrg?.organizationId === "object"
-    ? (currentOrg.organizationId as any)._id
-    : currentOrg?.organizationId || "unknown_org";
-
-  // 2. Chave de Storage Blindada (Isolamento por Empresa e Usuário)
-  const storageKey = `@altaire:tasks_${orgId}_${userId}`;
-
-  // Carrega as tarefas usando a chave dinâmica
-  useEffect(() => {
-    if (!orgId || !userId) return;
-
-    const savedTasks = localStorage.getItem(storageKey);
-    if (savedTasks) {
-      setTasks(JSON.parse(savedTasks));
-    } else {
-      setTasks([]); // Limpa a tela se o novo usuário não tiver tarefas
+  const loadTasks = useCallback(async () => {
+    if (!token) {
+      setIsLoaded(true);
+      return;
     }
-    
-    setIsLoaded(true);
-
-    const handleStorageChange = () => {
-      const updated = localStorage.getItem(storageKey);
-      if (updated) setTasks(JSON.parse(updated));
-    };
-    
-    window.addEventListener("storage", handleStorageChange);
-    return () => window.removeEventListener("storage", handleStorageChange);
-  }, [storageKey, orgId, userId]);
-
-  // Salva no LocalStorage
-  useEffect(() => {
-    if (isLoaded) {
-      localStorage.setItem(storageKey, JSON.stringify(tasks));
+    try {
+      const rows = await editorialService.listTasks();
+      const mapped: Task[] = Array.isArray(rows)
+        ? rows.map((t: any) => ({
+            id: String(t.id || t._id || ""),
+            text: String(t.title || t.text || ""),
+            completed: Boolean(t.completed ?? t.isDone),
+            createdAt: t.createdAt ? new Date(t.createdAt).getTime() : Date.now(),
+          }))
+        : [];
+      setTasks(mapped);
+    } catch {
+      setTasks([]);
+    } finally {
+      setIsLoaded(true);
     }
-  }, [tasks, isLoaded, storageKey]);
+  }, [token]);
 
-  const handleAddTask = (e: React.FormEvent) => {
+  useEffect(() => {
+    void loadTasks();
+  }, [loadTasks]);
+
+  const handleAddTask = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newTaskText.trim()) return;
-
-    const newTask: Task = {
-      id: crypto.randomUUID(),
-      text: newTaskText,
-      completed: false,
-      createdAt: Date.now(),
-    };
-
-    setTasks([newTask, ...tasks]);
+    const trimmed = newTaskText.trim();
+    if (!trimmed) return;
     setNewTaskText("");
+
+    try {
+      const created = await editorialService.createTask({
+        title: trimmed,
+        dueCategory: "today",
+        origin: "Manual",
+      });
+      const item: Task = {
+        id: String(created.id || created._id || ""),
+        text: String(created.title || trimmed),
+        completed: Boolean(created.completed ?? created.isDone),
+        createdAt: created.createdAt
+          ? new Date(created.createdAt).getTime()
+          : Date.now(),
+      };
+      setTasks((prev) => [item, ...prev]);
+    } catch {
+      void loadTasks();
+    }
   };
 
-  const toggleTask = (id: string) => {
-    setTasks(tasks.map(task => 
-      task.id === id ? { ...task, completed: !task.completed } : task
-    ));
+  const toggleTask = async (id: string) => {
+    const target = tasks.find((t) => t.id === id);
+    if (!target) return;
+    const nextCompleted = !target.completed;
+    setTasks((prev) =>
+      prev.map((task) =>
+        task.id === id ? { ...task, completed: nextCompleted } : task
+      )
+    );
+    if (TASK_ID_RE.test(id)) {
+      try {
+        await editorialService.updateTask(id, {
+          completed: nextCompleted,
+          isDone: nextCompleted,
+        });
+      } catch {
+        void loadTasks();
+      }
+    }
   };
 
-  const deleteTask = (id: string) => {
-    setTasks(tasks.filter(task => task.id !== id));
+  const deleteTask = async (id: string) => {
+    setTasks((prev) => prev.filter((task) => task.id !== id));
+    if (TASK_ID_RE.test(id)) {
+      try {
+        await editorialService.deleteTask(id);
+      } catch {
+        void loadTasks();
+      }
+    }
   };
 
-  const activeTasksCount = tasks.filter(t => !t.completed).length;
+  const activeTasksCount = tasks.filter((t) => !t.completed).length;
 
   if (!isLoaded) return <div className="h-[350px] bg-card border border-border rounded-sm shadow-sm animate-pulse" />;
 

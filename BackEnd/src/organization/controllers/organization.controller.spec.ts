@@ -18,7 +18,9 @@ describe('OrganizationController', () => {
       listFunctions: jest.fn().mockResolvedValue([]),
       createFunction: jest.fn().mockResolvedValue({ _id: functionId }),
       updateFunction: jest.fn().mockResolvedValue({ _id: functionId }),
-      deleteFunction: jest.fn().mockResolvedValue({ message: 'Função removida com sucesso.' }),
+      deleteFunction: jest
+        .fn()
+        .mockResolvedValue({ message: 'Função removida com sucesso.' }),
     };
 
     const module: TestingModule = await Test.createTestingModule({

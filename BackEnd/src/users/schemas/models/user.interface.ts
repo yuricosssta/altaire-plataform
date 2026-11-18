@@ -14,6 +14,15 @@ export type UserRoleType =
   | 'CLIENT'
   | 'EXTERNAL';
 
+export interface IUserPreferences {
+  preferredStartRoute?: string;
+  defaultScriptMode?: string;
+  defaultRetinaBalance?: boolean;
+  notifyDailyBriefing?: boolean;
+  notifySlotGaps?: boolean;
+  notifyAiSuggestions?: boolean;
+}
+
 export interface IUser {
   _id?: string;
   id?: string;
@@ -30,6 +39,10 @@ export interface IUser {
   invitedBy?: string;
   functionId?: string | null;
   avatarUrl?: string;
+  displayRole?: string;
+  editorialBio?: string;
+  twoFactorEnabled?: boolean;
+  preferences?: IUserPreferences;
   created_at?: Date;
   modified_at?: Date;
   resetPasswordToken?: string;

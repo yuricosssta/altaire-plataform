@@ -30,6 +30,12 @@ export const createUserSchema = z.object({
 
 export const updateUserSchema = z.object({
   name: z.string().optional(),
+  email: z.string().email('E-mail inválido').optional(),
+  avatarUrl: z.string().optional(),
+  displayRole: z.string().optional(),
+  editorialBio: z.string().optional(),
+  twoFactorEnabled: z.boolean().optional(),
+  preferences: z.record(z.unknown()).optional(),
   role: userRoleEnum.optional(),
   allowedProjects: z.array(z.string()).optional(),
   permissions: z.array(z.string()).optional(),

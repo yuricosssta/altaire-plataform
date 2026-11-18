@@ -1,8 +1,9 @@
-//src/storage/storage.service.ts
+//src/storage/services/storage.service.ts
 import {
   Injectable,
   InternalServerErrorException,
   ForbiddenException,
+  NotFoundException,
 } from '@nestjs/common';
 import {
   S3Client,
@@ -17,6 +18,7 @@ import {
   Organization,
 } from '../../organization/schemas/organization.schema';
 import { FileAsset, FileAssetDocument } from '../schemas/file-asset.schema';
+import { IFileAsset } from '../dto/storage.interface';
 
 @Injectable()
 export class StorageService {
@@ -41,10 +43,32 @@ export class StorageService {
       region: 'auto',
       endpoint: process.env.R2_ENDPOINT,
       credentials: {
-        accessKeyId: process.env.R2_ACCESS_KEY_ID,
-        secretAccessKey: process.env.R2_SECRET_ACCESS_KEY,
+        accessKeyId: process.env.R2_ACCESS_KEY_ID || '',
+        secretAccessKey: process.env.R2_SECRET_ACCESS_KEY || '',
       },
     });
+  }
+
+  private async resolveOrg(
+    orgId: string,
+    selectFields = '_id plan storageUsed',
+  ) {
+    if ((Types.ObjectId as any).isValid(orgId)) {
+      const byId = await this.orgModel
+        .findById(orgId)
+        .select(selectFields)
+        .exec();
+      if (byId) return byId;
+    }
+    return this.orgModel
+      .findOne({ slug: orgId || 'altaire' })
+      .select(selectFields)
+      .exec()
+      .then((doc) =>
+        doc
+          ? doc
+          : this.orgModel.findOne({ slug: 'altaire' }).select(selectFields).exec(),
+      );
   }
 
   async getPresignedUploadUrl(
@@ -53,17 +77,13 @@ export class StorageService {
     fileType: string,
     sizeBytes: number,
   ): Promise<{ uploadUrl: string; fileUrl: string }> {
-    // 1. Verifica a cota da empresa
-    const org = await this.orgModel
-      .findById(orgId)
-      .select('plan storageUsed')
-      .exec();
+    const org = await this.resolveOrg(orgId, '_id plan storageUsed');
     if (!org) throw new ForbiddenException('Organização não encontrada.');
 
     const limit =
       this.LIMITS[org.plan as keyof typeof this.LIMITS] || this.LIMITS.FREE;
 
-    if (org.storageUsed + sizeBytes > limit) {
+    if ((org.storageUsed || 0) + sizeBytes > limit) {
       throw new ForbiddenException(
         `LIMITE DE ARMAZENAMENTO EXCEDIDO: Seu plano permite até ${limit / (1024 * 1024)}MB. Faça upgrade para liberar mais espaço.`,
       );
@@ -76,7 +96,7 @@ export class StorageService {
         .slice(0, 10)
         .replace(/-/g, '/');
       const uniqueId = Math.random().toString(36).substring(2, 8);
-      const fileKey = `${orgId}/${datePrefix}/${uniqueId}-${cleanFileName}`;
+      const fileKey = `${org._id}/${datePrefix}/${uniqueId}-${cleanFileName}`;
 
       const command = new PutObjectCommand({
         Bucket: this.bucketName,
@@ -105,34 +125,148 @@ export class StorageService {
     fileName: string,
     mimeType: string,
     sizeBytes: number,
+    metadata?: Partial<IFileAsset>,
   ) {
-    // 1. Salva o registro do arquivo no MongoDB
+    const org = await this.resolveOrg(orgId, '_id');
+    if (!org)
+      throw new InternalServerErrorException('Organização não encontrada.');
+
+    const userObjectId = (Types.ObjectId as any).isValid(userId)
+      ? new (Types.ObjectId as any)(String(userId))
+      : new (Types.ObjectId as any)();
+
     const newAsset = new this.fileAssetModel({
-      organizationId: new (Types.ObjectId as any)(String(orgId)),
-      uploadedBy: new (Types.ObjectId as any)(String(userId)),
+      organizationId: org._id,
+      uploadedBy: userObjectId,
       fileName,
       fileUrl,
       mimeType,
       sizeBytes,
+      title: metadata?.title || fileName,
+      category: metadata?.category || 'guias',
+      projectScope: metadata?.projectScope || 'Acervo Global da Marca',
+      formatLabel: metadata?.formatLabel,
+      dimensionsOrSpec: metadata?.dimensionsOrSpec,
+      description: metadata?.description,
+      aiUsageDirective: metadata?.aiUsageDirective,
+      hexPreview: metadata?.hexPreview,
+      cssToken: metadata?.cssToken,
+      tags: metadata?.tags || [],
+      isFavorite: Boolean(metadata?.isFavorite),
     });
     await newAsset.save();
 
-    // 2. Aumenta o "Medidor" da Organização
-    await this.orgModel.findByIdAndUpdate(orgId, {
-      $inc: { storageUsed: sizeBytes },
-    });
+    if (sizeBytes > 0) {
+      await this.orgModel.findByIdAndUpdate(org._id, {
+        $inc: { storageUsed: sizeBytes },
+      });
+    }
 
     return newAsset;
   }
 
+  async createBrandAsset(
+    orgId: string,
+    userId: string,
+    data: Partial<IFileAsset>,
+  ) {
+    const org = await this.resolveOrg(orgId, '_id');
+    if (!org)
+      throw new InternalServerErrorException('Organização não encontrada.');
+
+    const userObjectId = (Types.ObjectId as any).isValid(userId)
+      ? new (Types.ObjectId as any)(String(userId))
+      : new (Types.ObjectId as any)();
+
+    const sizeBytes = Number(data.sizeBytes) || 0;
+    const newAsset = new this.fileAssetModel({
+      organizationId: org._id,
+      uploadedBy: userObjectId,
+      fileName: data.fileName || data.title || 'brand-asset',
+      fileUrl: data.fileUrl || '',
+      mimeType: data.mimeType || 'application/x-brand-asset',
+      sizeBytes,
+      title: data.title || data.fileName || 'Novo Recurso da Marca',
+      category: data.category || 'guias',
+      projectScope: data.projectScope || 'Acervo Global da Marca',
+      formatLabel: data.formatLabel,
+      dimensionsOrSpec: data.dimensionsOrSpec,
+      description: data.description,
+      aiUsageDirective: data.aiUsageDirective,
+      hexPreview: data.hexPreview,
+      cssToken: data.cssToken,
+      tags: Array.isArray(data.tags) ? data.tags : [],
+      isFavorite: Boolean(data.isFavorite),
+    });
+    await newAsset.save();
+
+    if (sizeBytes > 0) {
+      await this.orgModel.findByIdAndUpdate(org._id, {
+        $inc: { storageUsed: sizeBytes },
+      });
+    }
+
+    return newAsset.toObject();
+  }
+
+  async updateBrandAsset(
+    orgId: string,
+    assetId: string,
+    data: Partial<IFileAsset>,
+    userId?: string,
+  ) {
+    if (!(Types.ObjectId as any).isValid(assetId)) {
+      throw new NotFoundException('Ativo não encontrado.');
+    }
+    const org = await this.resolveOrg(orgId, '_id');
+    const query: Record<string, any> = {
+      _id: new (Types.ObjectId as any)(String(assetId)),
+    };
+    if (org) {
+      query.organizationId = org._id;
+    }
+    if (userId && (Types.ObjectId as any).isValid(userId)) {
+      query.uploadedBy = new (Types.ObjectId as any)(String(userId));
+    }
+
+    const allowedKeys = [
+      'title',
+      'category',
+      'projectScope',
+      'formatLabel',
+      'dimensionsOrSpec',
+      'description',
+      'aiUsageDirective',
+      'hexPreview',
+      'cssToken',
+      'tags',
+      'isFavorite',
+      'fileName',
+      'fileUrl',
+    ];
+    const updateSet: Record<string, unknown> = {};
+    for (const key of allowedKeys) {
+      if ((data as any)[key] !== undefined) {
+        updateSet[key] = (data as any)[key];
+      }
+    }
+
+    const updated = await this.fileAssetModel
+      .findOneAndUpdate(query, { $set: updateSet }, { new: true })
+      .lean()
+      .exec();
+
+    if (!updated) {
+      throw new NotFoundException(
+        'Arquivo ou ativo de marca não encontrado ou sem permissão para editar.',
+      );
+    }
+    return updated;
+  }
+
   // LISTAGEM DE ARQUIVOS (Isolado por usuário se userId for informado)
   async getOrganizationAssets(orgId: string, userId?: string) {
-    const org = (Types.ObjectId as any).isValid(orgId)
-      ? await this.orgModel.findById(orgId).select('storageUsed').exec()
-      : await this.orgModel
-          .findOne({ slug: 'altaire' })
-          .select('storageUsed')
-          .exec();
+    const org = await this.resolveOrg(orgId, '_id storageUsed');
 
     if (!org)
       throw new InternalServerErrorException('Organização não encontrada.');
@@ -161,11 +295,9 @@ export class StorageService {
     };
   }
 
-  // EXCLUSÃO DE ARQUIVOS (Banco + Nuvem)
+  // EXCLUSÃO DE ARQUIVOS (Banco + Nuvem quando há fileUrl R2)
   async deleteAsset(orgId: string, assetId: string, userId?: string) {
-    const org = (Types.ObjectId as any).isValid(orgId)
-      ? await this.orgModel.findById(orgId).select('_id').exec()
-      : await this.orgModel.findOne({ slug: 'altaire' }).select('_id').exec();
+    const org = await this.resolveOrg(orgId, '_id');
 
     const query: Record<string, any> = {
       _id: new (Types.ObjectId as any)(String(assetId)),
@@ -185,32 +317,36 @@ export class StorageService {
       );
     }
 
-    // 2. Extrai a "Key" (O caminho interno) removendo o domínio público da URL
-    // Ex: transforma "https://arquivos.site.com/123/foto.jpg" em "123/foto.jpg"
-    const fileKey = asset.fileUrl.replace(`${this.publicDomain}/`, '');
-
-    try {
-      // Exclui o arquivo fisicamente da Cloudflare R2
-      await (this.s3Client as any).send(
-        new DeleteObjectCommand({
-          Bucket: this.bucketName,
-          Key: fileKey,
-        }),
-      );
-    } catch (error) {
-      console.error('Erro ao deletar arquivo no R2:', error);
-      throw new InternalServerErrorException(
-        'Falha ao excluir o arquivo físico na nuvem.',
-      );
+    if (
+      asset.fileUrl &&
+      asset.fileUrl.startsWith('http') &&
+      this.bucketName
+    ) {
+      const fileKey = this.publicDomain
+        ? asset.fileUrl.replace(`${this.publicDomain}/`, '')
+        : asset.fileUrl;
+      try {
+        await (this.s3Client as any).send(
+          new DeleteObjectCommand({
+            Bucket: this.bucketName,
+            Key: fileKey,
+          }),
+        );
+      } catch (error) {
+        console.error('Erro ao deletar arquivo no R2:', error);
+        throw new InternalServerErrorException(
+          'Falha ao excluir o arquivo físico na nuvem.',
+        );
+      }
     }
 
-    // Exclui o registro do Cartório (MongoDB)
     await this.fileAssetModel.findByIdAndDelete(asset._id);
 
-    // Devolve os Megabytes para a conta da Empresa (Subtrai o tamanho)
-    await this.orgModel.findByIdAndUpdate(orgId, {
-      $inc: { storageUsed: -Math.abs(asset.sizeBytes) }, // Math.abs garante que sempre será uma subtração
-    });
+    if (org && (Number(asset.sizeBytes) || 0) > 0) {
+      await this.orgModel.findByIdAndUpdate(org._id, {
+        $inc: { storageUsed: -Math.abs(asset.sizeBytes) },
+      });
+    }
 
     return { message: 'Arquivo excluído e espaço liberado com sucesso.' };
   }

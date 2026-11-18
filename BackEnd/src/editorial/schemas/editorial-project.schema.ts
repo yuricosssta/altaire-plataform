@@ -8,20 +8,38 @@ export class EditorialProject {
   @Prop({ required: true })
   name: string;
 
+  @Prop({ default: '' })
+  brandOrClientName?: string;
+
   @Prop({ required: true })
   niche: string;
 
   @Prop({ required: true })
   subniche: string;
 
+  @Prop({ default: 'Orgânico' })
+  operationTypeLabel?: string;
+
   @Prop({ required: true })
   currentObjective: string;
+
+  @Prop({ default: 'Estruturação Inicial' })
+  currentPhaseLabel?: string;
+
+  @Prop({ default: 'in_setup' })
+  status?: string;
 
   @Prop({ required: true, default: 'pending' })
   editorialLineStatus: string;
 
   @Prop({ required: true, default: 'pending' })
   calendarStatus: string;
+
+  @Prop()
+  nextActionLabel?: string;
+
+  @Prop()
+  nextActionReason?: string;
 
   @Prop({ required: true, type: Types.ObjectId, ref: 'User' })
   createdBy: string;

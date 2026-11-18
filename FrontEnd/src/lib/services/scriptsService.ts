@@ -55,7 +55,15 @@ export const scriptsService = {
 
   createScript: async (
     projectId: string,
-    data: { format: ScriptFormat; mode: ScriptMode; calendarSlotId?: string; themeId?: string; title?: string },
+    data: {
+      format: ScriptFormat;
+      mode: ScriptMode;
+      calendarSlotId?: string;
+      themeId?: string;
+      title?: string;
+      autoGenerate?: boolean;
+      [key: string]: unknown;
+    },
   ): Promise<Script> => {
     const response = await localClient.post(`${BASE}/${projectId}/scripts`, data);
     return response.data;
@@ -73,7 +81,11 @@ export const scriptsService = {
     return response.data;
   },
 
-  updateScript: async (projectId: string, scriptId: string, data: Partial<Script>): Promise<Script> => {
+  updateScript: async (
+    projectId: string,
+    scriptId: string,
+    data: Partial<Script> & Record<string, unknown>,
+  ): Promise<Script> => {
     const response = await localClient.patch(`${BASE}/${projectId}/scripts/${scriptId}`, data);
     return response.data;
   },
@@ -164,6 +176,50 @@ export const scriptsService = {
 
   saveBrandStory: async (projectId: string, data: any): Promise<any> => {
     const response = await localClient.put(`${BASE}/${projectId}/scripts/brand-story`, data);
+    return response.data;
+  },
+
+  regenerateStoryCard: async (
+    projectId: string,
+    scriptId: string,
+    data: {
+      period: string;
+      cardId?: string;
+      cardNumber?: number;
+      currentCard?: Record<string, unknown>;
+      currentObjective?: string;
+      currentText?: string;
+    },
+  ): Promise<any> => {
+    const response = await localClient.post(
+      `${BASE}/${projectId}/scripts/${scriptId}/stories/regenerate`,
+      data,
+    );
+    return response.data;
+  },
+
+  listPublications: async (format?: string): Promise<any[]> => {
+    const response = await localClient.get('/editorial/publications', {
+      params: format ? { format } : undefined,
+    });
+    return response.data;
+  },
+
+  adaptPublication: async (
+    scriptId: string,
+    data: {
+      targetProjectId: string;
+      mode: 'COPY_LITERAL' | 'AI_ADAPT';
+      targetSlotId?: string;
+      adaptNotes?: string;
+      customTitle?: string;
+      preserveComplementaryMaterial?: boolean;
+    },
+  ): Promise<any> => {
+    const response = await localClient.post(
+      `/editorial/publications/${scriptId}/adapt`,
+      data,
+    );
     return response.data;
   },
 };

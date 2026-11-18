@@ -27,6 +27,7 @@ export class EditorialScriptMongooseRepository implements EditorialScriptReposit
     projectId: string,
     filters?: IScriptFilters,
   ): Promise<IEditorialScript[]> {
+    if (!(Types.ObjectId as any).isValid(projectId)) return [];
     const query: Record<string, unknown> = {
       projectId: toObjectId(projectId),
       isActive: { $ne: false },
@@ -41,7 +42,30 @@ export class EditorialScriptMongooseRepository implements EditorialScriptReposit
     return scripts as unknown as IEditorialScript[];
   }
 
+  async findAllAcrossProjects(
+    projectIds: string[],
+    filters?: IScriptFilters,
+  ): Promise<IEditorialScript[]> {
+    const validIds = projectIds
+      .filter((pid) => (Types.ObjectId as any).isValid(pid))
+      .map(toObjectId);
+    if (validIds.length === 0) return [];
+    const query: Record<string, unknown> = {
+      projectId: { $in: validIds },
+      isActive: { $ne: false },
+    };
+    if (filters?.format) query.format = filters.format;
+
+    const scripts = await this.scriptModel
+      .find(query)
+      .sort({ updatedAt: -1 })
+      .lean()
+      .exec();
+    return scripts as unknown as IEditorialScript[];
+  }
+
   async findById(id: string): Promise<IEditorialScript | null> {
+    if (!(Types.ObjectId as any).isValid(id)) return null;
     const script = await this.scriptModel
       .findOne({ _id: toObjectId(id), isActive: { $ne: false } })
       .lean()
@@ -50,14 +74,25 @@ export class EditorialScriptMongooseRepository implements EditorialScriptReposit
   }
 
   async create(data: ICreateEditorialScript): Promise<IEditorialScript> {
+    const calendarSlotId = data.calendarSlotId
+      ? (Types.ObjectId as any).isValid(data.calendarSlotId)
+        ? toObjectId(data.calendarSlotId)
+        : String(data.calendarSlotId)
+      : undefined;
+    const themeId = data.themeId
+      ? (Types.ObjectId as any).isValid(data.themeId)
+        ? toObjectId(data.themeId)
+        : String(data.themeId)
+      : undefined;
+
     const doc = new this.scriptModel({
       ...data,
       projectId: toObjectId(data.projectId),
-      calendarSlotId: data.calendarSlotId
-        ? toObjectId(data.calendarSlotId)
-        : undefined,
-      themeId: data.themeId ? toObjectId(data.themeId) : undefined,
-      createdBy: toObjectId(data.createdBy),
+      calendarSlotId,
+      themeId,
+      createdBy: (Types.ObjectId as any).isValid(data.createdBy)
+        ? toObjectId(data.createdBy)
+        : new (Types.ObjectId as any)(),
       version: data.version ?? 1,
       blocks: data.blocks || [],
       titles: data.titles || [],
@@ -74,6 +109,7 @@ export class EditorialScriptMongooseRepository implements EditorialScriptReposit
     id: string,
     data: IUpdateEditorialScript,
   ): Promise<IEditorialScript | null> {
+    if (!(Types.ObjectId as any).isValid(id)) return null;
     const set: Record<string, unknown> = {};
     for (const [key, value] of Object.entries(data)) {
       if (value !== undefined) set[key] = value;
@@ -91,6 +127,7 @@ export class EditorialScriptMongooseRepository implements EditorialScriptReposit
   }
 
   async softDelete(id: string): Promise<IEditorialScript | null> {
+    if (!(Types.ObjectId as any).isValid(id)) return null;
     const deleted = await this.scriptModel
       .findOneAndUpdate(
         { _id: toObjectId(id) },
@@ -141,9 +178,16 @@ export class EditorialScriptMongooseRepository implements EditorialScriptReposit
   }
 
   async countByThemeId(themeId: string): Promise<number> {
+    const orFilters: Record<string, unknown>[] = [
+      { themeId: String(themeId) },
+      { linkedThemeId: String(themeId) },
+    ];
+    if ((Types.ObjectId as any).isValid(themeId)) {
+      orFilters.push({ themeId: toObjectId(themeId) });
+    }
     return this.scriptModel
       .countDocuments({
-        themeId: toObjectId(themeId),
+        $or: orFilters,
         isActive: { $ne: false },
       })
       .exec();

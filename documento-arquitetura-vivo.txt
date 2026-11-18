@@ -1,3 +1,24 @@
+## REMOÇÃO DE MOCKS DO FRONTEND, PERSISTÊNCIA REAL VIA BFF/MONGODB E PORTAS DE LLM NO BACKEND - 18/11/2026 ##
+Resumo Técnico — Substituição Integral de Seeds Visuais, `localStorage` de Domínio e Simulações Locais por Endpoints Reais + Contratos `TODO(LLM)`:
+
+1. Remoção Completa de Mocks e Estados Fictícios no FrontEnd (`FrontEnd/src/*`):
+   - Removido o diretório `FrontEnd/src/lib/mocks/` e o stub `_notImplemented.ts`, além dos seeds iniciais, arrays de exemplo e simulações com `setTimeout`/`localStorage` em: `EditorialWorkspaceContext.tsx`, `/dashboard/editorial`, `/dashboard/editorial/[projectId]`, `LinhaEditorialModule.tsx`, `CalendarioEditorialModule.tsx`, `TemasEditorialModule.tsx`, `RoteirosEditorialModule.tsx`, `/dashboard/publicacoes`, `/dashboard/armazenamento`, `/dashboard/settings`, `/dashboard/cliente`, `/dashboard/externo`, `/dashboard/master-admin`, `BrandingSettings.tsx`, `StorageManagement.tsx`, `DataManagement.tsx`, `ActivityLog.tsx` e `PersonalTasksPanel.tsx`.
+   - Adicionadas constantes estruturais neutras e utilitário real de equilíbrio RETINA/Jornada em `FrontEnd/src/lib/constants/script-formats.ts` e `FrontEnd/src/lib/utils/theme-balance.ts`.
+   - Comportamento Empty-State: quando um projeto ou organização possui 0 registros no MongoDB, as interfaces inicializam vazias (`[]`) e exibem estados vazios orientativos para criação real no fluxo editorial.
+   - Todas as chamadas diretas remanescentes a `axios` / `@/lib/http` em páginas de dashboard e configurações foram migradas para os handlers BFF em `/api/*`.
+
+2. Expansão das Rotas BFF (`FrontEnd/src/app/api/*`) e Persistência Real no BackEnd (`BackEnd/src/*`):
+   - Novo módulo de workspace editorial (`BackEnd/src/editorial/services/editorial-workspace.service.ts`, `editorial-workspace.controller.ts`, schemas/repositórios `EditorialTask` e `EditorialActivityLog`), expondo `/editorial/workspace`, `/editorial/workspace/tasks` e `/editorial/workspace/activity`, alimentado automaticamente por `EditorialEventListener`.
+   - Endpoints adicionados/expandidos para suportar integralmente o ciclo no MongoDB: `PATCH /editorial/projects/:id`, `POST /editorial/projects/:id/duplicate`, `POST /editorial/projects/:projectId/versions`, `POST /editorial/projects/:projectId/extract-icp`, `POST /editorial/projects/:projectId/themes/batch`, `POST /editorial/calendars/:id/slots`, `DELETE /editorial/calendars/:id/items/:itemId`, `POST /editorial/calendars/:id/review`, `GET /editorial/publications`, `POST /editorial/publications/:id/adapt`, `POST .../stories/regenerate`, `POST/PATCH /storage/assets`, `PATCH/PUT /users/profile` e `PATCH /organizations/:orgId`.
+
+3. Portas Abstratas e Indicação Explícita `// TODO(LLM)` para Implementação Futura de IA (`BackEnd/src/editorial/generators/*`):
+   - Toda lógica cuja saída final dependerá de uma LLM foi isolada exclusivamente nas classes de geração do BackEnd, retornando respostas determinísticas estruturadas no contrato final com comentários padronizados `// TODO(LLM)` documentando prompt, inputs e schema de saída esperado:
+     - `BackEnd/src/editorial/generators/stub-mapa.generator.ts`: extração de ICP (`extractIcp`) e geração/consolidação de Mapa Estratégico (`generate`).
+     - `BackEnd/src/editorial/generators/stub-calendar.generator.ts`: distribuição estratégica do calendário (`generateCalendarPlan`), auditoria/review com sugestões (`generateCalendarReview`) e sugestões de pauta por slot (`generate`).
+     - `BackEnd/src/editorial/generators/stub-theme.generator.ts`: geração nos 3 modos (ROMA & Avatar, Dados de Mercado, Objetivo & Momento) (`generate`), expansão de cluster (`generateMoreThemes`) e reequilíbrio RETINA (`rebalanceSlots`).
+     - `BackEnd/src/editorial/generators/stub-script.generator.ts`: geração de pacotes completos por formato (`generate`), regeneração de bloco individual (`regenerateBlock`), regeneração de card de Story mantendo encadeamento (`regenerateStoryCard`) e adaptação cross-projeto (`adaptScriptToProject`).
+     - `BackEnd/src/editorial/generators/stub-workspace-advisor.generator.ts`: geração de alertas operacionais e recomendações diárias do workspace (`generateOperationalAlerts`).
+
 ## CATÁLOGO DE FUNÇÕES / CARGOS CUSTOMIZADOS POR ORGANIZAÇÃO (`OrganizationFunction`) - 16/11/2026 ##
 Resumo Técnico — Designações de Funções Livres Desacopladas da `role` de Sistema:
 

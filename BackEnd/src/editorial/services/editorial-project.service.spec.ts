@@ -84,7 +84,9 @@ describe('EditorialProjectService', () => {
 
     it('should throw ForbiddenException when CLIENT/EXTERNAL is not allowed to view the project', async () => {
       await expect(
-        service.findById(mockProject._id, 'other-user', ['507f1f77bcf86cd799439099']),
+        service.findById(mockProject._id, 'other-user', [
+          '507f1f77bcf86cd799439099',
+        ]),
       ).rejects.toThrow(ForbiddenException);
     });
 

@@ -3,17 +3,17 @@ import {
   Get,
   Delete,
   Param,
-  ForbiddenException,
+  Patch,
   Controller,
   Post,
   Body,
   UseGuards,
   Headers,
   Req,
-  BadRequestException,
 } from '@nestjs/common';
 import { StorageService } from '../services/storage.service';
 import { GetPresignedUrlDto } from '../dto/get-presigned-url.dto';
+import { IFileAsset } from '../dto/storage.interface';
 import { AuthGuard } from '../../auth/auth.guard';
 import { isAltaireOwnerOrAdmin } from '../../shared/utils/org-role.util';
 
@@ -28,14 +28,9 @@ export class StorageController {
     @Headers('x-org-id') orgId: string,
     @Body() dto: GetPresignedUrlDto,
   ) {
-    if (!orgId) {
-      throw new BadRequestException(
-        'Contexto da organização (x-org-id) é obrigatório no cabeçalho.',
-      );
-    }
-
+    const resolvedOrgId = orgId || 'altaire';
     return this.storageService.getPresignedUploadUrl(
-      orgId,
+      resolvedOrgId,
       dto.fileName,
       dto.fileType,
       dto.sizeBytes,
@@ -53,40 +48,67 @@ export class StorageController {
       fileName: string;
       mimeType: string;
       sizeBytes: number;
-    },
+    } & Partial<IFileAsset>,
   ) {
-    if (!orgId) {
-      throw new BadRequestException(
-        'Contexto da organização (x-org-id) é obrigatório no cabeçalho.',
-      );
-    }
-
-    // Extrai o ID do usuário que fez o upload a partir do Token JWT
+    const resolvedOrgId = orgId || 'altaire';
     const userId = req.user?.sub || req.user?.id;
 
     return this.storageService.confirmUploadAndRegister(
-      orgId,
+      resolvedOrgId,
       userId,
       body.fileUrl,
       body.fileName,
       body.mimeType,
       body.sizeBytes,
+      body,
     );
   }
 
   // LISTAR ARQUIVOS (Isolado por usuário para MEMBER; global/gestão para OWNER/ADMIN)
   @Get('assets')
   async getAssets(@Headers('x-org-id') orgId: string, @Req() req: any) {
-    if (!orgId)
-      throw new BadRequestException(
-        'Contexto da organização (x-org-id) é obrigatório.',
-      );
-
+    const resolvedOrgId = orgId || 'altaire';
     const userId = req.user?.sub || req.user?.id;
     const isManager = isAltaireOwnerOrAdmin(req.user?.email, req.user?.role);
 
     return this.storageService.getOrganizationAssets(
-      orgId,
+      resolvedOrgId,
+      isManager ? undefined : userId,
+    );
+  }
+
+  // CRIAR ATIVO / DIRETRIZ DE MARCA (com ou sem arquivo binário)
+  @Post('assets')
+  async createAsset(
+    @Headers('x-org-id') orgId: string,
+    @Req() req: any,
+    @Body() body: Partial<IFileAsset>,
+  ) {
+    const resolvedOrgId = orgId || 'altaire';
+    const userId = req.user?.sub || req.user?.id;
+    return this.storageService.createBrandAsset(resolvedOrgId, userId, body);
+  }
+
+  // ATUALIZAR ATIVO / FAVORITO / METADADOS DA MARCA
+  @Patch('assets/:id')
+  async updateAsset(
+    @Param('id') assetId: string,
+    @Headers('x-org-id') orgId: string,
+    @Headers('x-org-role') role: string,
+    @Req() req: any,
+    @Body() body: Partial<IFileAsset>,
+  ) {
+    const resolvedOrgId = orgId || 'altaire';
+    const userId = req.user?.sub || req.user?.id;
+    const isManager =
+      isAltaireOwnerOrAdmin(req.user?.email, req.user?.role) ||
+      role === 'ADMIN' ||
+      role === 'OWNER';
+
+    return this.storageService.updateBrandAsset(
+      resolvedOrgId,
+      assetId,
+      body,
       isManager ? undefined : userId,
     );
   }
@@ -99,11 +121,7 @@ export class StorageController {
     @Headers('x-org-role') role: string,
     @Req() req: any,
   ) {
-    if (!orgId)
-      throw new BadRequestException(
-        'Contexto da organização (x-org-id) é obrigatório.',
-      );
-
+    const resolvedOrgId = orgId || 'altaire';
     const userId = req.user?.sub || req.user?.id;
     const isManager =
       isAltaireOwnerOrAdmin(req.user?.email, req.user?.role) ||
@@ -111,7 +129,7 @@ export class StorageController {
       role === 'OWNER';
 
     return this.storageService.deleteAsset(
-      orgId,
+      resolvedOrgId,
       assetId,
       isManager ? undefined : userId,
     );

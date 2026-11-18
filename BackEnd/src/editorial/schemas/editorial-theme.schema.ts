@@ -50,6 +50,39 @@ export class EditorialTheme {
   @Prop()
   approach?: string;
 
+  @Prop()
+  techniqueUsed?: string;
+
+  @Prop()
+  romaPillar?: string;
+
+  @Prop()
+  consciousnessAxis?: string;
+
+  @Prop()
+  recommendedFormat?: string;
+
+  @Prop()
+  recommendedPlatform?: string;
+
+  @Prop()
+  painDesireOrObjection?: string;
+
+  @Prop({ default: false })
+  isFavorite?: boolean;
+
+  @Prop({ default: false })
+  isPriorityNextCycle?: boolean;
+
+  @Prop({ default: false })
+  isSavedForSales?: boolean;
+
+  @Prop({ default: false })
+  isMarketTest?: boolean;
+
+  @Prop({ type: [String], default: [] })
+  allocatedSlotIds?: string[];
+
   @Prop({ default: true })
   isActive: boolean;
 }
