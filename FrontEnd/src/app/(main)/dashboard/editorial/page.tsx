@@ -343,7 +343,9 @@ export default function CentralEstrategicaPage() {
   }, [editingProject, editNiche, editObjective]);
 
   /* Conclusão do Ponto C: Cria o projeto e redireciona canonicamente para a Linha Editorial */
-  const handleCreateProjectSubmit = (event: FormEvent<HTMLFormElement>) => {
+  const handleCreateProjectSubmit = async (
+    event: FormEvent<HTMLFormElement>,
+  ) => {
     event.preventDefault();
     setCreateError(null);
 
@@ -358,23 +360,29 @@ export default function CentralEstrategicaPage() {
       return;
     }
 
-    const created = createProject({
-      name: trimmedName,
-      brandOrClientName: trimmedBrand,
-      niche: trimmedNiche,
-      subniche: newSubniche.trim() || "Geral",
-      operationTypeLabel: newOpType,
-      currentObjectiveLabel: newObjective,
-      currentPhaseLabel: newPhase.trim() || "Estruturação Inicial",
-    });
+    try {
+      const created = await createProject({
+        name: trimmedName,
+        brandOrClientName: trimmedBrand,
+        niche: trimmedNiche,
+        subniche: newSubniche.trim() || "Geral",
+        operationTypeLabel: newOpType,
+        currentObjectiveLabel: newObjective,
+        currentPhaseLabel: newPhase.trim() || "Estruturação Inicial",
+      });
 
-    setIsCreateModalOpen(false);
-    setNewName("");
-    setNewNiche("");
-    setNewSubniche("");
+      setIsCreateModalOpen(false);
+      setNewName("");
+      setNewNiche("");
+      setNewSubniche("");
 
-    if (created && created.id) {
-      router.push(`/dashboard/editorial/${created.id}?aba=linha-editorial`);
+      if (created && created.id) {
+        router.push(`/dashboard/editorial/${created.id}?aba=linha-editorial`);
+      }
+    } catch {
+      setCreateError(
+        "Não foi possível criar o projeto agora. Tente novamente em instantes.",
+      );
     }
   };
 
@@ -391,11 +399,11 @@ export default function CentralEstrategicaPage() {
     setEditStatus(project.status);
   };
 
-  const handleSaveEditedProject = (event: FormEvent<HTMLFormElement>) => {
+  const handleSaveEditedProject = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (!editingProject || !editName.trim()) return;
 
-    updateProject({
+    await updateProject({
       id: editingProject.id,
       name: editName.trim(),
       brandOrClientName: editBrand.trim(),
@@ -421,11 +429,11 @@ export default function CentralEstrategicaPage() {
     setCopyScripts(false);
   };
 
-  const handleConfirmDuplicate = (event: FormEvent<HTMLFormElement>) => {
+  const handleConfirmDuplicate = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (!duplicatingProject || !dupName.trim()) return;
 
-    duplicateProject({
+    await duplicateProject({
       sourceProjectId: duplicatingProject.id,
       newName: dupName.trim(),
       copyStrategicBase,
@@ -438,9 +446,9 @@ export default function CentralEstrategicaPage() {
     setDuplicatingProject(null);
   };
 
-  const handleConfirmArchiveToggle = () => {
+  const handleConfirmArchiveToggle = async () => {
     if (!archivingProject) return;
-    toggleArchiveProject(archivingProject.id);
+    await toggleArchiveProject(archivingProject.id);
     setArchivingProject(null);
   };
 

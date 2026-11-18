@@ -6,7 +6,13 @@ import {
 
 export type ScriptMode = 'seguranca' | 'conexao';
 
-export type ScriptStatus = 'rascunho' | 'pronto' | 'publicado' | 'teste_ab';
+export type ScriptStatus =
+  | 'rascunho'
+  | 'pronto'
+  | 'in_production'
+  | 'publicado'
+  | 'teste_ab'
+  | 'arquivado';
 
 export type ScriptBlockType =
   | 'gancho'
@@ -139,6 +145,44 @@ export interface IScriptContent {
   thumbnailPrompts?: IThumbnailPrompt[];
   complementaryMaterials?: IComplementaryMaterial[];
   explanationMaterials?: IExplanationMaterial[];
+  // Campos ricos do Studio (RoteirosEditorialModule)
+  formatSlug?: string;
+  calendarSlotFormat?: string;
+  originType?: string;
+  linkedSlotId?: string;
+  linkedSlotLabel?: string;
+  linkedThemeId?: string;
+  retinaType?: string;
+  strategicObjective?: string;
+  editorialPillar?: string;
+  icpPainOrObjection?: string;
+  businessMoment?: string;
+  platform?: string;
+  estimatedDurationOrSize?: string;
+  speakingMode?: string;
+  versionLabel?: string;
+  scriptBlocks?: Record<string, unknown>[];
+  connectionSevenLinesChecklist?: string[];
+  carouselSlides?: Record<string, unknown>[];
+  storyPeriods?: Record<string, unknown>[];
+  predictiveQAs?: Record<string, unknown>[];
+  postLiveStoriesSummary?: string[];
+  captionOutdoorHook?: string;
+  captionBody?: string;
+  captionCta?: string;
+  seoKeywords?: string[];
+  seoTags?: string[];
+  youtubeChapters?: string[];
+  titleVariations?: Record<string, unknown>[];
+  imagePrompts?: Record<string, unknown>[];
+  qualifiedForComplementaryMaterial?: boolean;
+  complementaryMaterial?: Record<string, unknown>;
+  explanationMaterial?: Record<string, unknown>;
+  briefingCutAdjustment?: string;
+  mandatoryExamplesToInclude?: string;
+  brandStoryConnection?: string;
+  selectedReferenceNote?: string;
+  versionHistory?: Record<string, unknown>[];
 }
 
 export interface IEditorialScript extends IScriptContent {
@@ -155,6 +199,8 @@ export interface IEditorialScript extends IScriptContent {
   provisionalName?: string;
   briefing?: IScriptBriefing;
   attachments?: IScriptAttachment[];
+  isFavorite?: boolean;
+  adaptedFromId?: string;
   createdBy: string;
   isActive: boolean;
   createdAt?: Date;
@@ -173,6 +219,8 @@ export interface ICreateEditorialScript extends Partial<IScriptContent> {
   provisionalName?: string;
   briefing?: IScriptBriefing;
   attachments?: IScriptAttachment[];
+  isFavorite?: boolean;
+  adaptedFromId?: string;
   createdBy: string;
 }
 
@@ -183,6 +231,7 @@ export interface IUpdateEditorialScript extends Partial<IScriptContent> {
   title?: string;
   provisionalName?: string;
   briefing?: IScriptBriefing;
+  isFavorite?: boolean;
 }
 
 export interface IScriptFilters {

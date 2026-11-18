@@ -1,5 +1,5 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
-import { Document, Types } from 'mongoose';
+import { Document, SchemaTypes, Types } from 'mongoose';
 
 export type EditorialVersionDocument = EditorialVersion & Document;
 
@@ -20,6 +20,15 @@ export class EditorialVersion {
 
   @Prop({ required: true, default: 'active' })
   status: string;
+
+  @Prop()
+  phaseTag?: string;
+
+  @Prop()
+  reviewReason?: string;
+
+  @Prop({ type: SchemaTypes.Mixed })
+  strategicBase?: Record<string, unknown>;
 
   @Prop({ required: true, type: Types.ObjectId, ref: 'User' })
   createdBy: Types.ObjectId;

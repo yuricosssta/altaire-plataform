@@ -8,11 +8,26 @@ const objectIdSchema = z
 export const ProjectCardSchema = z.object({
   id: objectIdSchema,
   name: z.string().min(1, 'O nome do projeto é obrigatório.'),
+  brandOrClientName: z.string().optional(),
   niche: z.string(),
   subniche: z.string(),
+  operationTypeLabel: z.string().optional(),
   currentObjective: z.string(),
+  currentObjectiveLabel: z.string().optional(),
+  currentPhaseLabel: z.string().optional(),
+  status: z.string().optional(),
   editorialLineStatus: z.enum(['pending', 'active', 'archived']),
   calendarStatus: z.enum(['pending', 'active', 'archived']),
+  hasActiveLineEditorial: z.boolean().optional(),
+  lineEditorialStatus: z.string().optional(),
+  hasActiveCalendar: z.boolean().optional(),
+  themesCount: z.number().optional(),
+  allocatedThemesCount: z.number().optional(),
+  approvedScriptsCount: z.number().optional(),
+  draftScriptsCount: z.number().optional(),
+  nextActionLabel: z.string().optional(),
+  nextActionReason: z.string().optional(),
+  updatedAtLabel: z.string().optional(),
   updatedAt: z.date(),
 });
 
@@ -58,6 +73,12 @@ export const ProjectCreateSchema = z.object({
   niche: z.string().min(2, 'O nicho é obrigatório.'),
   subniche: z.string().min(2, 'O subnicho é obrigatório.'),
   currentObjective: z.string().min(2, 'Defina o objetivo atual do projeto.'),
+  brandOrClientName: z.string().optional(),
+  operationTypeLabel: z.string().optional(),
+  currentPhaseLabel: z.string().optional(),
+  status: z.string().optional(),
+  nextActionLabel: z.string().optional(),
+  nextActionReason: z.string().optional(),
 });
 
 export const EditorialVersionSchema = z.object({
@@ -65,14 +86,20 @@ export const EditorialVersionSchema = z.object({
   projectId: objectIdSchema,
   versionNumber: z.number().int().positive(),
   name: z.string().min(1, 'O nome da versão é obrigatório.'),
-  status: z.enum(['active', 'archived']),
+  status: z.enum(['active', 'draft', 'review_recommended', 'archived']),
+  phaseTag: z.string().optional(),
+  reviewReason: z.string().optional(),
+  strategicBase: z.record(z.unknown()).optional(),
   createdAt: z.date(),
   updatedAt: z.date(),
 });
 
 export const EditorialVersionUpdateSchema = z.object({
   name: z.string().min(1, 'O nome da versão não pode ficar vazio.').optional(),
-  status: z.enum(['active', 'archived']).optional(),
+  status: z.enum(['active', 'draft', 'review_recommended', 'archived']).optional(),
+  phaseTag: z.string().optional(),
+  reviewReason: z.string().optional(),
+  strategicBase: z.record(z.unknown()).optional(),
 });
 
 export const EditorialMapaSchema = z.object({
@@ -128,7 +155,13 @@ export const RetinaTypeSchema = z.enum([
 
 export const PlatformSchema = z.enum(['instagram', 'youtube', 'tiktok', 'linkedin']);
 
-export const CalendarStatusSchema = z.enum(['planned', 'in_production', 'recorded', 'published']);
+export const CalendarStatusSchema = z.enum([
+  'planned',
+  'in_production',
+  'script_ready',
+  'recorded',
+  'published',
+]);
 
 export const CalendarObjectiveSchema = z.enum([
   'increase_audience',
@@ -154,6 +187,7 @@ export const ProductionCapacitySchema = z.object({
   staticPostsPerWeek: z.coerce.number().int().min(0),
   livesPerWeek: z.coerce.number().int().min(0),
   storySequencesPerDay: z.coerce.number().int().min(0),
+  storiesPerSequence: z.coerce.number().int().min(0).optional(),
 });
 
 export const CalendarPeriodSchema = z.object({
@@ -202,24 +236,34 @@ export const CalendarDaySchema = z.object({
 });
 
 export const ReviewSuggestionSchema = z.object({
-  id: objectIdSchema,
+  id: z.string(),
   type: z.enum(['increase', 'reduce', 'adjust', 'frequency']),
   title: z.string(),
   description: z.string(),
   impact: z.enum(['high', 'medium', 'low']),
+  reason: z.string().optional(),
+  actionLabel: z.string().optional(),
+  applied: z.boolean().optional(),
 });
 
 export const EditorialCalendarSchema = z.object({
   id: objectIdSchema,
   projectId: objectIdSchema,
-  editorialVersionId: objectIdSchema,
+  editorialVersionId: z.string(),
   name: z.string().min(1),
   period: CalendarPeriodSchema,
+  periodLabel: z.string().optional(),
+  periodStart: z.string().optional(),
+  periodEnd: z.string().optional(),
+  mainObjective: z.string().optional(),
+  linkedLineName: z.string().optional(),
   platforms: z.array(PlatformSchema).min(1),
   capacity: ProductionCapacitySchema,
+  weeklyCapacity: z.record(z.number()).optional(),
   objective: CalendarObjectiveSchema,
-  status: z.enum(['active', 'archived']),
+  status: z.enum(['active', 'draft', 'upcoming', 'review_recommended', 'expired', 'archived']),
   days: z.array(CalendarDaySchema),
+  slots: z.array(z.record(z.unknown())).optional(),
   reviewSuggestions: z.array(ReviewSuggestionSchema).optional(),
   createdAt: z.coerce.date(),
   updatedAt: z.coerce.date(),
@@ -227,10 +271,15 @@ export const EditorialCalendarSchema = z.object({
 
 export const CalendarSetupSchema = z
   .object({
-    editorialVersionId: objectIdSchema,
+    editorialVersionId: z.string().optional(),
     periodType: PeriodTypeSchema,
     startDate: z.coerce.date(),
     endDate: z.coerce.date().optional(),
+    periodLabel: z.string().optional(),
+    periodStart: z.string().optional(),
+    periodEnd: z.string().optional(),
+    mainObjective: z.string().optional(),
+    linkedLineName: z.string().optional(),
     platforms: z.array(PlatformSchema).min(1, 'Selecione ao menos uma plataforma.'),
     capacity: ProductionCapacitySchema,
     objective: CalendarObjectiveSchema,
@@ -256,8 +305,19 @@ export const CalendarSetupSchema = z
 
 export const CalendarPatchSchema = z.object({
   name: z.string().min(1, 'O nome não pode ficar vazio.').optional(),
-  status: z.enum(['active', 'archived']).optional(),
-  editorialVersionId: objectIdSchema.optional(),
+  status: z
+    .enum(['active', 'draft', 'upcoming', 'review_recommended', 'expired', 'archived'])
+    .optional(),
+  editorialVersionId: z.string().optional(),
+  periodLabel: z.string().optional(),
+  periodStart: z.string().optional(),
+  periodEnd: z.string().optional(),
+  mainObjective: z.string().optional(),
+  linkedLineName: z.string().optional(),
+  platforms: z.array(z.string()).optional(),
+  weeklyCapacity: z.record(z.number()).optional(),
+  slots: z.array(z.record(z.unknown())).optional(),
+  reviewSuggestions: z.array(z.record(z.unknown())).optional(),
   capacity: ProductionCapacitySchema.optional(),
   objective: CalendarObjectiveSchema.optional(),
 });
@@ -268,21 +328,41 @@ export const CalendarDuplicateSchema = z.object({
   endDate: z.coerce.date().optional(),
 });
 
-export const CalendarItemUpdateSchema = z.object({
-  provisionalName: z.string().optional(),
-  theme: z.string().optional(),
-  painDesireObjection: z.string().optional(),
-  suggestedTime: z.string().optional(),
-  observations: z.string().optional(),
-  referenceUrl: z.string().optional(),
-  exampleUrl: z.string().optional(),
-  pillar: z.string().optional(),
-  strategicObjective: z.string().optional(),
-  status: CalendarStatusSchema.optional(),
-  retinaType: RetinaTypeSchema.optional(),
-  platforms: z.array(PlatformSchema).optional(),
-  objective: z.string().optional(),
-});
+export const CalendarItemUpdateSchema = z
+  .object({
+    provisionalName: z.string().optional(),
+    theme: z.string().optional(),
+    mainTheme: z.string().optional(),
+    provisionalTitle: z.string().optional(),
+    painDesireObjection: z.string().optional(),
+    icpPainDesireOrObjection: z.string().optional(),
+    icpAwarenessLevel: z.string().optional(),
+    suggestedTime: z.string().optional(),
+    scheduledTime: z.string().optional(),
+    observations: z.string().optional(),
+    executionNotes: z.string().optional(),
+    referenceUrl: z.string().optional(),
+    referenceLink: z.string().optional(),
+    exampleUrl: z.string().optional(),
+    pillar: z.string().optional(),
+    editorialPillar: z.string().optional(),
+    strategicObjective: z.string().optional(),
+    primaryObjective: z.string().optional(),
+    secondaryObjective: z.string().optional(),
+    status: CalendarStatusSchema.optional(),
+    retinaType: RetinaTypeSchema.optional(),
+    retinaBadge: z.string().optional(),
+    platforms: z.array(PlatformSchema).optional(),
+    platform: z.string().optional(),
+    format: z.string().optional(),
+    formatLabel: z.string().optional(),
+    objective: z.string().optional(),
+    themeId: z.string().nullable().optional(),
+    scriptId: z.string().nullable().optional(),
+    eligibleForComplementaryMaterial: z.boolean().optional(),
+    complementaryMaterialType: z.string().optional(),
+  })
+  .passthrough();
 
 export type ContentFormat = z.infer<typeof ContentFormatSchema>;
 export type RetinaType = z.infer<typeof RetinaTypeSchema>;
@@ -308,7 +388,14 @@ export const ScriptFormatSchema = ContentFormatSchema;
 
 export const ScriptModeSchema = z.enum(['seguranca', 'conexao']);
 
-export const ScriptStatusSchema = z.enum(['rascunho', 'pronto', 'publicado', 'teste_ab']);
+export const ScriptStatusSchema = z.enum([
+  'rascunho',
+  'in_production',
+  'pronto',
+  'publicado',
+  'teste_ab',
+  'arquivado',
+]);
 
 export const ScriptBlockTypeSchema = z.enum([
   'gancho',

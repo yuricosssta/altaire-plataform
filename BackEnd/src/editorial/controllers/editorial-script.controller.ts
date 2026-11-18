@@ -16,6 +16,8 @@ import { GetUser } from '../../shared/decorators/get-user-decorator';
 import { EditorialScriptService } from '../services/editorial-script.service';
 import { EditorialBrandStoryService } from '../services/editorial-brand-story.service';
 import {
+  adaptPublicationSchema,
+  AdaptPublicationInput,
   addAttachmentSchema,
   AddAttachmentInput,
   createScriptSchema,
@@ -26,9 +28,12 @@ import {
   GenerateScriptInput,
   regenerateBlockSchema,
   RegenerateBlockInput,
+  regenerateStoryCardSchema,
+  RegenerateStoryCardInput,
   updateScriptSchema,
   UpdateScriptInput,
 } from '../validations/editorial-script.zod';
+import { isClientOrExternalRole } from '../../shared/utils/org-role.util';
 import {
   upsertBrandStorySchema,
   UpsertBrandStoryInput,
@@ -42,6 +47,35 @@ export class EditorialScriptController {
     private readonly scriptService: EditorialScriptService,
     private readonly brandStoryService: EditorialBrandStoryService,
   ) {}
+
+  @Get('publications')
+  async listPublications(
+    @GetUser() user: any,
+    @Query('format') format?: ContentFormat,
+  ) {
+    const userId = typeof user === 'string' ? user : user?.sub;
+    const allowedProjects =
+      isClientOrExternalRole(user?.role) && Array.isArray(user?.allowedProjects)
+        ? user.allowedProjects.map(String)
+        : undefined;
+    return this.scriptService.findAllAcrossProjects(
+      'altaire',
+      userId,
+      allowedProjects,
+      format,
+    );
+  }
+
+  @Post('publications/:scriptId/adapt')
+  async adaptPublication(
+    @Param('scriptId') scriptId: string,
+    @Body(new ZodValidationPipe(adaptPublicationSchema))
+    data: AdaptPublicationInput,
+    @GetUser() user: any,
+  ) {
+    const userId = typeof user === 'string' ? user : user?.sub;
+    return this.scriptService.adaptPublication(scriptId, userId, data);
+  }
 
   @Get('projects/:projectId/scripts')
   async findAll(
@@ -203,5 +237,15 @@ export class EditorialScriptController {
     data: RegenerateBlockInput,
   ) {
     return this.scriptService.regenerateBlock(scriptId, blockId, data.context);
+  }
+
+  @Post('projects/:projectId/scripts/:scriptId/stories/regenerate')
+  async regenerateStoryCard(
+    @Param('projectId') _projectId: string,
+    @Param('scriptId') scriptId: string,
+    @Body(new ZodValidationPipe(regenerateStoryCardSchema))
+    data: RegenerateStoryCardInput,
+  ) {
+    return this.scriptService.regenerateStoryCard(scriptId, data);
   }
 }

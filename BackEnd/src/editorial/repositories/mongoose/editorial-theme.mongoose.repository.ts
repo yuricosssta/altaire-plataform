@@ -27,6 +27,7 @@ export class EditorialThemeMongooseRepository implements EditorialThemeRepositor
     projectId: string,
     filters: IThemeFilters = {},
   ): Promise<IEditorialTheme[]> {
+    if (!(Types.ObjectId as any).isValid(projectId)) return [];
     const query: Record<string, unknown> = {
       projectId: toObjectId(projectId),
       isActive: { $ne: false },
@@ -43,7 +44,24 @@ export class EditorialThemeMongooseRepository implements EditorialThemeRepositor
     return themes as unknown as IEditorialTheme[];
   }
 
+  async findAllByProjects(projectIds: string[]): Promise<IEditorialTheme[]> {
+    const validIds = projectIds
+      .filter((pid) => (Types.ObjectId as any).isValid(pid))
+      .map(toObjectId);
+    if (validIds.length === 0) return [];
+    const themes = await this.themeModel
+      .find({
+        projectId: { $in: validIds },
+        isActive: { $ne: false },
+      })
+      .sort({ createdAt: -1 })
+      .lean()
+      .exec();
+    return themes as unknown as IEditorialTheme[];
+  }
+
   async findById(id: string): Promise<IEditorialTheme | null> {
+    if (!(Types.ObjectId as any).isValid(id)) return null;
     const theme = await this.themeModel
       .findOne({ _id: toObjectId(id), isActive: { $ne: false } })
       .lean()
@@ -52,9 +70,12 @@ export class EditorialThemeMongooseRepository implements EditorialThemeRepositor
   }
 
   async findByIds(ids: string[]): Promise<IEditorialTheme[]> {
-    if (!ids.length) return [];
+    const validIds = ids
+      .filter((tid) => (Types.ObjectId as any).isValid(tid))
+      .map(toObjectId);
+    if (!validIds.length) return [];
     const themes = await this.themeModel
-      .find({ _id: { $in: ids.map(toObjectId) }, isActive: { $ne: false } })
+      .find({ _id: { $in: validIds }, isActive: { $ne: false } })
       .lean()
       .exec();
     return themes as unknown as IEditorialTheme[];
@@ -72,6 +93,7 @@ export class EditorialThemeMongooseRepository implements EditorialThemeRepositor
     id: string,
     data: IUpdateEditorialTheme,
   ): Promise<IEditorialTheme | null> {
+    if (!(Types.ObjectId as any).isValid(id)) return null;
     const set: Record<string, unknown> = {};
     for (const [key, value] of Object.entries(data)) {
       if (value !== undefined) set[key] = value;

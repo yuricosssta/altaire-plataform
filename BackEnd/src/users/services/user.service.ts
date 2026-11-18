@@ -9,14 +9,14 @@ import {
   UnauthorizedException,
 } from '@nestjs/common';
 import { UsersRepository } from '../repositories/user.repository';
-import {
-  CreateUser,
-  OAuthUser,
-  UpdateUser,
-} from '../validations/users.zod';
+import { CreateUser, OAuthUser, UpdateUser } from '../validations/users.zod';
 import * as bcrypt from 'bcrypt';
 import * as crypto from 'crypto';
-import { IUser, UserRoleType, UserRule } from '../schemas/models/user.interface';
+import {
+  IUser,
+  UserRoleType,
+  UserRule,
+} from '../schemas/models/user.interface';
 import { MailService } from '../../shared/services/mail.service';
 import {
   AltaireOrgRole,
@@ -116,10 +116,7 @@ export class UsersService {
   async upsertOAuthUser(data: OAuthUser) {
     const normalizedEmail = data.email.trim().toLowerCase();
     const existing = await this.userRepository.findOneByEmail(normalizedEmail);
-    const orgRole = resolveAltaireRoleByEmail(
-      normalizedEmail,
-      existing?.role,
-    );
+    const orgRole = resolveAltaireRoleByEmail(normalizedEmail, existing?.role);
     const isAdmin = orgRole === 'OWNER' || orgRole === 'ADMIN';
 
     if (existing) {

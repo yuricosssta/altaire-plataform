@@ -5,6 +5,7 @@ import {
 } from '../schemas/models/editorial-calendar.interface';
 import {
   ICreateEditorialTheme,
+  IEditorialTheme,
   RetinaPriority,
   ThemeOrigin,
 } from '../schemas/models/editorial-theme.interface';
@@ -30,6 +31,12 @@ export interface IThemeGenerationInput {
   formats?: ContentFormat[];
   retinaTypes?: RetinaType[];
   sourceContext?: string;
+  /** Contexto adicional dos modos Mercado / Objetivo. */
+  videoLinks?: string[];
+  comments?: string[];
+  reviews?: string[];
+  objective?: string;
+  businessMoment?: string;
   /** Deslocamento do round-robin (evita títulos repetidos em generate-more). */
   offset?: number;
 }
@@ -43,4 +50,20 @@ export abstract class ThemeGenerator {
     context: IThemeGenerationContext,
     input: IThemeGenerationInput,
   ): Promise<ICreateEditorialTheme[]>;
+
+  abstract generateMoreThemes(
+    context: IThemeGenerationContext,
+    seedTheme: IEditorialTheme,
+    count: number,
+    batchId: string,
+  ): Promise<ICreateEditorialTheme[]>;
+
+  abstract rebalanceSlots(context: {
+    slots: Record<string, unknown>[];
+    themes: IEditorialTheme[];
+    scenario: string;
+  }): Promise<{
+    updatedSlots: Record<string, unknown>[];
+    allocatedPairs: { calendarItemId: string; theme: IEditorialTheme }[];
+  }>;
 }

@@ -6,8 +6,7 @@ import Link from 'next/link';
 import { ArrowLeft, Loader2, Trash2, FileText, Upload } from 'lucide-react';
 import { toast } from 'sonner';
 import { scriptsService } from '@/lib/services/scriptsService';
-import { mockBrandStory } from '@/lib/mocks/scripts.mock';
-import type { ScriptAttachment } from '@/lib/dto/editorial.schema';
+import type { BrandStory, ScriptAttachment } from '@/lib/dto/editorial.schema';
 
 const ATTACHMENT_TABS = [
   { type: 'brand_story' as const, label: 'História da Marca' },
@@ -19,12 +18,20 @@ const ATTACHMENT_TABS = [
 export default function ScriptAttachmentsPage() {
   const params = useParams<{ projectId: string; scriptId: string; format: string }>();
   const [attachments, setAttachments] = useState<ScriptAttachment[]>([]);
+  const [brandStory, setBrandStory] = useState<BrandStory | null>(null);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<string>('brand_story');
 
   const load = useCallback(async () => {
     setLoading(true);
-    try { setAttachments(await scriptsService.listAttachments(params.projectId, params.scriptId)); }
+    try {
+      const [attList, bs] = await Promise.all([
+        scriptsService.listAttachments(params.projectId, params.scriptId),
+        scriptsService.getBrandStory(params.projectId).catch(() => null),
+      ]);
+      setAttachments(attList);
+      setBrandStory(bs);
+    }
     catch (err: any) { toast.error(err?.message || 'Erro'); } finally { setLoading(false); }
   }, [params.projectId, params.scriptId]);
 
@@ -39,7 +46,6 @@ export default function ScriptAttachmentsPage() {
   };
 
   const filtered = attachments.filter((a) => a.type === activeTab);
-  const brandStory = mockBrandStory;
 
   return (
     <div className="space-y-6">

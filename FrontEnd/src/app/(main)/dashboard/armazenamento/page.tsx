@@ -1,7 +1,7 @@
 // FrontEnd/src/app/(main)/dashboard/armazenamento/page.tsx
 "use client";
 
-import React, { useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import {
   Camera,
@@ -28,6 +28,8 @@ import {
 import { clsx } from "clsx";
 import { WORKSPACE_ROUTES } from "@/lib/constants/routes";
 import { DarkCustomSelect } from "@/components/ui/DarkCustomSelect";
+import { storageService } from "@/lib/services/storageService";
+import { editorialService } from "@/lib/services/editorialService";
 
 /* -------------------------------------------------------------------------- */
 /* Tipos e Categorias Canônicas (Seção 2.5.2 — Assets & Arquivos)             */
@@ -109,249 +111,73 @@ const ASSET_CATEGORIES: readonly {
   },
 ] as const;
 
-const PROJECT_SCOPES = [
-  "Todos os Projetos",
-  "Acervo Global da Marca",
-  "Legion Altaire · SaaS",
-  "Mentoria High-Ticket",
-  "Imersão Executiva",
-] as const;
+const STORAGE_QUOTA_BYTES = 25 * 1024 * 1024 * 1024; // 25 GB
+const OBJECT_ID_RE = /^[0-9a-fA-F]{24}$/;
 
-const INITIAL_ASSETS: readonly BrandAssetItem[] = [
-  /* 01. Logos */
-  {
-    id: "ast-logo-1",
-    title: "Lockup Oficial — ALTAIRE / LEGION (Dark Surface)",
-    category: "logos",
-    projectScope: "Acervo Global da Marca",
-    formatLabel: "SVG · Vetorial",
-    dimensionsOrSpec: "Escalável · 16px a 512px",
-    sizeLabel: "18 KB",
-    updatedAt: "Atualizado há 2 dias",
-    description:
-      "Composição horizontal canônica com brasão simplificado dourado e tipografia geométrica para fundos escuros.",
-    aiUsageDirective:
-      "Aplicar no cabeçalho de carrosséis institucionais, encerramento de vídeos longos e documentos oficiais.",
-    tags: ["Lockup", "Oficial", "Dark-First", "SVG"],
-    isFavorite: true,
-  },
-  {
-    id: "ast-logo-2",
-    title: "Símbolo Monolítico Dourado — Brasão Simplificado",
-    category: "logos",
-    projectScope: "Acervo Global da Marca",
-    formatLabel: "SVG / PNG 4K",
-    dimensionsOrSpec: "1024 × 1024 px",
-    sizeLabel: "42 KB",
-    updatedAt: "Atualizado há 5 dias",
-    description:
-      "Marca reduzida reconstruída geometricamente para avatares, selos de assinatura editorial, favicons e marca d'água.",
-    aiUsageDirective:
-      "Usar como assinatura discreta no canto superior direito de slides de carrossel 4:5.",
-    tags: ["Símbolo", "Avatar", "Marca d'água"],
-    isFavorite: true,
-  },
+function formatBytesLabel(bytes: number): string {
+  if (!Number.isFinite(bytes) || bytes <= 0) return "0 KB";
+  if (bytes < 1024 * 1024) return `${Math.max(1, Math.round(bytes / 1024))} KB`;
+  if (bytes < 1024 * 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  return `${(bytes / (1024 * 1024 * 1024)).toFixed(2)} GB`;
+}
 
-  /* 02. Paleta & Tokens */
-  {
-    id: "ast-pal-1",
-    title: "Champagne Gold Primary — Destaque Estratégico",
-    category: "paleta",
-    projectScope: "Acervo Global da Marca",
-    formatLabel: "HEX · Token CSS",
-    dimensionsOrSpec: "#CFA965",
-    sizeLabel: "Contraste AAA",
-    updatedAt: "Padrão Canônico",
-    description:
-      "Tom dourado champagne principal usado para sinalizar o Fio Estratégico, CTAs dominantes, selos ativos e foco.",
-    aiUsageDirective:
-      "Destacar apenas 1 a 2 palavras-chave nucleares por título de capa ou slide de carrossel.",
-    hexPreview: "#CFA965",
-    cssToken: "var(--la-gold)",
-    tags: ["Cor Primária", "Dourado", "Destaque"],
-    isFavorite: true,
-  },
-  {
-    id: "ast-pal-2",
-    title: "Onyx Deep Canvas — Superfície Base",
-    category: "paleta",
-    projectScope: "Acervo Global da Marca",
-    formatLabel: "HEX · Token CSS",
-    dimensionsOrSpec: "#05060A",
-    sizeLabel: "Base Dark-First",
-    updatedAt: "Padrão Canônico",
-    description:
-      "Fundo profundo de alto contraste projetado para leitura prolongada, zero fadiga visual e destaque das camadas em vidro fumê.",
-    aiUsageDirective:
-      "Definir como fundo padrão em prompts de thumbnails, slides de carrossel e telas de apresentação.",
-    hexPreview: "#05060A",
-    cssToken: "var(--la-canvas)",
-    tags: ["Fundo", "Onyx", "Dark-First"],
-    isFavorite: false,
-  },
-  {
-    id: "ast-pal-3",
-    title: "Champagne Gold Light — Iluminação & Hover",
-    category: "paleta",
-    projectScope: "Acervo Global da Marca",
-    formatLabel: "HEX · Token CSS",
-    dimensionsOrSpec: "#E5C787",
-    sizeLabel: "Acento Luminoso",
-    updatedAt: "Padrão Canônico",
-    description:
-      "Variação luminosa para subtítulos técnicos, badges em foco, reflexos superiores de borda e estados interativos.",
-    aiUsageDirective:
-      "Aplicar em eyebrows, numeração de etapas (01, 02, 03) e conectores de diagramas.",
-    hexPreview: "#E5C787",
-    cssToken: "var(--la-gold-light)",
-    tags: ["Eyebrow", "Luz", "Token"],
-    isFavorite: false,
-  },
+function mapBackendAssetToUi(raw: any): BrandAssetItem {
+  const validCategories: AssetCategoryId[] = [
+    "logos",
+    "paleta",
+    "fotos",
+    "templates",
+    "broll",
+    "guias",
+  ];
+  const rawCat = String(raw.category || "guias").toLowerCase();
+  const category: AssetCategoryId = validCategories.includes(
+    rawCat as AssetCategoryId
+  )
+    ? (rawCat as AssetCategoryId)
+    : "guias";
 
-  /* 03. Fotos do Especialista */
-  {
-    id: "ast-foto-1",
-    title: "Retrato Editorial — Direção Executiva (Fundo Onyx)",
-    category: "fotos",
-    projectScope: "Legion Altaire · SaaS",
-    formatLabel: "WEBP / PNG Recortado",
-    dimensionsOrSpec: "2400 × 3000 px (4:5)",
-    sizeLabel: "1.8 MB",
-    updatedAt: "Há 3 dias",
-    description:
-      "Fotografia de alta nitidez com iluminação lateral quente (key light dourada sutil), ideal para capas de tese e posicionamento.",
-    aiUsageDirective:
-      "Recomendado para capas de conteúdos de Autoridade e Transformação na Matriz RETINA.",
-    tags: ["Autoridade", "Capa 4:5", "Recorte Limpo"],
-    isFavorite: true,
-  },
-  {
-    id: "ast-foto-2",
-    title: "Bastidores em Mesa de Operação — Duplo Monitor",
-    category: "fotos",
-    projectScope: "Mentoria High-Ticket",
-    formatLabel: "JPG Alta Resolução",
-    dimensionsOrSpec: "3840 × 2160 px (16:9)",
-    sizeLabel: "2.4 MB",
-    updatedAt: "Há 1 semana",
-    description:
-      "Cena autêntica de planejamento estratégico e revisão de arquitetura editorial em ambiente escuro minimalista.",
-    aiUsageDirective:
-      "Usar em thumbnails de YouTube/Vídeo Longo e aberturas de sequências de Stories do dia.",
-    tags: ["Bastidores", "Thumbnail 16:9", "Conexão"],
-    isFavorite: false,
-  },
+  const bytes = Number(raw.sizeBytes || raw.size || 0);
+  const sizeLabel = raw.sizeLabel
+    ? String(raw.sizeLabel)
+    : bytes > 0
+      ? formatBytesLabel(bytes)
+      : "Registrado";
 
-  /* 04. Templates Visuais */
-  {
-    id: "ast-tpl-1",
-    title: "Matriz de Carrossel Editorial 4:5 — 8 a 10 Slides",
-    category: "templates",
-    projectScope: "Legion Altaire · SaaS",
-    formatLabel: "Template Canônico",
-    dimensionsOrSpec: "1080 × 1350 px (4:5)",
-    sizeLabel: "Sistema Ativo",
-    updatedAt: "Sincronizado com Função 03",
-    description:
-      "Estrutura com Slide 01 de Gancho Outdoor, desenvolvimento com Fio Estratégico Dourado e slide final de CTA orientado à oferta.",
-    aiUsageDirective:
-      "Vinculado automaticamente ao Studio de Carrossel para formatação dos blocos de texto por slide.",
-    tags: ["Carrossel 4:5", "Função 03", "Retenção"],
-    isFavorite: true,
-  },
-  {
-    id: "ast-tpl-2",
-    title: "Grid de Thumbnail 16:9 — Contraste Tese vs. Sintoma",
-    category: "templates",
-    projectScope: "Legion Altaire · SaaS",
-    formatLabel: "Template de Capa",
-    dimensionsOrSpec: "1920 × 1080 px (16:9)",
-    sizeLabel: "Sistema Ativo",
-    updatedAt: "Sincronizado com Função 03",
-    description:
-      "Layout dividido com expressão firme do especialista à direita, máximo de 4 palavras de impacto à esquerda e recorte de UI.",
-    aiUsageDirective:
-      "Usar como referência nos prompts de geração de capa para Vídeos Longos.",
-    tags: ["YouTube", "Thumbnail 16:9", "Alto CTR"],
-    isFavorite: false,
-  },
-
-  /* 05. B-Roll & Vídeos */
-  {
-    id: "ast-broll-1",
-    title: "B-Roll 01 — Navegação Fluida na Linha Editorial & Calendário",
-    category: "broll",
-    projectScope: "Legion Altaire · SaaS",
-    formatLabel: "MP4 · 60fps",
-    dimensionsOrSpec: "1920 × 1080 px · 14s",
-    sizeLabel: "12.6 MB",
-    updatedAt: "Há 4 dias",
-    description:
-      "Take de tela em close-up mostrando a aprovação da Linha Editorial e o preenchimento imediato dos slots da semana.",
-    aiUsageDirective:
-      "Sugerir na coluna 'Direção Visual' do roteiro sempre que o locutor mencionar organização ou fim do improviso.",
-    tags: ["Screen Take", "Demonstração", "60fps"],
-    isFavorite: true,
-  },
-  {
-    id: "ast-broll-2",
-    title: "B-Roll 02 — Transição do Mapa de Temas para o Roteiro Pronto",
-    category: "broll",
-    projectScope: "Legion Altaire · SaaS",
-    formatLabel: "MP4 · 60fps",
-    dimensionsOrSpec: "1080 × 1920 px (9:16) · 09s",
-    sizeLabel: "8.9 MB",
-    updatedAt: "Há 6 dias",
-    description:
-      "Corte dinâmico vertical para Reels/Shorts exibindo um tema sendo enviado ao slot e gerando roteiro técnico.",
-    aiUsageDirective:
-      "Inserir nos primeiros 4 segundos de Reels de prova operacional para elevar retenção visual.",
-    tags: ["Reels 9:16", "Retenção", "Prova Visual"],
-    isFavorite: false,
-  },
-
-  /* 06. Guias & Documentos */
-  {
-    id: "ast-doc-1",
-    title: "Manual de Identidade Verbal & Regras Anti-Genérico",
-    category: "guias",
-    projectScope: "Acervo Global da Marca",
-    formatLabel: "PDF / Markdown",
-    dimensionsOrSpec: "18 páginas · v2.4",
-    sizeLabel: "640 KB",
-    updatedAt: "Auditado",
-    description:
-      "Diretrizes de vocabulário, termos proibidos, cadência de frases e postura analítica da marca Legion Altaire.",
-    aiUsageDirective:
-      "Injetado na camada de sistema da IA para blindar a escrita contra clichês de marketing digital.",
-    tags: ["Tom de Voz", "Governança", "IA Context"],
-    isFavorite: true,
-  },
-  {
-    id: "ast-doc-2",
-    title: "Dossiê de Objeções Reais e Perguntas de Compra — ICP",
-    category: "guias",
-    projectScope: "Mentoria High-Ticket",
-    formatLabel: "PDF Estruturado",
-    dimensionsOrSpec: "12 páginas · Pesquisa ICP",
-    sizeLabel: "490 KB",
-    updatedAt: "Há 5 dias",
-    description:
-      "Mapeamento das 20 principais objeções silenciosas coletadas em diagnósticos comerciais e sessões estratégicas.",
-    aiUsageDirective:
-      "Fonte primária para o Modo 1 de Geração de Temas (A partir do negócio e do público).",
-    tags: ["ICP", "Objeções", "Base Estratégica"],
-    isFavorite: false,
-  },
-];
+  return {
+    id: String(raw.id || raw._id || ""),
+    title: String(raw.title || raw.fileName || "Ativo de marca"),
+    category,
+    projectScope: String(raw.projectScope || "Acervo Global da Marca"),
+    formatLabel: String(
+      raw.formatLabel ||
+        (raw.mimeType ? String(raw.mimeType).split("/").pop()?.toUpperCase() : "Arquivo")
+    ),
+    dimensionsOrSpec: String(raw.dimensionsOrSpec || "Padrão Editorial"),
+    sizeLabel,
+    updatedAt: raw.updatedAt
+      ? new Date(raw.updatedAt).toLocaleDateString("pt-BR")
+      : "Sincronizado",
+    description: String(raw.description || ""),
+    aiUsageDirective: String(raw.aiUsageDirective || ""),
+    hexPreview: raw.hexPreview ? String(raw.hexPreview) : undefined,
+    cssToken: raw.cssToken ? String(raw.cssToken) : undefined,
+    tags: Array.isArray(raw.tags) ? raw.tags.map(String) : [],
+    isFavorite: Boolean(raw.isFavorite),
+  };
+}
 
 /* -------------------------------------------------------------------------- */
 /* Componente Principal: BrandAssetsStoragePage                               */
 /* -------------------------------------------------------------------------- */
 
 export default function BrandAssetsStoragePage() {
-  const [assets, setAssets] =
-    useState<readonly BrandAssetItem[]>(INITIAL_ASSETS);
+  const [assets, setAssets] = useState<readonly BrandAssetItem[]>([]);
+  const [storageUsedBytes, setStorageUsedBytes] = useState<number>(0);
+  const [projectNames, setProjectNames] = useState<readonly string[]>([]);
+  const [isLoadingAssets, setIsLoadingAssets] = useState<boolean>(true);
+  const [isSavingAsset, setIsSavingAsset] = useState<boolean>(false);
+  const [selectedUploadFile, setSelectedUploadFile] = useState<File | null>(null);
   const [activeCategory, setActiveCategory] =
     useState<AssetCategoryId>("logos");
   const [selectedProject, setSelectedProject] =
@@ -382,13 +208,50 @@ export default function BrandAssetsStoragePage() {
   const [newHex, setNewHex] = useState<string>("#CFA965");
   const [newTags, setNewTags] = useState<string>("Marca, Oficial");
 
+  const loadStorageData = useCallback(async () => {
+    setIsLoadingAssets(true);
+    try {
+      const [storageRes, projectsRes] = await Promise.all([
+        storageService.getAssets(),
+        editorialService.listProjects().catch(() => []),
+      ]);
+      const rawAssets = Array.isArray(storageRes?.assets)
+        ? storageRes.assets
+        : [];
+      setAssets(rawAssets.map(mapBackendAssetToUi));
+      setStorageUsedBytes(Number(storageRes?.storageUsed || 0));
+      setProjectNames(
+        Array.isArray(projectsRes)
+          ? projectsRes.map((p: any) => String(p.name || "")).filter(Boolean)
+          : []
+      );
+    } catch {
+      setAssets([]);
+    } finally {
+      setIsLoadingAssets(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    void loadStorageData();
+  }, [loadStorageData]);
+
+  const availableProjectScopes = useMemo(() => {
+    const unique = new Set<string>(["Todos os Projetos", "Acervo Global da Marca"]);
+    for (const name of projectNames) unique.add(name);
+    for (const asset of assets) {
+      if (asset.projectScope) unique.add(asset.projectScope);
+    }
+    return Array.from(unique);
+  }, [projectNames, assets]);
+
   /* Opções tipadas para os componentes DarkCustomSelect */
   const projectFilterOptions = useMemo(() => {
-    return PROJECT_SCOPES.map((scope) => ({
+    return availableProjectScopes.map((scope) => ({
       value: scope,
       label: `Escopo: ${scope}`,
     }));
-  }, []);
+  }, [availableProjectScopes]);
 
   const uploadCategoryOptions = useMemo(() => {
     return ASSET_CATEGORIES.map((c) => ({
@@ -399,13 +262,13 @@ export default function BrandAssetsStoragePage() {
   }, []);
 
   const uploadProjectScopeOptions = useMemo(() => {
-    return PROJECT_SCOPES.filter((s) => s !== "Todos os Projetos").map(
-      (scope) => ({
+    return availableProjectScopes
+      .filter((s) => s !== "Todos os Projetos")
+      .map((scope) => ({
         value: scope,
         label: scope,
-      })
-    );
-  }, []);
+      }));
+  }, [availableProjectScopes]);
 
   /* Contagem por categoria respeitando o escopo de projeto selecionado */
   const categoryCounts = useMemo(() => {
@@ -471,44 +334,62 @@ export default function BrandAssetsStoragePage() {
     }, 1800);
   };
 
-  const handleToggleFavorite = (assetId: string) => {
+  const handleToggleFavorite = async (assetId: string) => {
+    const target = assets.find((item) => item.id === assetId);
+    if (!target) return;
+    const nextFav = !target.isFavorite;
+
     setAssets((prev) =>
       prev.map((item) =>
-        item.id === assetId ? { ...item, isFavorite: !item.isFavorite } : item
+        item.id === assetId ? { ...item, isFavorite: nextFav } : item
       )
     );
     setInspectedAsset((prev) =>
-      prev && prev.id === assetId
-        ? { ...prev, isFavorite: !prev.isFavorite }
-        : prev
+      prev && prev.id === assetId ? { ...prev, isFavorite: nextFav } : prev
     );
+
+    if (OBJECT_ID_RE.test(assetId)) {
+      try {
+        await storageService.updateAsset(assetId, { isFavorite: nextFav });
+      } catch {
+        void loadStorageData();
+      }
+    }
   };
 
-  const handleDeleteAsset = (assetId: string) => {
+  const handleDeleteAsset = async (assetId: string) => {
     setAssets((prev) => prev.filter((item) => item.id !== assetId));
     if (inspectedAsset?.id === assetId) {
       setInspectedAsset(null);
+    }
+
+    if (OBJECT_ID_RE.test(assetId)) {
+      try {
+        await storageService.deleteAsset(assetId);
+        await loadStorageData();
+      } catch {
+        void loadStorageData();
+      }
     }
   };
 
   const handleOpenUploadModal = (presetCategory?: AssetCategoryId) => {
     setNewCategory(presetCategory ?? activeCategory);
+    setSelectedUploadFile(null);
     setIsUploadModalOpen(true);
   };
 
-  const handleCreateAsset = (e: React.FormEvent) => {
+  const handleCreateAsset = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newTitle.trim()) return;
+    if (!newTitle.trim() || isSavingAsset) return;
+    setIsSavingAsset(true);
 
-    const created: BrandAssetItem = {
-      id: `ast-${Date.now()}`,
+    const metadataPayload = {
       title: newTitle.trim(),
       category: newCategory,
       projectScope: newProjectScope,
       formatLabel: newFormatLabel.trim() || "Arquivo Digital",
       dimensionsOrSpec: newSpec.trim() || "Padrão Canônico",
-      sizeLabel: "Novo · Sincronizado",
-      updatedAt: "Agora mesmo",
       description:
         newDescription.trim() ||
         "Ativo cadastrado no acervo central para alimentar a operação editorial.",
@@ -521,15 +402,31 @@ export default function BrandAssetsStoragePage() {
         .split(",")
         .map((t) => t.trim())
         .filter(Boolean),
-      isFavorite: false,
     };
 
-    setAssets((prev) => [created, ...prev]);
-    setActiveCategory(newCategory);
-    setNewTitle("");
-    setNewDescription("");
-    setNewAiDirective("");
-    setIsUploadModalOpen(false);
+    try {
+      if (selectedUploadFile) {
+        await storageService.uploadAssetWithFile(
+          selectedUploadFile,
+          metadataPayload
+        );
+      } else {
+        await storageService.createAsset({
+          ...metadataPayload,
+          fileName: newTitle.trim(),
+        });
+      }
+
+      await loadStorageData();
+      setActiveCategory(newCategory);
+      setNewTitle("");
+      setNewDescription("");
+      setNewAiDirective("");
+      setSelectedUploadFile(null);
+      setIsUploadModalOpen(false);
+    } finally {
+      setIsSavingAsset(false);
+    }
   };
 
   return (
@@ -573,11 +470,19 @@ export default function BrandAssetsStoragePage() {
                   Armazenamento Pro
                 </span>
                 <span className="font-la-mono text-xs font-bold text-la-gold-light">
-                  3.4 GB / 25 GB
+                  {formatBytesLabel(storageUsedBytes)} / 25 GB
                 </span>
               </div>
               <div className="mt-1.5 h-1.5 w-44 overflow-hidden rounded-la-full bg-white/10">
-                <div className="h-full w-[18%] bg-la-gold" />
+                <div
+                  className="h-full bg-la-gold transition-all"
+                  style={{
+                    width: `${Math.min(
+                      100,
+                      Math.round((storageUsedBytes / STORAGE_QUOTA_BYTES) * 100)
+                    )}%`,
+                  }}
+                />
               </div>
             </div>
 
@@ -1111,6 +1016,23 @@ export default function BrandAssetsStoragePage() {
             >
               <label className="flex flex-col gap-1">
                 <span className="font-la-mono text-[0.6875rem] uppercase text-la-text-secondary">
+                  Upload de Arquivo no Storage R2 (Opcional)
+                </span>
+                <input
+                  type="file"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0] || null;
+                    setSelectedUploadFile(file);
+                    if (file && !newTitle.trim()) {
+                      setNewTitle(file.name.replace(/\.[^.]+$/, ""));
+                    }
+                  }}
+                  className="rounded-la-md border border-dashed border-la-border-gold/45 bg-black/40 p-2.5 font-la-mono text-xs text-la-text-secondary file:mr-3 file:rounded-la-xs file:border-0 file:bg-la-gold file:px-2.5 file:py-1 file:font-sans file:text-xs file:font-semibold file:text-la-text-inverse"
+                />
+              </label>
+
+              <label className="flex flex-col gap-1">
+                <span className="font-la-mono text-[0.6875rem] uppercase text-la-text-secondary">
                   Título / Identificação do Ativo
                 </span>
                 <input
@@ -1244,9 +1166,10 @@ export default function BrandAssetsStoragePage() {
                 </button>
                 <button
                   type="submit"
-                  className="min-h-[2.625rem] rounded-la-md bg-la-gold px-5 py-2 font-la-sans text-xs font-bold text-la-text-inverse hover:bg-la-gold-light"
+                  disabled={isSavingAsset}
+                  className="min-h-[2.625rem] rounded-la-md bg-la-gold px-5 py-2 font-la-sans text-xs font-bold text-la-text-inverse hover:bg-la-gold-light disabled:opacity-60"
                 >
-                  Salvar no Repositório
+                  {isSavingAsset ? "Salvando..." : "Salvar no Repositório"}
                 </button>
               </div>
             </form>

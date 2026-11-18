@@ -21,7 +21,15 @@ export const JourneyStageSchema = z.enum([
   'compartilhamento',
 ]);
 
-export const ThemeStatusSchema = z.enum(['active', 'archived', 'favorite', 'test']);
+export const ThemeStatusSchema = z.enum([
+  'active',
+  'archived',
+  'favorite',
+  'test',
+  'priority_next_cycle',
+  'saved_for_sales',
+  'market_test',
+]);
 
 export const ThemeFlagSchema = z.enum(['prioritario_proximo_ciclo', 'guardado_para_vendas']);
 
@@ -57,6 +65,18 @@ export const RetinaPrioritySchema = z.enum([
 
 // ===== Tema =====
 
+export const ThemeVolumeSchema = z.enum([
+  '12',
+  '15',
+  '18',
+  '20',
+  '24',
+  '30',
+  '45',
+  '50',
+  '100',
+]);
+
 export const ThemeSchema = z.object({
   id: objectIdSchema,
   projectId: objectIdSchema,
@@ -74,6 +94,17 @@ export const ThemeSchema = z.object({
   batchId: z.string().optional(),
   angle: z.string().optional(),
   approach: z.string().optional(),
+  techniqueUsed: z.string().optional(),
+  romaPillar: z.string().optional(),
+  consciousnessAxis: z.string().optional(),
+  recommendedFormat: z.string().optional(),
+  recommendedPlatform: z.string().optional(),
+  painDesireOrObjection: z.string().optional(),
+  isFavorite: z.boolean().optional(),
+  isPriorityNextCycle: z.boolean().optional(),
+  isSavedForSales: z.boolean().optional(),
+  isMarketTest: z.boolean().optional(),
+  allocatedSlotIds: z.array(z.string()).optional(),
   createdAt: z.coerce.date(),
   updatedAt: z.coerce.date(),
 });
@@ -90,34 +121,60 @@ export const ThemeUpdateSchema = z.object({
   flags: z.array(ThemeFlagSchema).optional(),
   angle: z.string().optional(),
   approach: z.string().optional(),
+  techniqueUsed: z.string().optional(),
+  romaPillar: z.string().optional(),
+  consciousnessAxis: z.string().optional(),
+  recommendedFormat: z.string().optional(),
+  recommendedPlatform: z.string().optional(),
+  painDesireOrObjection: z.string().optional(),
+  isFavorite: z.boolean().optional(),
+  isPriorityNextCycle: z.boolean().optional(),
+  isSavedForSales: z.boolean().optional(),
+  isMarketTest: z.boolean().optional(),
+  allocatedSlotIds: z.array(z.string()).optional(),
 });
 
 // ===== Parâmetros de geração por modo =====
 
 export const RomaAvatarParamsSchema = z.object({
-  volume: z.enum(['20', '50', '100']),
-  pillars: z.array(z.string()).min(1, 'Selecione ao menos um pilar.'),
-  retinaPriority: RetinaPrioritySchema,
+  volume: ThemeVolumeSchema.default('20'),
+  pillars: z.array(z.string()).optional(),
+  retinaPriority: RetinaPrioritySchema.default('balanced'),
+  niche: z.string().optional(),
+  subniche: z.string().optional(),
 });
 
 export const MarketParamsSchema = z.object({
-  volume: z.enum(['20', '50', '100']).optional(),
-  videoLinks: z.array(z.string().url('Link inválido.')).max(5, 'Máximo de 5 links.').optional(),
+  volume: ThemeVolumeSchema.optional(),
+  videoLinks: z.array(z.string()).max(10).optional(),
   comments: z.array(z.string()).optional(),
   reviews: z.array(z.string()).optional(),
+  marketNotes: z.string().optional(),
 });
 
 export const ObjectiveParamsSchema = z.object({
   objective: ThemeObjectiveSchema,
   businessMoment: BusinessMomentSchema,
-  platforms: z.array(PlatformSchema).min(1, 'Selecione ao menos uma plataforma.'),
-  volume: z.enum(['20', '50', '100']).optional(),
+  platforms: z.array(PlatformSchema).optional(),
+  volume: ThemeVolumeSchema.optional(),
 });
 
 export const GenerationRequestSchema = z.discriminatedUnion('mode', [
-  z.object({ mode: z.literal('roma_avatar'), params: RomaAvatarParamsSchema }),
-  z.object({ mode: z.literal('market'), params: MarketParamsSchema }),
-  z.object({ mode: z.literal('objective'), params: ObjectiveParamsSchema }),
+  z.object({
+    mode: z.literal('roma_avatar'),
+    params: RomaAvatarParamsSchema,
+    persist: z.boolean().optional(),
+  }),
+  z.object({
+    mode: z.literal('market'),
+    params: MarketParamsSchema,
+    persist: z.boolean().optional(),
+  }),
+  z.object({
+    mode: z.literal('objective'),
+    params: ObjectiveParamsSchema,
+    persist: z.boolean().optional(),
+  }),
 ]);
 
 export const GenerationResultSchema = z.object({
@@ -147,14 +204,18 @@ export const CalendarSuggestionsRequestSchema = z.object({
 });
 
 export const AssignThemeSchema = z.object({
-  calendarItemId: objectIdSchema,
-  themeId: objectIdSchema.optional(),
+  calendarItemId: z.string().min(1),
+  themeId: z.string().min(1).optional(),
   title: z.string().optional(),
+  unassign: z.boolean().optional(),
 });
 
 export const RebalanceRequestSchema = z.object({
   objective: ThemeObjectiveSchema.optional(),
   businessMoment: BusinessMomentSchema.optional(),
+  scenario: z.string().optional(),
+  slots: z.array(z.record(z.unknown())).optional(),
+  persist: z.boolean().optional(),
 });
 
 export const SimulateRequestSchema = z.object({
@@ -193,10 +254,11 @@ export const RebalanceResultSchema = z.object({
   report: BalanceReportSchema,
   slots: z.array(
     z.object({
-      calendarItemId: objectIdSchema,
+      calendarItemId: z.string(),
       theme: ThemeSchema,
     }),
   ),
+  updatedSlots: z.array(z.record(z.unknown())).optional(),
 });
 
 export const CalendarThemeVersionSchema = z.object({
@@ -237,6 +299,7 @@ export type ThemeFlag = z.infer<typeof ThemeFlagSchema>;
 export type ThemeObjective = z.infer<typeof ThemeObjectiveSchema>;
 export type BusinessMoment = z.infer<typeof BusinessMomentSchema>;
 export type RetinaPriority = z.infer<typeof RetinaPrioritySchema>;
+export type ThemeVolume = z.infer<typeof ThemeVolumeSchema>;
 
 export type Theme = z.infer<typeof ThemeSchema>;
 export type ThemeUpdate = z.infer<typeof ThemeUpdateSchema>;

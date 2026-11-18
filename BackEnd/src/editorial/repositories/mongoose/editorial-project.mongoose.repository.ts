@@ -48,6 +48,7 @@ export class EditorialProjectMongooseRepository implements EditorialProjectRepos
   }
 
   async findById(id: string): Promise<IEditorialProject | null> {
+    if (!(Types.ObjectId as any).isValid(id)) return null;
     const project = await this.projectModel
       .findOne({
         _id: new (Types.ObjectId as any)(id),
@@ -56,6 +57,19 @@ export class EditorialProjectMongooseRepository implements EditorialProjectRepos
       .lean()
       .exec();
     return project as unknown as IEditorialProject | null;
+  }
+
+  async findByIds(ids: string[]): Promise<IEditorialProject[]> {
+    const validIds = ids
+      .filter((pid) => (Types.ObjectId as any).isValid(pid))
+      .map((pid) => new (Types.ObjectId as any)(pid));
+    if (validIds.length === 0) return [];
+    const projects = await this.projectModel
+      .find({ _id: { $in: validIds }, isActive: { $ne: false } })
+      .sort({ updatedAt: -1 })
+      .lean()
+      .exec();
+    return projects as unknown as IEditorialProject[];
   }
 
   async create(data: ICreateEditorialProject): Promise<IEditorialProject> {

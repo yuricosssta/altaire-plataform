@@ -125,6 +125,18 @@ export const THEME_STATUS_META: Record<ThemeStatus, { label: string; badgeClass:
     label: 'Teste de mercado',
     badgeClass: 'border-sky-500/30 bg-sky-500/10 text-sky-400',
   },
+  priority_next_cycle: {
+    label: 'Prioritário próximo ciclo',
+    badgeClass: 'border-primary/40 bg-primary/15 text-primary',
+  },
+  saved_for_sales: {
+    label: 'Guardado para vendas',
+    badgeClass: 'border-amber-500/30 bg-amber-500/10 text-amber-400',
+  },
+  market_test: {
+    label: 'Teste de mercado',
+    badgeClass: 'border-sky-500/30 bg-sky-500/10 text-sky-400',
+  },
 };
 
 export const THEME_FLAG_META: Record<ThemeFlag, { label: string; badgeClass: string }> = {

@@ -1,7 +1,7 @@
 // FrontEnd/src/app/(main)/dashboard/publicacoes/page.tsx
 "use client";
 
-import React, { useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import {
   Archive,
@@ -27,6 +27,8 @@ import {
 import { clsx } from "clsx";
 import { WORKSPACE_ROUTES } from "@/lib/constants/routes";
 import { DarkCustomSelect } from "@/components/ui/DarkCustomSelect";
+import { scriptsService } from "@/lib/services/scriptsService";
+import { editorialService } from "@/lib/services/editorialService";
 
 /* -------------------------------------------------------------------------- */
 /* Tipos e Constantes Canônicas                                               */
@@ -90,45 +92,6 @@ export type ContentLibraryRecord = {
   readonly adaptedFromId?: string;
 };
 
-const EDITORIAL_PROJECTS_CONTEXT: readonly EditorialProjectContextSummary[] = [
-  {
-    id: "proj-legion-saas",
-    name: "Legion Altaire · SaaS",
-    niche: "SaaS & Inteligência Editorial",
-    offer: "Assinatura Legion Altaire Pro",
-    romaPromise:
-      "Transformar a estratégia do negócio em conteúdo com direção, autoridade e vendas.",
-    icpSummary:
-      "Especialistas, mentores, infoprodutores e consultores cansados de posts genéricos.",
-    toneOfVoice: "Estratégico, Analítico, Direto e Premium",
-    activeLineName: "Linha v1 — Sistema Operacional Editorial",
-  },
-  {
-    id: "proj-produto-x",
-    name: "Produto X — Lançamento Semente",
-    niche: "Finanças & Investimentos",
-    offer: "Mentoria Algorithmic Trading",
-    romaPromise:
-      "Estruturar uma carteira quantitativa validada sem depender de análises subjetivas.",
-    icpSummary:
-      "Investidores e profissionais liberais com patrimônio buscando consistência técnica.",
-    toneOfVoice: "Técnico, Seguro, Baseado em Dados",
-    activeLineName: "Linha v1 — Lançamento Semente",
-  },
-  {
-    id: "proj-mentoria-ht",
-    name: "Mentoria High-Ticket — Evergreen",
-    niche: "Consultoria & Negócios B2B",
-    offer: "Programa Executivo de Escala Comercial",
-    romaPromise:
-      "Previsibilidade de aquisição de clientes de alto valor com operação enxuta.",
-    icpSummary:
-      "Fundadores de agências e consultorias B2B faturando entre R$ 30k e R$ 150k/mês.",
-    toneOfVoice: "Executivo, Pragmático e Orientado a Margem",
-    activeLineName: "Linha v2 — Aquisição Contínua B2B",
-  },
-] as const;
-
 const FORMAT_FILTERS: readonly {
   readonly key: ContentFormatKey | "TODOS";
   readonly label: string;
@@ -183,158 +146,120 @@ const RETINA_OPTIONS: readonly RetinaTypeKey[] = [
   "Interação",
 ] as const;
 
-const INITIAL_CONTENT_ITEMS: readonly ContentLibraryRecord[] = [
-  {
-    id: "pub-01",
-    title: "O erro silencioso que bloqueia sua autoridade mesmo postando todo dia",
-    formatKey: "short_video",
-    formatLabel: "REEL · Vídeo Curto",
-    projectId: "proj-produto-x",
-    projectName: "Produto X — Lançamento Semente",
-    createdAt: "12/09/2026",
-    status: "aprovado",
-    themeTitle: "Frequência sem direção estratégica vs. Posicionamento",
-    pillarName: "Pilar 01 · Posicionamento & Tese",
-    retinaType: "Transformação",
-    scriptMode: "Modo Técnico (Teleprompter)",
-    hookOutdoor:
-      "Publicar todo dia sem conectar sua oferta ao seu conteúdo só acelera o desgaste da sua imagem.",
-    scriptPreview:
-      "[00:00 - GANCHO] Se o seu perfil está ativo, mas as reuniões qualificadas não aumentam, o problema não é falta de constância. [00:12 - DESENVOLVIMENTO] Quando cada post nasce solto...",
-    captionPreview:
-      "Frequência sem direção é ruído operacional. Veja como alinhar cada formato aos pilares de conversão da sua oferta antes de gravar.",
-    coverPromptEn:
-      "Minimalist dark luxury editorial portrait, executive strategist in deep onyx studio, subtle champagne gold rim lighting, 9:16 vertical composition --ar 9:16",
-    ctaLabel: "Comente DIREÇÃO para receber o Checklist de Auditoria Editorial.",
-    complementaryMaterial: "Checklist de Auditoria de Posicionamento (PDF)",
-    isFavorite: true,
-  },
-  {
-    id: "pub-02",
-    title: "Por que prompts soltos nunca substituem um Sistema Operacional Editorial",
-    formatKey: "carousel",
-    formatLabel: "CARROSSEL · 10 Lâminas 4:5",
-    projectId: "proj-legion-saas",
-    projectName: "Legion Altaire · SaaS",
-    createdAt: "04/11/2026",
-    status: "publicado",
-    themeTitle: "Cadeia de Contexto: Base Estratégica → Linha → Calendário → Roteiro",
-    pillarName: "Pilar 02 · Arquitetura de Contexto",
-    retinaType: "Autoridade",
-    scriptMode: "Modo Técnico (Teleprompter)",
-    hookOutdoor:
-      "Lâmina 01: Uma IA comum responde a um comando. Um Sistema Editorial constrói um ativo de vendas.",
-    scriptPreview:
-      "Slide 01: Gancho de contraste | Slide 02: A fragmentação do histórico de chat | Slide 03-07: Os 3 elos da cadeia Legion Altaire | Slide 10: CTA para diagnóstico.",
-    captionPreview:
-      "Quando você precisa reexplicar seu negócio a cada novo prompt, sua comunicação perde unidade. Deslize para ver como blindamos o contexto por Projeto Editorial.",
-    coverPromptEn:
-      "Architectural dark glassmorphism interface diagram with glowing champagne gold strategic thread connecting 3 monolithic nodes on #05060A background --ar 4:5",
-    ctaLabel: "Salve este carrossel e acesse o link da bio para conhecer o Legion Altaire.",
-    complementaryMaterial: "Mapa Comparativo: Prompt Isolado vs. Sistema Editorial",
-    isFavorite: true,
-  },
-  {
-    id: "pub-03",
-    title: "Anatomia da Oferta High-Ticket: Como preparar a audiência em 14 dias",
-    formatKey: "long_video",
-    formatLabel: "YOUTUBE · Vídeo Longo (18 min)",
-    projectId: "proj-mentoria-ht",
-    projectName: "Mentoria High-Ticket — Evergreen",
-    createdAt: "06/11/2026",
-    status: "em_producao",
-    themeTitle: "Elevação de Nível de Consciência antes da abertura de agenda",
-    pillarName: "Pilar 03 · Quebra de Objeções Silenciosas",
-    retinaType: "Níveis de Consciência",
-    scriptMode: "Modo Conexão (Tópicos)",
-    hookOutdoor:
-      "O cliente de alto valor não compra no impulso; ele compra quando sua linha editorial antecipa as 4 objeções centrais.",
-    scriptPreview:
-      "Bloco 01: O erro de fazer pitch direto para audiência fria | Bloco 02: A matriz de aquecimento em 2 semanas | Bloco 03: Estudo de caso real e estrutura de diagnóstico.",
-    captionPreview:
-      "Capítulos: 00:00 A armadilha do volume | 04:15 Os 4 níveis de consciência B2B | 11:40 Como estruturar o calendário de aquecimento.",
-    coverPromptEn:
-      "Cinematic 16:9 YouTube thumbnail, confident B2B advisor next to a dark glass board with gold strategic timeline metrics --ar 16:9",
-    ctaLabel: "Preencha a aplicação estratégica no primeiro link da descrição.",
-    complementaryMaterial: "Planilha de Qualificação de Leads High-Ticket (XLSX)",
-    isFavorite: false,
-  },
-  {
-    id: "pub-04",
-    title: "Sequência Narrativa de Quinta: Bastidores de Decisão + Caixa de Perguntas",
-    formatKey: "stories_sequence",
-    formatLabel: "STORIES · 4 Blocos Diários",
-    projectId: "proj-legion-saas",
-    projectName: "Legion Altaire · SaaS",
-    createdAt: "07/11/2026",
-    status: "em_revisao",
-    themeTitle: "Rotina real de planejamento sem improviso de última hora",
-    pillarName: "Pilar 01 · Clareza Operacional",
-    retinaType: "Relacionamento",
-    scriptMode: "Modo Conexão (Tópicos)",
-    hookOutdoor:
-      "Manhã: Contraste entre abrir o celular sem saber o que postar vs. abrir o Painel do Dia.",
-    scriptPreview:
-      "Manhã (3 stories): Bastidor da mesa + gancho | Almoço (2 stories): Micro-prova | Tarde (3 stories): Abertura de caixinha com 3 perguntas preditivas | Noite: Fechamento e CTA.",
-    captionPreview:
-      "Sequência completa com textos espelho para leitura sem áudio e 3 respostas estruturadas para Q&A.",
-    coverPromptEn:
-      "First-person POV of a dark minimalist workspace with a laptop displaying Legion Altaire daily panel in champagne gold accents --ar 9:16",
-    ctaLabel: "Responda este story com a palavra AGENDA para ver a demonstração.",
-    complementaryMaterial: null,
-    isFavorite: false,
-  },
-  {
-    id: "pub-05",
-    title: "Live de Diagnóstico: Revisando Linhas Editoriais ao Vivo",
-    formatKey: "live",
-    formatLabel: "LIVE · Roteiro em Tópicos (60 min)",
-    projectId: "proj-produto-x",
-    projectName: "Produto X — Lançamento Semente",
-    createdAt: "01/11/2026",
-    status: "rascunho",
-    themeTitle: "Auditoria ao vivo de promessa ROMA e equilíbrio RETINA",
-    pillarName: "Pilar 02 · Prova Metodológica",
-    retinaType: "Interação",
-    scriptMode: "Modo Conexão (Tópicos)",
-    hookOutdoor:
-      "Como identificar em 5 minutos se o seu calendário está gerando compradores ou apenas curiosos.",
-    scriptPreview:
-      "00-10 min: Abertura e critério de análise | 10-45 min: 3 diagnósticos práticos na tela | 45-60 min: Transição para oferta e bloco de stories pós-live.",
-    captionPreview:
-      "Roteiro cronológico em tópicos para condução natural + sequência de 3 stories de colheita imediata pós-transmissão.",
-    coverPromptEn:
-      "Dark broadcast studio setup, professional microphone, glowing gold live indicator badge --ar 16:9",
-    ctaLabel: "Entre no grupo silencioso de avisos para receber o resumo da Live.",
-    complementaryMaterial: "Guia Resumo da Live + Checklist de Revisão",
-    isFavorite: false,
-  },
-  {
-    id: "pub-06",
-    title: "[Histórico] Campanha Q2 — Manifesto de Transição de Posicionamento",
-    formatKey: "static_post",
-    formatLabel: "POST ESTÁTICO · Síntese 4:5",
-    projectId: "proj-mentoria-ht",
-    projectName: "Mentoria High-Ticket — Evergreen",
-    createdAt: "18/07/2026",
-    status: "arquivado",
-    themeTitle: "O fim das consultorias genéricas no mercado B2B",
-    pillarName: "Pilar 01 · Tese Central",
-    retinaType: "Engajamento",
-    scriptMode: "Modo Técnico (Teleprompter)",
-    hookOutdoor:
-      "Mercado maduro não compra promessa vaga; compra método auditável.",
-    scriptPreview:
-      "Arte única de alto impacto visual com manifesto de 5 parágrafos na legenda.",
-    captionPreview:
-      "Registro histórico da campanha de reposicionamento Q2 preservado para referência editorial.",
-    coverPromptEn:
-      "Minimalist monolithic sculpture in dark onyx and brushed gold, editorial typography layout --ar 4:5",
-    ctaLabel: "Salve para referência estratégica.",
-    complementaryMaterial: null,
-    isFavorite: false,
-  },
-];
+const OBJECT_ID_RE = /^[0-9a-fA-F]{24}$/;
+
+const FORMAT_LABELS: Record<ContentFormatKey, string> = {
+  short_video: "REEL · Vídeo Curto",
+  long_video: "YOUTUBE · Vídeo Longo",
+  carousel: "CARROSSEL · 4:5",
+  stories_sequence: "STORIES · Sequência",
+  static_post: "POST · Imagem Única",
+  live: "LIVE · Evento",
+};
+
+function mapBackendFormatKey(format?: string, formatSlug?: string): ContentFormatKey {
+  const f = String(formatSlug || format || "").toLowerCase();
+  if (f === "long_video" || f === "video_longo") return "long_video";
+  if (f === "carousel" || f === "carrossel") return "carousel";
+  if (f === "stories_sequence" || f === "sequencia_stories") return "stories_sequence";
+  if (f === "static_post" || f === "post_estatico") return "static_post";
+  if (f === "live" || f === "live_semanal") return "live";
+  return "short_video";
+}
+
+function mapBackendRetinaLabel(raw?: string): RetinaTypeKey {
+  const r = String(raw || "").toLowerCase();
+  if (r.includes("autor")) return "Autoridade";
+  if (r.includes("consci")) return "Níveis de Consciência";
+  if (r.includes("relac")) return "Relacionamento";
+  if (r.includes("engaj")) return "Engajamento";
+  if (r.includes("inter")) return "Interação";
+  return "Transformação";
+}
+
+function mapBackendPubStatus(raw?: string): ContentStatusKey {
+  const s = String(raw || "").toLowerCase();
+  if (s === "pronto" || s === "ready" || s === "aprovado") return "aprovado";
+  if (s === "in_production" || s === "em_producao") return "em_producao";
+  if (s === "teste_ab" || s === "em_revisao" || s === "ab_test") return "em_revisao";
+  if (s === "publicado" || s === "published") return "publicado";
+  if (s === "arquivado" || s === "archived") return "arquivado";
+  return "rascunho";
+}
+
+function mapProjectToContextSummary(p: any): EditorialProjectContextSummary {
+  const id = String(p.id || p._id || "");
+  return {
+    id,
+    name: String(p.name || "Projeto Editorial"),
+    niche: String(p.niche || ""),
+    offer: String(p.currentObjectiveLabel || p.currentObjective || "Posicionamento"),
+    romaPromise: p.subniche
+      ? `Estratégia em ${p.niche || "conteúdo"} · ${p.subniche}`
+      : "Base Estratégica do Projeto",
+    icpSummary: String(p.brandOrClientName || p.name || ""),
+    toneOfVoice: "Definido na Base Estratégica",
+    activeLineName: p.hasActiveLineEditorial
+      ? "Linha Editorial Ativa"
+      : "Linha em preparação",
+  };
+}
+
+function mapBackendPublicationToRecord(
+  s: any,
+  projectMap: ReadonlyMap<string, EditorialProjectContextSummary>
+): ContentLibraryRecord {
+  const projectId = String(s.projectId || "");
+  const proj = projectMap.get(projectId);
+  const formatKey = mapBackendFormatKey(s.format, s.formatSlug);
+  const blocks = Array.isArray(s.scriptBlocks) && s.scriptBlocks.length > 0
+    ? s.scriptBlocks
+    : Array.isArray(s.blocks)
+      ? s.blocks
+      : [];
+  const firstBlockText =
+    blocks[0]?.wordForWordSpeech ||
+    blocks[0]?.content ||
+    blocks[0]?.connectionBulletLine ||
+    s.captionBody ||
+    "Pacote de roteiro estruturado pronto para edição no Studio.";
+  const compMat =
+    s.complementaryMaterial?.title ||
+    (Array.isArray(s.complementaryMaterials) && s.complementaryMaterials[0]?.title) ||
+    null;
+  const coverPrompt =
+    (Array.isArray(s.imagePrompts) && s.imagePrompts[0]?.promptEnglish) ||
+    (Array.isArray(s.thumbnailPrompts) && s.thumbnailPrompts[0]?.promptEn) ||
+    "Minimalist dark obsidian and gold editorial scene";
+
+  return {
+    id: String(s.id || s._id || ""),
+    title: String(s.title || "Roteiro Editorial"),
+    formatKey,
+    formatLabel: FORMAT_LABELS[formatKey],
+    projectId,
+    projectName: String(s.projectName || proj?.name || "Projeto Editorial"),
+    createdAt: s.createdAt
+      ? new Date(s.createdAt).toLocaleDateString("pt-BR")
+      : "Sincronizado",
+    status: mapBackendPubStatus(s.status),
+    themeTitle: String(s.provisionalName || s.title || ""),
+    pillarName: String(s.editorialPillar || "Pilar Estratégico"),
+    retinaType: mapBackendRetinaLabel(s.retinaType),
+    scriptMode:
+      s.mode === "seguranca" || s.speakingMode === "TELEPROMPTER"
+        ? "Modo Técnico (Teleprompter)"
+        : "Modo Conexão (Tópicos)",
+    hookOutdoor: String(s.captionOutdoorHook || s.title || ""),
+    scriptPreview: String(firstBlockText).slice(0, 260),
+    captionPreview: String(s.captionBody || s.caption || ""),
+    coverPromptEn: String(coverPrompt),
+    ctaLabel: String(s.captionCta || "Confira no Studio do Roteiro"),
+    complementaryMaterial: compMat ? String(compMat) : null,
+    isFavorite: Boolean(s.isFavorite),
+    adaptedFromId: s.adaptedFromId ? String(s.adaptedFromId) : undefined,
+  };
+}
 
 function getFormatIcon(formatKey: ContentFormatKey) {
   switch (formatKey) {
@@ -355,8 +280,11 @@ function getFormatIcon(formatKey: ContentFormatKey) {
 }
 
 export default function ContentLibraryPage() {
-  const [items, setItems] =
-    useState<readonly ContentLibraryRecord[]>(INITIAL_CONTENT_ITEMS);
+  const [items, setItems] = useState<readonly ContentLibraryRecord[]>([]);
+  const [projectsContext, setProjectsContext] = useState<
+    readonly EditorialProjectContextSummary[]
+  >([]);
+  const [isLoadingLibrary, setIsLoadingLibrary] = useState<boolean>(true);
 
   /* Estados de Filtros */
   const [selectedProjectId, setSelectedProjectId] = useState<string>("TODOS");
@@ -380,8 +308,7 @@ export default function ContentLibraryPage() {
 
   const [duplicatingItem, setDuplicatingItem] =
     useState<ContentLibraryRecord | null>(null);
-  const [targetProjectId, setTargetProjectId] =
-    useState<string>("proj-legion-saas");
+  const [targetProjectId, setTargetProjectId] = useState<string>("");
   const [duplicationStrategy, setDuplicationStrategy] = useState<
     "AI_ADAPT" | "RAW_COPY"
   >("AI_ADAPT");
@@ -393,6 +320,39 @@ export default function ContentLibraryPage() {
   const [recentBannerMessage, setRecentBannerMessage] = useState<string | null>(
     null
   );
+
+  const loadPublicationsLibrary = useCallback(async () => {
+    setIsLoadingLibrary(true);
+    try {
+      const [rawProjects, rawPublications] = await Promise.all([
+        editorialService.listProjects().catch(() => []),
+        scriptsService.listPublications().catch(() => []),
+      ]);
+
+      const mappedProjects = Array.isArray(rawProjects)
+        ? rawProjects.map(mapProjectToContextSummary)
+        : [];
+      setProjectsContext(mappedProjects);
+
+      const projMap = new Map<string, EditorialProjectContextSummary>(
+        mappedProjects.map((p) => [p.id, p])
+      );
+      const mappedPubs = Array.isArray(rawPublications)
+        ? rawPublications.map((s) => mapBackendPublicationToRecord(s, projMap))
+        : [];
+      setItems(mappedPubs);
+
+      if (mappedProjects[0]) {
+        setTargetProjectId((prev) => prev || mappedProjects[0]!.id);
+      }
+    } finally {
+      setIsLoadingLibrary(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    void loadPublicationsLibrary();
+  }, [loadPublicationsLibrary]);
 
   const activeMetrics = useMemo(() => {
     const nonArchived = items.filter((item) => item.status !== "arquivado");
@@ -418,12 +378,12 @@ export default function ContentLibraryPage() {
   const projectSelectOptions = useMemo(() => {
     return [
       { value: "TODOS", label: "Projeto: Todos os Projetos" },
-      ...EDITORIAL_PROJECTS_CONTEXT.map((proj) => ({
+      ...projectsContext.map((proj) => ({
         value: proj.id,
         label: proj.name,
       })),
     ];
-  }, []);
+  }, [projectsContext]);
 
   const retinaSelectOptions = useMemo(() => {
     return [
@@ -495,28 +455,56 @@ export default function ContentLibraryPage() {
 
   const targetProjectContext = useMemo(() => {
     return (
-      EDITORIAL_PROJECTS_CONTEXT.find((p) => p.id === targetProjectId) ??
-      EDITORIAL_PROJECTS_CONTEXT[0]
+      projectsContext.find((p) => p.id === targetProjectId) ??
+      projectsContext[0] ??
+      null
     );
-  }, [targetProjectId]);
+  }, [projectsContext, targetProjectId]);
 
-  const handleToggleFavorite = (id: string) => {
+  const handleToggleFavorite = async (id: string) => {
+    const target = items.find((item) => item.id === id);
+    if (!target) return;
+    const nextFav = !target.isFavorite;
+
     setItems((prev) =>
       prev.map((item) =>
-        item.id === id ? { ...item, isFavorite: !item.isFavorite } : item
+        item.id === id ? { ...item, isFavorite: nextFav } : item
       )
     );
+
+    if (OBJECT_ID_RE.test(target.projectId) && OBJECT_ID_RE.test(id)) {
+      try {
+        await scriptsService.updateScript(target.projectId, id, {
+          isFavorite: nextFav,
+        });
+      } catch {
+        void loadPublicationsLibrary();
+      }
+    }
   };
 
-  const handleToggleArchive = (id: string) => {
+  const handleToggleArchive = async (id: string) => {
+    const target = items.find((item) => item.id === id);
+    if (!target) return;
+    const isArchived = target.status === "arquivado";
+    const nextStatus: ContentStatusKey = isArchived ? "rascunho" : "arquivado";
+    const nextBackendStatus = isArchived ? "rascunho" : "arquivado";
+
     setItems((prev) =>
-      prev.map((item) => {
-        if (item.id !== id) return item;
-        const nextStatus: ContentStatusKey =
-          item.status === "arquivado" ? "rascunho" : "arquivado";
-        return { ...item, status: nextStatus };
-      })
+      prev.map((item) =>
+        item.id === id ? { ...item, status: nextStatus } : item
+      )
     );
+
+    if (OBJECT_ID_RE.test(target.projectId) && OBJECT_ID_RE.test(id)) {
+      try {
+        await scriptsService.updateScript(target.projectId, id, {
+          status: nextBackendStatus,
+        });
+      } catch {
+        void loadPublicationsLibrary();
+      }
+    }
   };
 
   const handleCopyText = (key: string, text: string) => {
@@ -532,60 +520,60 @@ export default function ContentLibraryPage() {
   const handleOpenDuplicationModal = (item: ContentLibraryRecord) => {
     setDuplicatingItem(item);
     const alternativeProject =
-      EDITORIAL_PROJECTS_CONTEXT.find((p) => p.id !== item.projectId) ??
-      EDITORIAL_PROJECTS_CONTEXT[0];
-    setTargetProjectId(alternativeProject.id);
+      projectsContext.find((p) => p.id !== item.projectId) ??
+      projectsContext[0];
+    setTargetProjectId(alternativeProject?.id || item.projectId);
     setDuplicationStrategy("AI_ADAPT");
     setCustomDuplicateTitle(`${item.title} (Adaptação Estratégica)`);
     setPreserveComplementaryMaterial(Boolean(item.complementaryMaterial));
   };
 
-  const handleConfirmDuplication = (e: React.FormEvent) => {
+  const handleConfirmDuplication = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!duplicatingItem) return;
+    if (!duplicatingItem || !targetProjectContext) return;
+    if (!OBJECT_ID_RE.test(duplicatingItem.id) || !OBJECT_ID_RE.test(targetProjectContext.id)) {
+      return;
+    }
 
     setIsProcessingAiAdaptation(true);
-
-    window.setTimeout(() => {
-      const isCrossProject = targetProjectContext.id !== duplicatingItem.projectId;
+    try {
+      const isCrossProject =
+        targetProjectContext.id !== duplicatingItem.projectId;
       const isAiAdapted = duplicationStrategy === "AI_ADAPT";
 
-      const newRecord: ContentLibraryRecord = {
-        ...duplicatingItem,
-        id: `pub-${Date.now()}`,
-        title:
-          customDuplicateTitle.trim() ||
-          `${duplicatingItem.title} (${targetProjectContext.name})`,
-        projectId: targetProjectContext.id,
-        projectName: targetProjectContext.name,
-        createdAt: "Agora mesmo",
-        status: isAiAdapted ? "em_revisao" : "rascunho",
-        hookOutdoor: isAiAdapted
-          ? `[Adaptado para ${targetProjectContext.offer}] ${duplicatingItem.hookOutdoor}`
-          : duplicatingItem.hookOutdoor,
-        scriptPreview: isAiAdapted
-          ? `[Contexto Injetado: ICP ${targetProjectContext.icpSummary} · Tom ${targetProjectContext.toneOfVoice}] ${duplicatingItem.scriptPreview}`
-          : duplicatingItem.scriptPreview,
-        ctaLabel: isAiAdapted
-          ? `CTA alinhado à promessa: "${targetProjectContext.romaPromise}"`
-          : duplicatingItem.ctaLabel,
-        complementaryMaterial: preserveComplementaryMaterial
-          ? duplicatingItem.complementaryMaterial
-          : null,
-        adaptedFromId: duplicatingItem.id,
-      };
+      const createdRaw = await scriptsService.adaptPublication(
+        duplicatingItem.id,
+        {
+          targetProjectId: targetProjectContext.id,
+          mode: isAiAdapted ? "AI_ADAPT" : "COPY_LITERAL",
+          customTitle:
+            customDuplicateTitle.trim() ||
+            `${duplicatingItem.title} (${targetProjectContext.name})`,
+          preserveComplementaryMaterial,
+        }
+      );
+
+      const projMap = new Map<string, EditorialProjectContextSummary>(
+        projectsContext.map((p) => [p.id, p])
+      );
+      const newRecord = mapBackendPublicationToRecord(createdRaw, projMap);
 
       setItems((prev) => [newRecord, ...prev]);
-      setIsProcessingAiAdaptation(false);
       setDuplicatingItem(null);
 
       setRecentBannerMessage(
         isAiAdapted
-          ? `Pacote duplicado e remodelado com IA para a Base Estratégica de "${targetProjectContext.name}" (${isCrossProject ? "Entre Projetos" : "Mesmo Projeto"}).`
+          ? `Pacote duplicado e remodelado para a Base Estratégica de "${targetProjectContext.name}" (${isCrossProject ? "Entre Projetos" : "Mesmo Projeto"}).`
           : `Cópia literal criada em "${targetProjectContext.name}" com status Rascunho para revisão manual.`
       );
       window.setTimeout(() => setRecentBannerMessage(null), 6000);
-    }, 550);
+    } catch {
+      setRecentBannerMessage(
+        "Não foi possível duplicar/adaptar esta publicação no servidor."
+      );
+    } finally {
+      setIsProcessingAiAdaptation(false);
+    }
   };
 
   return (
@@ -1020,7 +1008,7 @@ export default function ContentLibraryPage() {
                   <DarkCustomSelect
                     fullWidth
                     value={targetProjectId}
-                    options={EDITORIAL_PROJECTS_CONTEXT.map((proj) => ({
+                    options={projectsContext.map((proj) => ({
                       value: proj.id,
                       label: `${proj.name} ${
                         proj.id === duplicatingItem.projectId
@@ -1046,33 +1034,35 @@ export default function ContentLibraryPage() {
                 </label>
               </div>
 
-              <div className="rounded-la-lg border border-la-border-gold/40 bg-[#0B0F18] p-4">
-                <span className="font-la-mono text-[0.625rem] font-semibold uppercase tracking-[0.08em] text-la-gold-light">
-                  Base Estratégica Detectada no Destino ({targetProjectContext.name})
-                </span>
-                <div className="mt-2 grid grid-cols-1 gap-2 text-xs sm:grid-cols-2">
-                  <div>
-                    <span className="font-la-mono text-[0.625rem] text-la-text-muted">
-                      Oferta & Linha Ativa:
-                    </span>
-                    <p className="font-la-sans font-semibold text-la-text-primary">
-                      {targetProjectContext.offer} · {targetProjectContext.activeLineName}
-                    </p>
+              {targetProjectContext ? (
+                <div className="rounded-la-lg border border-la-border-gold/40 bg-[#0B0F18] p-4">
+                  <span className="font-la-mono text-[0.625rem] font-semibold uppercase tracking-[0.08em] text-la-gold-light">
+                    Base Estratégica Detectada no Destino ({targetProjectContext.name})
+                  </span>
+                  <div className="mt-2 grid grid-cols-1 gap-2 text-xs sm:grid-cols-2">
+                    <div>
+                      <span className="font-la-mono text-[0.625rem] text-la-text-muted">
+                        Oferta & Linha Ativa:
+                      </span>
+                      <p className="font-la-sans font-semibold text-la-text-primary">
+                        {targetProjectContext.offer} · {targetProjectContext.activeLineName}
+                      </p>
+                    </div>
+                    <div>
+                      <span className="font-la-mono text-[0.625rem] text-la-text-muted">
+                        Tom de Voz:
+                      </span>
+                      <p className="font-la-sans font-semibold text-la-text-primary">
+                        {targetProjectContext.toneOfVoice}
+                      </p>
+                    </div>
                   </div>
-                  <div>
-                    <span className="font-la-mono text-[0.625rem] text-la-text-muted">
-                      Tom de Voz:
-                    </span>
-                    <p className="font-la-sans font-semibold text-la-text-primary">
-                      {targetProjectContext.toneOfVoice}
-                    </p>
-                  </div>
+                  <p className="mt-2 text-justify [text-align-last:left] hyphens-auto font-la-sans text-xs text-la-text-secondary">
+                    <strong className="text-la-gold-light">Promessa ROMA:</strong>{" "}
+                    {targetProjectContext.romaPromise}
+                  </p>
                 </div>
-                <p className="mt-2 text-justify [text-align-last:left] hyphens-auto font-la-sans text-xs text-la-text-secondary">
-                  <strong className="text-la-gold-light">Promessa ROMA:</strong>{" "}
-                  {targetProjectContext.romaPromise}
-                </p>
-              </div>
+              ) : null}
 
               <div className="flex flex-col gap-2">
                 <span className="font-la-mono text-[0.6875rem] font-semibold uppercase text-la-text-secondary">

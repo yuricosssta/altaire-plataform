@@ -43,6 +43,7 @@ import {
   X,
 } from "lucide-react";
 import { clsx } from "clsx";
+import { editorialService } from "@/lib/services/editorialService";
 
 /* ========================================================================== */
 /* CONTRATOS E TIPAGENS ESTRITAS DA FUNÇÃO 01 (LINHA EDITORIAL & BASE)        */
@@ -334,224 +335,74 @@ const RETINA_METADATA: readonly {
   },
 ];
 
-function createDefaultStrategicBase(
+function createEmptyStrategicBase(
   niche: string,
   subniche: string,
   objective: string
 ): StrategicBaseData {
   return {
-    niche: niche || "Finanças & Investimentos",
-    subniche: subniche || "Algorithmic Trading & Gestão de Risco",
-    mainProductOrOffer:
-      "Formação & Mentoria Estratégica — Operação Sistêmica Previsível",
-    offerFormatAndTicket:
-      "Mentoria + Sistema Operacional • Ticket R$ 2.997 a R$ 5.000",
-    offerDeliverablesSummary:
-      "Acompanhamento estratégico, método proprietário passo a passo, templates executáveis e validação de carteira/operação.",
-    mainPromise: `Transformar o conhecimento disperso em ${niche || "seu mercado"} em uma operação estruturada, previsível e orientada a conversão real.`,
-    romaConcreteResult:
-      "Estruturar em até 30 dias um sistema completo que elimina o improviso diário e gera demanda qualificada para a oferta principal.",
-    puvUniqueValueProp:
-      "O único sistema que une direção estratégica, matriz RETINA e execução por formato preservando 100% do contexto do negócio.",
-    muvUniqueMechanism:
-      "Arquitetura de Contexto Persistente (Base Estratégica → Linha Editorial → Calendário Realista → Temas → Roteiros por Formato).",
-    bigIdeaAndWorldview:
-      "Publicar muito conteúdo sem contexto estratégico apenas acelera o desgaste. Autoridade e vendas nascem quando cada peça cumpre uma função clara na jornada de decisão do comprador.",
-    positioningStatement: `Para especialistas, consultores e marcas de ${niche || "alta performance"} que recusam fórmulas rasas e exigem direção estratégica conectada à venda.`,
-    icpRawText: `DOSSIÊ COMPLETO DE PESQUISA DE ICP (IDEAL CUSTOMER PROFILE) — ${niche.toUpperCase()} / ${subniche.toUpperCase()}
-
-1. PERFIL DEMOGRÁFICO E MOMENTO DE CARREIRA/NEGÓCIO:
-Profissionais liberais, especialistas técnicos, mentores, infoprodutores e gestores entre 28 e 52 anos que já possuem um produto, serviço ou conhecimento validado, faturam entre R$ 15 mil e R$ 150 mil/mês, mas sentem que sua comunicação digital está muito abaixo da sua competência técnica real.
-
-2. LINGUAGEM E EXPRESSÕES RECORRENTES DO COMPRADOR:
-- "Eu sou muito bom no que faço no bastidor, mas meu perfil não transmite meu nível real."
-- "Não tenho tempo para ficar o dia inteiro gravando dancinha ou conteúdo raso que só atrai curioso."
-- "Quando uso IA comum, o texto sai com cara de robô genérico e não parece comigo."
-- "Posto, posto, tenho curtidas de colegas, mas na hora de abrir carrinho ou vender mentoria o público trava no preço."
-
-3. DORES VISCERAIS E PROBLEMAS URGENTES:
-- Improviso diário exaustivo: acordar sem saber o que postar nos Stories ou qual Reel gravar na semana.
-- Atração de público desqualificado que pede dicas grátis no direct mas nunca compra a oferta principal.
-- Sensação de desconexão total entre o conteúdo publicado na semana e os argumentos necessários para fechar vendas.
-- Inconsistência operacional: começa um calendário ambicioso demais na segunda-feira e abandona na semana seguinte por falta de tempo real.
-
-4. DESEJOS VISCERAIS E RESULTADOS BUSCADOS:
-- Ser reconhecido imediatamente como uma referência séria, densa e inquestionável no seu subnicho.
-- Ter uma linha editorial clara e uma agenda semanal enxuta que caiba na rotina real de trabalho.
-- Publicar conteúdos que eduquem o nível de consciência do seguidor e já quebrem as objeções antes da conversa comercial.
-- Contar com uma inteligência artificial que conheça profundamente sua oferta, seu método (MUV) e seu tom de voz.
-
-5. OBJEÇÕES REAIS DE COMPRA:
-- "Já comprei cursos de conteúdo e templates de prompts antes e acabei não aplicando porque dava trabalho demais adaptar."
-- "Minha rotina é corrida demais, não consigo gravar 3 vídeos por dia."
-- "Meu nicho é muito técnico/específico, será que essa metodologia serve para o meu público comprador?"
-- "Tenho receio de automatizar com IA e perder minha autenticidade e minha identidade verbal."
-
-6. MITOS DO MERCADO E FRACASSOS PASSADOS:
-- Mito 1: "Basta postar todo dia em alta quantidade que as vendas acontecem sozinhas." (Realidade: volume sem direção só gera ruído).
-- Mito 2: "Conteúdo técnico afasta a audiência; você precisa simplificar tudo ao extremo." (Realidade: conteúdo raso atrai curioso; profundidade bem estruturada atrai comprador).
-- Fracasso passado: Contratou social media júnior ou usou prompts soltos no ChatGPT que geraram postagens genéricas de Wikipedia sem conexão com a promessa ROMA.`,
-    icpUploadedDocs: [
-      {
-        id: "doc-icp-initial",
-        fileName: "Dossie_Completo_ICP_Pesquisa_Profunda_v1.md",
-        fileSizeBytes: 148200,
-        fileType: "text/markdown",
-        uploadedAt: "Sincronizado na Base Estratégica",
-        extractedCharsCount: 2540,
-        extractedWordsCount: 382,
-        rawPreview:
-          "DOSSIÊ COMPLETO DE PESQUISA DE ICP — Perfil demográfico, linguagem do comprador, dores viscerais, desejos, objeções e mitos...",
-      },
-    ],
-    icpProfileSummary:
-      "Especialistas, mentores, consultores e operadores com alta competência técnica real, mas que sofrem com comunicação fragmentada, falta de tempo e desconexão entre conteúdo e oferta.",
-    icpVocabularyAndSlang:
-      "Usa termos como: 'previsibilidade', 'qualificação de lead', 'autoridade real vs. palco', 'custo de oportunidade', 'sistema', 'escala com margem', 'posicionamento premium'.",
-    icpPains: [
-      "Improviso diário exaustivo: decidir em cima da hora o que postar sem ligação com a meta do mês.",
-      "Atração de audiência curiosa que elogia o conteúdo gratuito, mas não enxerga valor na oferta paga.",
-      "Textos gerados por IAs genéricas que soam robóticos e destroem a percepção de autoridade.",
-      "Falta de tempo operacional para sustentar calendários irreais fora da sua capacidade semanal.",
-      "Incapacidade de conectar os Stories e Reels do dia aos pilares do Mecanismo Único (MUV).",
-    ],
-    icpDesires: [
-      "Construir percepção imediata de autoridade imperial e domínio técnico no subnicho.",
-      "Operar com um calendário realista, previsível e 100% conectado ao objetivo comercial do período.",
-      "Ter os temas e roteiros já alinhados às dores, desejos e objeções reais do comprador.",
-      "Aumentar a conversão em vendas com leads que já chegam conscientes do problema e da solução.",
-    ],
-    icpObjections: [
-      "Não tenho disponibilidade para gravar dezenas de conteúdos complexos toda semana.",
-      "Já tentei usar IA para criar roteiros e o resultado ficou superficial e sem a minha voz.",
-      "Meu subnicho é muito específico e exige precisão técnica sem promessas apelativas.",
-      "Tenho medo de criar uma estrutura complexa e não conseguir manter a constância na rotina.",
-    ],
-    icpMythsAndPastFailures: [
-      "Mito de que 'viralizar com vídeo amplo' equivale a construir um negócio lucrativo.",
-      "Mito de que linha editorial é apenas escolher 3 assuntos aleatórios para falar no perfil.",
-      "Fracasso passado ao delegar a estratégia para terceiros sem antes documentar a Base Estratégica.",
-      "Fracasso passado ao usar listas de '100 ideias de posts' desconectadas da promessa ROMA.",
-    ],
-    icpDecisionTriggers: [
-      "Demonstração clara de método proprietário com lógica de causa e efeito.",
-      "Respeito explícito à capacidade real de produção da operação.",
-      "Provas de consistência estratégica e linguagem sóbria, sem clichês vazios de marketing.",
-    ],
+    niche: niche || "",
+    subniche: subniche || "",
+    mainProductOrOffer: "",
+    offerFormatAndTicket: "",
+    offerDeliverablesSummary: "",
+    mainPromise: "",
+    romaConcreteResult: "",
+    puvUniqueValueProp: "",
+    muvUniqueMechanism: "",
+    bigIdeaAndWorldview: "",
+    positioningStatement: "",
+    icpRawText: "",
+    icpUploadedDocs: [],
+    icpProfileSummary: "",
+    icpVocabularyAndSlang: "",
+    icpPains: [],
+    icpDesires: [],
+    icpObjections: [],
+    icpMythsAndPastFailures: [],
+    icpDecisionTriggers: [],
     icpAwarenessStrategies: [
       {
         level: "Inconsciente",
-        description:
-          "Acha que seu problema é o algoritmo ou falta de alcance, não percebe a falta de direção estratégica.",
-        recommendedApproach:
-          "Conteúdos de diagnóstico e contraste que revelam por que postar no improviso drena autoridade.",
+        description: "",
+        recommendedApproach: "",
       },
       {
         level: "Consciente do Problema",
-        description:
-          "Sabe que produz conteúdo sem retorno proporcional em vendas, mas não sabe estruturar o fluxo.",
-        recommendedApproach:
-          "Nomear a dor invisível e apresentar os 6 tipos RETINA como estrutura de equilíbrio.",
+        description: "",
+        recommendedApproach: "",
       },
       {
         level: "Consciente da Solução",
-        description:
-          "Busca uma metodologia de linha editorial e calendário inteligente, comparando alternativas.",
-        recommendedApproach:
-          "Demonstrar o Mecanismo Único (MUV): como a Base Estratégica alimenta Linha, Calendário, Temas e Roteiros.",
+        description: "",
+        recommendedApproach: "",
       },
       {
         level: "Consciente do Produto",
-        description:
-          "Já conhece a oferta, mas tem dúvidas sobre tempo de execução e aderência ao seu caso.",
-        recommendedApproach:
-          "Quebra direta de objeções de rotina, bastidores práticos de uso e estudos de aplicação.",
+        description: "",
+        recommendedApproach: "",
       },
       {
         level: "Totalmente Consciente",
-        description:
-          "Pronto para decidir; precisa apenas de clareza de condição, próximo passo e urgência legítima.",
-        recommendedApproach:
-          "Chamada direta para ação (CTA de conversão), resumo de entregáveis e garantia de direção.",
+        description: "",
+        recommendedApproach: "",
       },
     ],
     voiceArchetypeLabel: "Direto, Estratégico e Sem Rodeios",
-    voiceTraits: [
-      "Direto e sem rodeios",
-      "Professoral, mas sem ser chato",
-      "Elegante, sem parecer distante",
-      "Forte, sem parecer teatral",
-    ],
-    voiceHowToOpenReasoning:
-      "Abrir sempre expondo uma contradição real do mercado ou uma dor específica do ICP nos primeiros 3 segundos, seguida pela tese central da marca.",
-    voiceWhatToRepeat: [
-      "O conteúdo nunca começa pelo post; começa pelo contexto.",
-      "Sem Base Estratégica, qualquer calendário vira improviso organizado.",
-      "Cada formato cumpre uma função dentro da matriz RETINA.",
-      "A IA propõe e acelera; o estrategista revisa e aprova.",
-    ],
-    voiceWhatToAvoid: [
-      "Nunca usar jargões infantis, gírias forçadas ou promessas de dinheiro fácil.",
-      "Evitar aberturas lentas como 'Olá pessoal, no vídeo de hoje vamos falar sobre...'.",
-      "Nunca publicar conteúdo desconectado dos pilares ou da oferta ativa do projeto.",
-    ],
-    centralMessage: `Comunicação estratégica orientada para ${objective.toLowerCase() || "conversão e autoridade"} em ${niche || "Finanças"}, combatendo o improviso desconectado e instalando previsibilidade através do método proprietário.`,
-    pillars: [
-      {
-        id: "pil-1",
-        title: "01. Visão de Mundo & Quebra de Mitos do Mercado",
-        objective:
-          "Desconstruir crenças erradas do ICP e posicionar a tese soberana da marca.",
-        connectedPainOrDesire:
-          "Combate o mito do volume cego e gera identificação imediata com compradores maduros.",
-      },
-      {
-        id: "pil-2",
-        title: "02. Diagnóstico dos Erros Invisíveis do ICP",
-        objective:
-          "Elevar o nível de consciência mostrando a causa estrutural da falta de resultado.",
-        connectedPainOrDesire:
-          "Ataca a dor de produzir muito e atrair apenas curiosos desqualificados.",
-      },
-      {
-        id: "pil-3",
-        title: "03. Mecanismo Único da Oferta (MUV em Ação)",
-        objective:
-          "Explicar por que o método proprietário funciona onde as tentativas passadas falharam.",
-        connectedPainOrDesire:
-          "Conecta o desejo de previsibilidade diretamente à lógica da oferta principal.",
-      },
-      {
-        id: "pil-4",
-        title: "04. Educação Prática & Transformação Aplicável",
-        objective:
-          "Entregar vitórias rápidas e acionáveis que provam a competência técnica do especialista.",
-        connectedPainOrDesire:
-          "Gera salvamentos qualificados e constrói confiança técnica imediata.",
-      },
-      {
-        id: "pil-5",
-        title: "05. Bastidores da Execução & Provas Reais",
-        objective:
-          "Documentar a rotina real, critérios técnicos e estudos de caso da operação.",
-        connectedPainOrDesire:
-          "Humaniza a autoridade e tangibiliza a entrega do produto.",
-      },
-      {
-        id: "pil-6",
-        title: "06. Superação de Objeções & Condução para Oferta",
-        objective:
-          "Responder diretamente às travas de tempo, preço e aplicação antes do fechamento.",
-        connectedPainOrDesire:
-          "Remove o atrito de compra para os leads conscientes da solução e do produto.",
-      },
-    ],
+    voiceTraits: [],
+    voiceHowToOpenReasoning: "",
+    voiceWhatToRepeat: [],
+    voiceWhatToAvoid: [],
+    centralMessage: objective
+      ? `Comunicação estratégica orientada para ${objective.toLowerCase()}.`
+      : "",
+    pillars: [],
     retinaDistribution: {
       Relacionamento: 20,
-      Engajamento: 10,
+      Engajamento: 15,
       Transformacao: 25,
       Interacao: 10,
-      NiveisDeConsciencia: 20,
+      NiveisDeConsciencia: 15,
       Autoridade: 15,
     },
     weeklyCapacity: {
@@ -560,7 +411,7 @@ Profissionais liberais, especialistas técnicos, mentores, infoprodutores e gest
       carousels: 2,
       staticPosts: 2,
       weeklyLives: 1,
-      dailyStorySequences: 4,
+      dailyStorySequences: 3,
       storiesPerSequence: 5,
     },
   };
@@ -575,187 +426,20 @@ function formatFileSize(bytes: number): string {
 }
 
 /* ========================================================================== */
-/* MOTOR LOCAL INTELIGENTE DE EXTRAÇÃO SEMÂNTICA DO ICP (ARQUIVO OU TEXTO)    */
-/* ========================================================================== */
-
-function extractStructuredICPFromRawText(
-  rawText: string,
-  niche: string,
-  subniche: string
-): {
-  profileSummary: string;
-  vocabularyAndSlang: string;
-  pains: string[];
-  desires: string[];
-  objections: string[];
-  myths: string[];
-  triggers: string[];
-} {
-  const cleanLines = rawText
-    .split(/\r?\n/)
-    .map((line) => line.replace(/^[\s•\-*0-9.)]+/, "").trim())
-    .filter((line) => line.length > 18);
-
-  const findMatchingLines = (keywords: string[], fallback: string[]): string[] => {
-    const matched: string[] = [];
-    for (const line of cleanLines) {
-      const lower = line.toLowerCase();
-      if (
-        keywords.some((kw) => lower.includes(kw)) &&
-        !lower.endsWith(":") &&
-        line.length <= 220
-      ) {
-        if (!matched.includes(line)) {
-          matched.push(line);
-        }
-      }
-      if (matched.length >= 6) break;
-    }
-    return matched.length >= 2 ? matched : fallback;
-  };
-
-  const pains = findMatchingLines(
-    [
-      "dor",
-      "problema",
-      "frustra",
-      "improviso",
-      "cansad",
-      "exaust",
-      "falta de",
-      "não consegu",
-      "dificuldade",
-      "trav",
-      "erro",
-      "perde",
-      "sofre",
-    ],
-    [
-      `Improviso constante na comunicação de ${niche} sem conexão direta com a oferta principal.`,
-      "Atração de seguidores curiosos que consomem conteúdo gratuito mas não avançam para compra.",
-      "Falta de tempo na rotina para produzir conteúdos complexos sem direção estratégica.",
-      "Textos e roteiros genéricos que não refletem a profundidade técnica do especialista.",
-      "Sensação de estagnação comercial mesmo mantendo frequência de publicação.",
-    ]
-  );
-
-  const desires = findMatchingLines(
-    [
-      "desej",
-      "quer",
-      "busca",
-      "objetivo",
-      "sonh",
-      "ambiç",
-      "previsibilidade",
-      "reconhecid",
-      "autoridade",
-      "escalar",
-      "vender",
-      "liberdade",
-      "clareza",
-    ],
-    [
-      `Ser reconhecido como autoridade incontestável em ${subniche || niche}.`,
-      "Possuir uma operação editorial previsível que caiba na disponibilidade real da semana.",
-      "Atrair compradores qualificados que já compreendem o valor da oferta antes do atendimento.",
-      "Transformar o conhecimento técnico em ativos de conteúdo que geram vendas recorrentes.",
-    ]
-  );
-
-  const objections = findMatchingLines(
-    [
-      "objeç",
-      "receio",
-      "medo",
-      "dúvida",
-      "será que",
-      "não tenho tempo",
-      "caro",
-      "preço",
-      "já tentei",
-      "específico",
-      "rotina",
-    ],
-    [
-      "Minha rotina é muito intensa; não consigo sustentar uma produção pesada de conteúdo.",
-      "Já testei ferramentas de IA antes e o resultado ficou artificial e sem a minha personalidade.",
-      `Meu mercado (${subniche || niche}) é muito específico; fórmulas genéricas não funcionam nele.`,
-      "Preciso ver aplicação prática imediata para justificar o investimento de tempo e capital.",
-    ]
-  );
-
-  const myths = findMatchingLines(
-    [
-      "mito",
-      "crença",
-      "fracasso",
-      "erradamente",
-      "ilusão",
-      "acha que",
-      "tentou",
-      "postar todo dia",
-      "viral",
-    ],
-    [
-      "Mito de que quantidade bruta de posts substitui posicionamento e linha editorial.",
-      "Crença de que conteúdo denso e estratégico afasta o público comprador.",
-      "Fracasso passado ao seguir calendários prontos que ignoravam a oferta e o MUV do negócio.",
-      "Ilusão de que métricas de vaidade (views aleatórios) pagam as contas da operação.",
-    ]
-  );
-
-  const triggers = findMatchingLines(
-    [
-      "gatilho",
-      "decisão",
-      "compra quando",
-      "confia",
-      "prova",
-      "método",
-      "clareza",
-      "segurança",
-    ],
-    [
-      "Clareza metodológica que demonstra domínio real de causa e efeito.",
-      "Planejamento adaptável à capacidade operacional real do especialista.",
-      "Conexão transparente entre diagnóstico do problema, mecanismo único e oferta.",
-    ]
-  );
-
-  const firstParagraph =
-    cleanLines.find((l) => l.length > 45 && !l.toUpperCase().startsWith("DOSSIÊ")) ||
-    `Comprador qualificado de ${niche} (${subniche}) que valoriza direção estratégica, método comprovado e eficiência operacional acima de táticas superficiais.`;
-
-  return {
-    profileSummary: firstParagraph.slice(0, 320),
-    vocabularyAndSlang:
-      "Linguagem pragmática, orientada a resultado, eficiência, posicionamento de alto valor, previsibilidade e método aplicável.",
-    pains,
-    desires,
-    objections,
-    myths,
-    triggers,
-  };
-}
-
-/* ========================================================================== */
 /* COMPONENTE PRINCIPAL: LinhaEditorialModule                                 */
 /* ========================================================================== */
 
 export function LinhaEditorialModule(props: LinhaEditorialModuleProps) {
-  const resolvedProjectId = props.projectId || "proj-default";
+  const resolvedProjectId = props.projectId || "";
   const projectName = props.projectName || "Projeto Editorial";
   const { initialView } = props;
 
-  const resolvedNiche =
-    props.projectNiche || props.niche || "Finanças & Investimentos";
-  const resolvedSubniche =
-    props.projectSubniche || props.subniche || "Algorithmic Trading";
+  const resolvedNiche = props.projectNiche || props.niche || "";
+  const resolvedSubniche = props.projectSubniche || props.subniche || "";
   const resolvedObjective =
     props.projectObjective || props.currentObjective || "Conversão";
   const resolvedPhase =
-    props.currentPhase || "Aquecimento — Operação Estratégica";
+    props.currentPhase || "Estruturação Estratégica";
 
   const handleTriggerGoToCalendar = useCallback(() => {
     if (props.onGoToCalendarTab) {
@@ -771,44 +455,12 @@ export function LinhaEditorialModule(props: LinhaEditorialModuleProps) {
     props.onNavigateToCalendar,
   ]);
 
-  const storageKey = `la-linha-editorial-v2-${resolvedProjectId}`;
-
-  /* Estado das Versões da Linha Editorial */
+  /* Estado das Versões da Linha Editorial (persistido no MongoDB via BFF) */
   const [versions, setVersions] = useState<readonly LineEditorialVersionRecord[]>(
-    () => [
-      {
-        id: "line-v1-active",
-        name: `Linha Editorial v1 — ${(projectName || "").split("—")[1]?.trim() || "Base Estratégica"}`,
-        status: "active",
-        createdAt: "15/10/2026",
-        updatedAt: "Hoje às 14:20",
-        phaseTag: resolvedPhase,
-        strategicBase: createDefaultStrategicBase(
-          resolvedNiche,
-          resolvedSubniche,
-          resolvedObjective
-        ),
-      },
-      {
-        id: "line-v2-aquecimento",
-        name: "Linha Editorial v2 — Campanha de Aquecimento & Conversão",
-        status: "review_recommended",
-        createdAt: "22/10/2026",
-        updatedAt: "Ontem às 19:10",
-        phaseTag: "Pré-Lançamento / Intensificação RETINA",
-        reviewReason:
-          "O projeto entrou em fase de aquecimento comercial. Recomendamos elevar o peso de Níveis de Consciência e Autoridade na distribuição RETINA.",
-        strategicBase: createDefaultStrategicBase(
-          resolvedNiche,
-          resolvedSubniche,
-          "Aquecer para campanha de vendas"
-        ),
-      },
-    ]
+    [],
   );
-
-  const [selectedVersionId, setSelectedVersionId] =
-    useState<string>("line-v1-active");
+  const [isLoadingVersions, setIsLoadingVersions] = useState<boolean>(true);
+  const [selectedVersionId, setSelectedVersionId] = useState<string>("");
 
   /* Controle das 3 Telas Internas da Subfunção */
   const [viewMode, setViewMode] = useState<"versions" | "onboarding" | "map">(
@@ -856,65 +508,164 @@ export function LinhaEditorialModule(props: LinhaEditorialModuleProps) {
   const [renameValue, setRenameValue] = useState<string>("");
 
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  /* Carrega estado persistido do localStorage */
-  useEffect(() => {
+  /* Carrega versões persistidas no backend */
+  const loadVersions = useCallback(async () => {
+    if (!resolvedProjectId || resolvedProjectId === "proj-default") {
+      setIsLoadingVersions(false);
+      return;
+    }
+    setIsLoadingVersions(true);
     try {
-      const saved = window.localStorage.getItem(storageKey);
-      if (saved) {
-        const parsed = JSON.parse(saved) as LineEditorialVersionRecord[];
-        if (Array.isArray(parsed) && parsed.length > 0) {
-          setVersions(parsed);
-          setSelectedVersionId(parsed[0].id);
-        }
+      const apiVersions = await editorialService.listVersions(resolvedProjectId);
+      const mapped = await Promise.all(
+        (apiVersions || []).map(async (v: any) => {
+          const vid = String(v.id || v._id || "");
+          const baseTemplate = createEmptyStrategicBase(
+            resolvedNiche,
+            resolvedSubniche,
+            resolvedObjective,
+          );
+          let strategicBase: StrategicBaseData = baseTemplate;
+          if (v.strategicBase && typeof v.strategicBase === "object") {
+            strategicBase = { ...baseTemplate, ...(v.strategicBase as any) };
+          } else if (vid) {
+            try {
+              const mapa = await editorialService.getMapa(vid);
+              if (mapa) {
+                strategicBase = {
+                  ...baseTemplate,
+                  positioningStatement:
+                    mapa.positioningPhrase || baseTemplate.positioningStatement,
+                  centralMessage:
+                    mapa.mensagemCentral || baseTemplate.centralMessage,
+                  pillars: (mapa.pilares || []).map((p: any, i: number) => ({
+                    id: `pil-${i + 1}`,
+                    title: p.title,
+                    objective: p.description || "",
+                    connectedPainOrDesire: "",
+                  })),
+                  voiceTraits: mapa.tomDeVoz?.traits || [],
+                };
+              }
+            } catch {
+              /* Versão recém-criada pode não possuir mapa salvo */
+            }
+          }
+          return {
+            id: vid,
+            name: v.name || `Linha Editorial v${v.versionNumber || 1}`,
+            status: (v.status as LineEditorialStatus) || "draft",
+            createdAt: v.createdAt
+              ? new Date(v.createdAt).toLocaleDateString("pt-BR")
+              : "Recente",
+            updatedAt: v.updatedAt
+              ? new Date(v.updatedAt).toLocaleTimeString("pt-BR", {
+                  hour: "2-digit",
+                  minute: "2-digit",
+                })
+              : "Recente",
+            phaseTag: v.phaseTag || resolvedPhase,
+            reviewReason: v.reviewReason,
+            strategicBase,
+          } satisfies LineEditorialVersionRecord;
+        }),
+      );
+      setVersions(mapped);
+      if (mapped.length > 0) {
+        const active = mapped.find((m) => m.status === "active") || mapped[0];
+        setSelectedVersionId((prev) =>
+          mapped.some((m) => m.id === prev) ? prev : active.id,
+        );
       }
     } catch {
-      /* Ignora erro de storage */
+      /* Mantém vazio se projeto novo sem versões */
+    } finally {
+      setIsLoadingVersions(false);
     }
-  }, [storageKey]);
+  }, [
+    resolvedProjectId,
+    resolvedNiche,
+    resolvedSubniche,
+    resolvedObjective,
+    resolvedPhase,
+  ]);
 
-  /* Persistência automática */
+  useEffect(() => {
+    void loadVersions();
+    return () => {
+      if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+    };
+  }, [loadVersions]);
+
+  /* Persistência automática com debounce para BFF/MongoDB */
   const persistVersions = useCallback(
-    (nextVersions: readonly LineEditorialVersionRecord[]) => {
+    (
+      nextVersions: readonly LineEditorialVersionRecord[],
+      changedVersionId?: string,
+    ) => {
       setAutosaveStatus("saving");
       setVersions(nextVersions);
-      try {
-        window.localStorage.setItem(storageKey, JSON.stringify(nextVersions));
-        setTimeout(() => {
+
+      const targetId = changedVersionId || selectedVersionId;
+      const target = nextVersions.find((v) => v.id === targetId);
+
+      if (
+        !target ||
+        !resolvedProjectId ||
+        target.id.startsWith("__draft")
+      ) {
+        setAutosaveStatus("saved");
+        return;
+      }
+
+      if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+      saveTimerRef.current = setTimeout(async () => {
+        try {
+          await editorialService.updateVersion(target.id, {
+            name: target.name,
+            phaseTag: target.phaseTag,
+            strategicBase: target.strategicBase as unknown as Record<
+              string,
+              unknown
+            >,
+          } as any);
           setAutosaveStatus("saved");
           const now = new Date();
           setLastSavedTime(
             now.toLocaleTimeString("pt-BR", {
               hour: "2-digit",
               minute: "2-digit",
-            })
+            }),
           );
-        }, 280);
-      } catch {
-        setAutosaveStatus("error");
-      }
+        } catch {
+          setAutosaveStatus("error");
+        }
+      }, 450);
     },
-    [storageKey]
+    [resolvedProjectId, selectedVersionId],
   );
 
   const currentVersion = useMemo(() => {
-    const fallback: LineEditorialVersionRecord = versions[0] ?? {
-      id: "line-v1-fallback",
-      name: `Linha Editorial v1 — ${(projectName || "").split("—")[1]?.trim() || "Base Estratégica"}`,
-      status: "active" as const,
-      createdAt: "15/10/2026",
-      updatedAt: "Hoje às 14:20",
+    const emptyFallback: LineEditorialVersionRecord = {
+      id: "__draft_empty__",
+      name: `Linha Editorial — ${projectName}`,
+      status: "draft",
+      createdAt: "Nova",
+      updatedAt: "Não salva",
       phaseTag: resolvedPhase,
-      strategicBase: createDefaultStrategicBase(
+      strategicBase: createEmptyStrategicBase(
         resolvedNiche,
         resolvedSubniche,
-        resolvedObjective
+        resolvedObjective,
       ),
     };
+    if (versions.length === 0) return emptyFallback;
     return (
       versions.find((v) => v.id === selectedVersionId) ??
       versions.find((v) => v.status === "active") ??
-      fallback
+      versions[0]
     );
   }, [
     versions,
@@ -930,17 +681,20 @@ export function LinhaEditorialModule(props: LinhaEditorialModuleProps) {
 
   const updateStrategicBase = useCallback(
     (updater: (prev: StrategicBaseData) => StrategicBaseData) => {
+      if (versions.length === 0) {
+        return;
+      }
       const next = versions.map((ver) => {
         if (ver.id !== currentVersion.id) return ver;
         return {
           ...ver,
-          updatedAt: "Salvo automaticamente agora",
+          updatedAt: "Salvo automaticamente",
           strategicBase: updater(ver.strategicBase),
         };
       });
-      persistVersions(next);
+      persistVersions(next, currentVersion.id);
     },
-    [versions, currentVersion.id, persistVersions]
+    [versions, currentVersion.id, persistVersions],
   );
 
   const icpTextMetrics = useMemo(() => {
@@ -1085,23 +839,30 @@ export function LinhaEditorialModule(props: LinhaEditorialModuleProps) {
           ? `${currentBase.icpRawText}\n\n${extractedText}`
           : extractedText;
 
-        const extractedMatrix = extractStructuredICPFromRawText(
-          combinedRawText,
-          currentBase.niche,
-          currentBase.subniche
+        const extractedMatrix = await editorialService.extractIcp(
+          resolvedProjectId,
+          {
+            rawText: combinedRawText,
+            niche: currentBase.niche || resolvedNiche,
+            brandOrClientName: projectName,
+          },
         );
 
         updateStrategicBase((prev) => ({
           ...prev,
           icpUploadedDocs: [newDocRecord, ...prev.icpUploadedDocs],
           icpRawText: combinedRawText,
-          icpProfileSummary: extractedMatrix.profileSummary,
-          icpVocabularyAndSlang: extractedMatrix.vocabularyAndSlang,
-          icpPains: extractedMatrix.pains,
-          icpDesires: extractedMatrix.desires,
-          icpObjections: extractedMatrix.objections,
-          icpMythsAndPastFailures: extractedMatrix.myths,
-          icpDecisionTriggers: extractedMatrix.triggers,
+          icpProfileSummary:
+            extractedMatrix.profileSummary || prev.icpProfileSummary,
+          icpVocabularyAndSlang:
+            extractedMatrix.vocabularyAndSlang || prev.icpVocabularyAndSlang,
+          icpPains: extractedMatrix.pains || prev.icpPains,
+          icpDesires: extractedMatrix.desires || prev.icpDesires,
+          icpObjections: extractedMatrix.objections || prev.icpObjections,
+          icpMythsAndPastFailures:
+            extractedMatrix.myths || prev.icpMythsAndPastFailures,
+          icpDecisionTriggers:
+            extractedMatrix.triggers || prev.icpDecisionTriggers,
         }));
 
         setExtractionSuccessBanner(
@@ -1112,22 +873,20 @@ export function LinhaEditorialModule(props: LinhaEditorialModuleProps) {
           "Não foi possível processar o arquivo enviado. Tente novamente ou cole o conteúdo na aba de Texto Completo."
         );
       } finally {
-        setTimeout(() => {
-          setIsUploadingFile(false);
-          setUploadProgress(0);
-        }, 300);
+        setIsUploadingFile(false);
+        setUploadProgress(0);
       }
     },
     [
       currentBase.icpRawText,
       currentBase.niche,
-      currentBase.subniche,
       projectName,
+      resolvedProjectId,
       resolvedNiche,
       resolvedObjective,
       resolvedSubniche,
       updateStrategicBase,
-    ]
+    ],
   );
 
   const handleFileDrop = (event: DragEvent<HTMLDivElement>) => {
@@ -1149,8 +908,8 @@ export function LinhaEditorialModule(props: LinhaEditorialModuleProps) {
     }));
   };
 
-  /* Extração com IA a partir do Texto */
-  const handleRunAIExtractionFromRawText = () => {
+  /* Extração com IA a partir do Texto (via BFF / MapaGenerator) */
+  const handleRunAIExtractionFromRawText = async () => {
     if (!currentBase.icpRawText.trim()) {
       setUploadError(
         "Cole o texto do seu ICP ou faça upload de um arquivo antes de acionar a estruturação com IA."
@@ -1162,29 +921,36 @@ export function LinhaEditorialModule(props: LinhaEditorialModuleProps) {
     setIsExtractingWithAI(true);
     setExtractionSuccessBanner(null);
 
-    setTimeout(() => {
-      const extracted = extractStructuredICPFromRawText(
-        currentBase.icpRawText,
-        currentBase.niche,
-        currentBase.subniche
-      );
+    try {
+      const extracted = await editorialService.extractIcp(resolvedProjectId, {
+        rawText: currentBase.icpRawText,
+        niche: currentBase.niche || resolvedNiche,
+        brandOrClientName: projectName,
+      });
 
       updateStrategicBase((prev) => ({
         ...prev,
-        icpProfileSummary: extracted.profileSummary,
-        icpVocabularyAndSlang: extracted.vocabularyAndSlang,
-        icpPains: extracted.pains,
-        icpDesires: extracted.desires,
-        icpObjections: extracted.objections,
-        icpMythsAndPastFailures: extracted.myths,
-        icpDecisionTriggers: extracted.triggers,
+        icpProfileSummary: extracted.profileSummary || prev.icpProfileSummary,
+        icpVocabularyAndSlang:
+          extracted.vocabularyAndSlang || prev.icpVocabularyAndSlang,
+        icpPains: extracted.pains || prev.icpPains,
+        icpDesires: extracted.desires || prev.icpDesires,
+        icpObjections: extracted.objections || prev.icpObjections,
+        icpMythsAndPastFailures:
+          extracted.myths || prev.icpMythsAndPastFailures,
+        icpDecisionTriggers: extracted.triggers || prev.icpDecisionTriggers,
       }));
 
-      setIsExtractingWithAI(false);
       setExtractionSuccessBanner(
         `Extração concluída! ${icpTextMetrics.words.toLocaleString("pt-BR")} palavras analisadas e convertidas em Dores, Desejos, Objeções, Mitos e Níveis de Consciência.`
       );
-    }, 550);
+    } catch {
+      setUploadError(
+        "Não foi possível executar a extração estratégica no momento. Tente novamente."
+      );
+    } finally {
+      setIsExtractingWithAI(false);
+    }
   };
 
   const handlePasteFromClipboard = async () => {
@@ -1208,92 +974,157 @@ export function LinhaEditorialModule(props: LinhaEditorialModuleProps) {
     }
   };
 
-  /* Handlers de Versão */
-  const handleCreateNewVersion = (e: FormEvent<HTMLFormElement>) => {
+  /* Handlers de Versão (persistidos no backend) */
+  const handleCreateNewVersion = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
+    if (!resolvedProjectId) return;
     const title =
       newVersionName.trim() ||
       `Linha Editorial v${versions.length + 1} — ${newVersionPhase.trim() || "Nova Fase"}`;
 
-    const created: LineEditorialVersionRecord = {
-      id: `line-v-${Date.now()}`,
-      name: title,
-      status: "draft",
-      createdAt: "Criada hoje",
-      updatedAt: "Agora mesmo",
-      phaseTag: newVersionPhase.trim() || "Em estruturação",
-      strategicBase: { ...currentBase },
-    };
+    try {
+      const saved = await editorialService.createVersion(resolvedProjectId, {
+        name: title,
+        status: versions.length === 0 ? "active" : "draft",
+        phaseTag: newVersionPhase.trim() || "Em estruturação",
+        strategicBase: { ...currentBase } as unknown as Record<
+          string,
+          unknown
+        >,
+      });
 
-    const next = [created, ...versions];
-    persistVersions(next);
-    setSelectedVersionId(created.id);
-    setNewVersionName("");
-    setIsCreateVersionModalOpen(false);
-    setViewMode("onboarding");
-    setActiveOnboardingStep("icp_profundo");
+      const created: LineEditorialVersionRecord = {
+        id: String(saved.id || (saved as any)._id),
+        name: saved.name,
+        status: (saved.status as LineEditorialStatus) || "draft",
+        createdAt: "Criada hoje",
+        updatedAt: "Agora mesmo",
+        phaseTag: newVersionPhase.trim() || "Em estruturação",
+        strategicBase: { ...currentBase },
+      };
+
+      setVersions((prev) => [created, ...prev]);
+      setSelectedVersionId(created.id);
+      setNewVersionName("");
+      setIsCreateVersionModalOpen(false);
+      setViewMode("onboarding");
+      setActiveOnboardingStep("icp_profundo");
+    } catch {
+      setAutosaveStatus("error");
+    }
   };
 
-  const handleSetVersionActive = (versionId: string) => {
-    const next = versions.map((v) => {
-      if (v.id === versionId) {
-        return {
-          ...v,
-          status: "active" as const,
-          updatedAt: "Definida como ativa agora",
-          reviewReason: undefined,
-        };
-      }
-      if (v.status === "active") {
-        return { ...v, status: "draft" as const };
-      }
-      return v;
-    });
-    persistVersions(next);
-    setSelectedVersionId(versionId);
+  const handleSetVersionActive = async (versionId: string) => {
+    if (!versionId || versionId.startsWith("__draft")) {
+      setIsCreateVersionModalOpen(true);
+      return;
+    }
+    try {
+      await editorialService.updateVersion(versionId, { status: "active" });
+      setVersions((prev) =>
+        prev.map((v) => {
+          if (v.id === versionId) {
+            return {
+              ...v,
+              status: "active" as const,
+              updatedAt: "Definida como ativa agora",
+              reviewReason: undefined,
+            };
+          }
+          if (v.status === "active") {
+            return { ...v, status: "archived" as const };
+          }
+          return v;
+        }),
+      );
+      setSelectedVersionId(versionId);
+    } catch {
+      setAutosaveStatus("error");
+    }
   };
 
-  const handleDuplicateVersion = (ver: LineEditorialVersionRecord) => {
-    const duplicated: LineEditorialVersionRecord = {
-      ...ver,
-      id: `line-dup-${Date.now()}`,
-      name: `${ver.name} (Cópia)`,
-      status: "draft",
-      createdAt: "Duplicada hoje",
-      updatedAt: "Agora mesmo",
-      strategicBase: { ...ver.strategicBase },
-    };
-    persistVersions([duplicated, ...versions]);
-    setSelectedVersionId(duplicated.id);
+  const handleDuplicateVersion = async (ver: LineEditorialVersionRecord) => {
+    try {
+      const saved = await editorialService.duplicateVersion(ver.id);
+      const duplicated: LineEditorialVersionRecord = {
+        ...ver,
+        id: String((saved as any).id || (saved as any)._id),
+        name: saved.name || `${ver.name} (Cópia)`,
+        status: "draft",
+        createdAt: "Duplicada hoje",
+        updatedAt: "Agora mesmo",
+        strategicBase: { ...ver.strategicBase },
+      };
+      setVersions((prev) => [duplicated, ...prev]);
+      setSelectedVersionId(duplicated.id);
+    } catch {
+      setAutosaveStatus("error");
+    }
   };
 
-  const handleToggleArchiveVersion = (ver: LineEditorialVersionRecord) => {
+  const handleToggleArchiveVersion = async (
+    ver: LineEditorialVersionRecord,
+  ) => {
     const nextStatus: LineEditorialStatus =
       ver.status === "archived" ? "draft" : "archived";
-    const next = versions.map((v) =>
-      v.id === ver.id
-        ? { ...v, status: nextStatus, updatedAt: "Status atualizado agora" }
-        : v
-    );
-    persistVersions(next);
+    try {
+      await editorialService.updateVersion(ver.id, { status: nextStatus });
+      setVersions((prev) =>
+        prev.map((v) =>
+          v.id === ver.id
+            ? { ...v, status: nextStatus, updatedAt: "Status atualizado agora" }
+            : v,
+        ),
+      );
+    } catch {
+      setAutosaveStatus("error");
+    }
   };
 
-  const handleSaveRename = (versionId: string) => {
+  const handleSaveRename = async (versionId: string) => {
     if (!renameValue.trim()) {
       setRenamingVersionId(null);
       return;
     }
-    const next = versions.map((v) =>
-      v.id === versionId
-        ? { ...v, name: renameValue.trim(), updatedAt: "Renomeada agora" }
-        : v
-    );
-    persistVersions(next);
-    setRenamingVersionId(null);
+    try {
+      await editorialService.updateVersion(versionId, {
+        name: renameValue.trim(),
+      });
+      setVersions((prev) =>
+        prev.map((v) =>
+          v.id === versionId
+            ? { ...v, name: renameValue.trim(), updatedAt: "Renomeada agora" }
+            : v,
+        ),
+      );
+    } finally {
+      setRenamingVersionId(null);
+    }
   };
 
-  const handleApproveAndOpenMap = () => {
-    handleSetVersionActive(currentVersion.id);
+  const handleApproveAndOpenMap = async () => {
+    if (versions.length === 0 || currentVersion.id.startsWith("__draft")) {
+      const saved = await editorialService.createVersion(resolvedProjectId, {
+        name: `Linha Editorial v1 — ${projectName}`,
+        status: "active",
+        phaseTag: resolvedPhase,
+        strategicBase: currentBase as unknown as Record<string, unknown>,
+      });
+      const created: LineEditorialVersionRecord = {
+        id: String(saved.id || (saved as any)._id),
+        name: saved.name,
+        status: "active",
+        createdAt: "Criada hoje",
+        updatedAt: "Agora mesmo",
+        phaseTag: resolvedPhase,
+        strategicBase: currentBase,
+      };
+      setVersions([created]);
+      setSelectedVersionId(created.id);
+      setViewMode("map");
+      return;
+    }
+    await handleSetVersionActive(currentVersion.id);
     setViewMode("map");
   };
 
@@ -1476,6 +1307,32 @@ export function LinhaEditorialModule(props: LinhaEditorialModuleProps) {
       {/* =================================================================== */}
       {viewMode === "versions" ? (
         <section className="flex flex-col gap-4">
+          {isLoadingVersions ? (
+            <div className="rounded-la-xl border border-white/10 bg-[#080B12]/90 p-8 text-center font-la-mono text-[0.8125rem] text-la-text-secondary">
+              Carregando versões da Linha Editorial...
+            </div>
+          ) : null}
+
+          {!isLoadingVersions && versions.length === 0 ? (
+            <div className="flex flex-col items-center justify-center gap-3 rounded-la-xl border border-dashed border-la-border-gold/40 bg-[#080B12]/90 p-10 text-center">
+              <Compass className="h-8 w-8 text-la-gold" />
+              <h3 className="font-la-sans text-[1.125rem] font-semibold text-la-text-primary">
+                Nenhuma Linha Editorial estruturada ainda
+              </h3>
+              <p className="max-w-[34rem] font-la-sans text-[0.875rem] text-la-text-secondary">
+                Crie a primeira versão da Linha Editorial para documentar ICP, oferta, tom de voz, pilares e distribuição RETINA deste projeto.
+              </p>
+              <button
+                type="button"
+                onClick={() => setIsCreateVersionModalOpen(true)}
+                className="mt-2 inline-flex min-h-[2.625rem] items-center gap-2 rounded-la-md bg-la-gold px-5 py-2 font-la-sans text-[0.8125rem] font-semibold text-la-text-inverse shadow-[var(--la-elevation-gold)] hover:bg-la-gold-light"
+              >
+                <Plus className="h-4 w-4 stroke-[2.5]" />
+                <span>Criar Primeira Linha Editorial</span>
+              </button>
+            </div>
+          ) : null}
+
           {versions.map((ver) => {
             const isSelected = ver.id === currentVersion.id;
             const isActive = ver.status === "active";

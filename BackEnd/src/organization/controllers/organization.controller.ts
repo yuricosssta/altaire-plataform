@@ -248,6 +248,22 @@ export class OrganizationController {
     return this.orgService.updateSettings(orgId, adminId, settings);
   }
 
+  @Patch(':orgId')
+  async updateOrgProfile(
+    @Param('orgId') orgId: string,
+    @Body() body: { name?: string; acronym?: string; billingDocument?: string },
+    @Req() req: any,
+  ) {
+    const adminId = req.user.sub || req.user.id;
+    const isAdmin = isAltaireOwnerOrAdmin(req.user?.email, req.user?.role);
+    return this.orgService.updateOrganizationProfile(
+      orgId,
+      adminId,
+      body,
+      isAdmin,
+    );
+  }
+
   // Busca por slug
   @Get(':slug')
   getBySlug(@Param('slug') slug: string) {

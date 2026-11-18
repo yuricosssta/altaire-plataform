@@ -10,11 +10,10 @@ export async function GET(
     request,
     `/projects/${projectId}/scripts/${scriptId}/versions`,
   );
-
   if ('ok' in result) {
     return NextResponse.json(result.data);
   }
-  return NextResponse.json(result, { status: 502 });
+  return NextResponse.json(result, { status: (result as any)?.status || 502 });
 }
 
 export async function POST(
@@ -23,18 +22,13 @@ export async function POST(
 ) {
   const { projectId, scriptId } = await params;
   const body = await request.json().catch(() => ({}));
-
   const result = await proxyEditorialRequest(
     request,
     `/projects/${projectId}/scripts/${scriptId}/versions`,
-    {
-      method: 'POST',
-      body,
-    },
+    { method: 'POST', body },
   );
-
   if ('ok' in result) {
     return NextResponse.json(result.data, { status: 201 });
   }
-  return NextResponse.json(result, { status: 502 });
+  return NextResponse.json(result, { status: (result as any)?.status || 502 });
 }

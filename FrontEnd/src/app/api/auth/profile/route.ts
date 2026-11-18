@@ -1,56 +1,62 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { verifyInternalToken, getAuthTokenFromRequest } from '@/lib/auth/token.service';
-import { resolveAltaireRoleByEmail } from '@/lib/auth/userProvision';
-import { getBackendApiUrl } from '@/lib/api/serverUtils';
+import {
+  getBackendApiUrl,
+  getBffAuthHeader,
+  getBffOrgHeaders,
+} from '@/lib/api/serverUtils';
 import { success, error, ERROR_CODES } from '@/lib/api/response';
 
-export async function GET(request: NextRequest) {
-  const token = await getAuthTokenFromRequest(request);
-  if (!token) {
-    return NextResponse.json(
-      error(ERROR_CODES.UNAUTHORIZED, 'Token de acesso não encontrado.'),
-      { status: 401 },
-    );
-  }
-
-  const payload = await verifyInternalToken(token);
-  if (!payload) {
-    return NextResponse.json(
-      error(ERROR_CODES.UNAUTHORIZED, 'Token inválido ou expirado.'),
-      { status: 401 },
-    );
-  }
-
-  const resolvedRole = payload.role || resolveAltaireRoleByEmail(payload.email);
-  const backendUrl = getBackendApiUrl();
-
+async function forwardProfile(request: NextRequest, method: 'GET' | 'PATCH' | 'PUT') {
   try {
-    const meResponse = await fetch(`${backendUrl}/users/${payload.sub}`, {
-      headers: {
-        Authorization: `Bearer ${token}`,
-        'x-org-id': 'altaire',
-        'x-org-role': resolvedRole,
-      },
-      cache: 'no-store',
-    });
+    const backendUrl = getBackendApiUrl();
+    const authHeader = await getBffAuthHeader(request);
+    const orgHeaders = getBffOrgHeaders(request);
 
-    if (meResponse.ok) {
-      const userData = await meResponse.json();
-      return NextResponse.json(success(userData));
+    const headers: Record<string, string> = { ...orgHeaders };
+    if (authHeader) headers['Authorization'] = authHeader;
+
+    let bodyStr: string | undefined;
+    if (method !== 'GET') {
+      headers['Content-Type'] = 'application/json';
+      const body = await request.json().catch(() => ({}));
+      bodyStr = JSON.stringify(body);
     }
-  } catch {
-    // Fallback para os claims do JWT caso o BackEnd esteja inacessível
-  }
 
-  return NextResponse.json(
-    success({
-      _id: payload.sub,
-      id: payload.sub,
-      sub: payload.sub,
-      email: payload.email,
-      name: payload.name,
-      org: 'altaire',
-      role: resolvedRole,
-    }),
-  );
+    const response = await fetch(`${backendUrl}/users/profile`, {
+      method,
+      headers,
+      body: bodyStr,
+    });
+    const data = await response.json().catch(() => null);
+
+    if (!response.ok) {
+      return NextResponse.json(
+        error(
+          ERROR_CODES.EXTERNAL_ERROR,
+          data?.message || 'Erro ao processar perfil',
+        ),
+        { status: response.status },
+      );
+    }
+
+    return NextResponse.json(success(data));
+  } catch (err: unknown) {
+    const message =
+      err instanceof Error ? err.message : 'Falha ao conectar com o backend';
+    return NextResponse.json(error(ERROR_CODES.INTERNAL_ERROR, message), {
+      status: 502,
+    });
+  }
+}
+
+export async function GET(request: NextRequest) {
+  return forwardProfile(request, 'GET');
+}
+
+export async function PATCH(request: NextRequest) {
+  return forwardProfile(request, 'PATCH');
+}
+
+export async function PUT(request: NextRequest) {
+  return forwardProfile(request, 'PUT');
 }

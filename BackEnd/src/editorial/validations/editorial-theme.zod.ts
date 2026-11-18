@@ -26,11 +26,26 @@ export const themeStatusSchema = z.enum([
   'archived',
   'favorite',
   'test',
+  'priority_next_cycle',
+  'saved_for_sales',
+  'market_test',
 ]);
 
 export const themeFlagSchema = z.enum([
   'prioritario_proximo_ciclo',
   'guardado_para_vendas',
+]);
+
+export const themeVolumeSchema = z.enum([
+  '12',
+  '15',
+  '18',
+  '20',
+  '24',
+  '30',
+  '45',
+  '50',
+  '100',
 ]);
 
 export const themeObjectiveSchema = z.enum([
@@ -84,33 +99,94 @@ export const themeUpdateSchema = z.object({
   flags: z.array(themeFlagSchema).optional(),
   angle: z.string().optional(),
   approach: themeApproachSchema.optional(),
+  techniqueUsed: z.string().optional(),
+  romaPillar: z.string().optional(),
+  consciousnessAxis: z.string().optional(),
+  recommendedFormat: z.string().optional(),
+  recommendedPlatform: z.string().optional(),
+  painDesireOrObjection: z.string().optional(),
+  isFavorite: z.boolean().optional(),
+  isPriorityNextCycle: z.boolean().optional(),
+  isSavedForSales: z.boolean().optional(),
+  isMarketTest: z.boolean().optional(),
+  allocatedSlotIds: z.array(z.string()).optional(),
 });
 
 export const romaAvatarParamsSchema = z.object({
-  volume: z.enum(['20', '50', '100']),
-  pillars: z.array(z.string()).min(1),
-  retinaPriority: retinaPrioritySchema,
+  volume: themeVolumeSchema.default('20'),
+  pillars: z.array(z.string()).optional(),
+  retinaPriority: retinaPrioritySchema.default('balanced'),
+  niche: z.string().optional(),
+  subniche: z.string().optional(),
 });
 
 export const marketParamsSchema = z.object({
-  volume: z.enum(['20', '50', '100']).optional(),
-  videoLinks: z.array(z.string().url()).max(5).optional(),
+  volume: themeVolumeSchema.optional(),
+  videoLinks: z.array(z.string()).max(10).optional(),
   comments: z.array(z.string()).optional(),
   reviews: z.array(z.string()).optional(),
+  marketNotes: z.string().optional(),
 });
 
 export const objectiveParamsSchema = z.object({
   objective: themeObjectiveSchema,
   businessMoment: businessMomentSchema,
-  platforms: z.array(platformSchema).min(1),
-  volume: z.enum(['20', '50', '100']).optional(),
+  platforms: z.array(platformSchema).optional(),
+  volume: themeVolumeSchema.optional(),
 });
 
 export const generationRequestSchema = z.discriminatedUnion('mode', [
-  z.object({ mode: z.literal('roma_avatar'), params: romaAvatarParamsSchema }),
-  z.object({ mode: z.literal('market'), params: marketParamsSchema }),
-  z.object({ mode: z.literal('objective'), params: objectiveParamsSchema }),
+  z.object({
+    mode: z.literal('roma_avatar'),
+    params: romaAvatarParamsSchema,
+    persist: z.boolean().optional(),
+  }),
+  z.object({
+    mode: z.literal('market'),
+    params: marketParamsSchema,
+    persist: z.boolean().optional(),
+  }),
+  z.object({
+    mode: z.literal('objective'),
+    params: objectiveParamsSchema,
+    persist: z.boolean().optional(),
+  }),
 ]);
+
+export const createThemesBatchSchema = z.object({
+  batchName: z.string().optional(),
+  themes: z
+    .array(
+      z
+        .object({
+          title: z.string().min(1),
+          pillar: z.string().optional(),
+          retinaType: retinaTypeSchema.optional(),
+          consciousnessLevel: consciousnessLevelSchema.optional(),
+          journeyStage: journeyStageSchema.optional(),
+          format: contentFormatSchema.optional(),
+          platforms: z.array(platformSchema).optional(),
+          origin: themeOriginSchema.optional(),
+          status: themeStatusSchema.optional(),
+          flags: z.array(themeFlagSchema).optional(),
+          angle: z.string().optional(),
+          approach: themeApproachSchema.optional(),
+          techniqueUsed: z.string().optional(),
+          romaPillar: z.string().optional(),
+          consciousnessAxis: z.string().optional(),
+          recommendedFormat: z.string().optional(),
+          recommendedPlatform: z.string().optional(),
+          painDesireOrObjection: z.string().optional(),
+          isFavorite: z.boolean().optional(),
+          isPriorityNextCycle: z.boolean().optional(),
+          isSavedForSales: z.boolean().optional(),
+          isMarketTest: z.boolean().optional(),
+          allocatedSlotIds: z.array(z.string()).optional(),
+        })
+        .passthrough(),
+    )
+    .min(1),
+});
 
 export const bulkStatusSchema = z.object({
   themeIds: z.array(z.string().regex(/^[0-9a-fA-F]{24}$/)).min(1),
@@ -122,21 +198,25 @@ export const generateMoreSchema = z.object({
 });
 
 export const calendarSuggestionsRequestSchema = z.object({
-  calendarId: z.string().regex(/^[0-9a-fA-F]{24}$/),
+  calendarId: z.string().min(1),
+  slotId: z.string().optional(),
 });
 
 export const assignThemeSchema = z.object({
-  calendarItemId: z.string().regex(/^[0-9a-fA-F]{24}$/),
-  themeId: z
-    .string()
-    .regex(/^[0-9a-fA-F]{24}$/)
-    .optional(),
+  calendarItemId: z.string().min(1),
+  calendarId: z.string().optional(),
+  themeId: z.string().min(1).optional(),
   title: z.string().optional(),
+  unassign: z.boolean().optional(),
 });
 
 export const rebalanceRequestSchema = z.object({
   objective: themeObjectiveSchema.optional(),
   businessMoment: businessMomentSchema.optional(),
+  scenario: z.string().optional(),
+  calendarId: z.string().optional(),
+  slots: z.array(z.record(z.unknown())).optional(),
+  persist: z.boolean().optional(),
 });
 
 export const simulateRequestSchema = z.object({
@@ -153,6 +233,7 @@ export const saveVersionSchema = z.object({
 
 export type ThemeUpdateInput = z.infer<typeof themeUpdateSchema>;
 export type GenerationRequestInput = z.infer<typeof generationRequestSchema>;
+export type CreateThemesBatchInput = z.infer<typeof createThemesBatchSchema>;
 export type BulkStatusInput = z.infer<typeof bulkStatusSchema>;
 export type GenerateMoreInput = z.infer<typeof generateMoreSchema>;
 export type CalendarSuggestionsRequestInput = z.infer<

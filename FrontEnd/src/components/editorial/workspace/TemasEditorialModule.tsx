@@ -45,11 +45,26 @@ import {
 import {
   FORMAT_META,
   RETINA_META,
+  mapBackendCalendarToRecord,
+  mapBackendFormatToUi,
+  mapBackendRetinaToUi,
+  mapUiFormatToBackend,
   type CalendarSlotItem,
   type EditorialCalendarRecord,
   type RetinaTypeKey,
   type SlotContentFormat,
 } from "./CalendarioEditorialModule";
+import { themesService } from "@/lib/services/themesService";
+import { editorialService } from "@/lib/services/editorialService";
+import type {
+  BusinessMoment,
+  CalendarThemeVersion,
+  RetinaPriority,
+  Theme,
+  ThemeObjective,
+  ThemeVolume,
+} from "@/lib/dto/themes.schema";
+import type { Platform } from "@/lib/dto/editorial.schema";
 
 /* ========================================================================== */
 /* COMPONENTE AUXILIAR: TÍTULO DE TEMA EDITÁVEL MULTILINHA (SEM CORTE)        */
@@ -199,15 +214,6 @@ export interface SavedCalendarThemeVersion {
 /* CONSTANTES CANÔNICAS DO DOCUMENTO DA FUNÇÃO 02                             */
 /* ========================================================================== */
 
-const DEFAULT_ROMA_PILLARS: readonly string[] = [
-  "01. Visão de Mundo & Quebra de Mitos do Mercado",
-  "02. Diagnóstico dos Erros Invisíveis do ICP",
-  "03. Mecanismo Único da Oferta (MUV em Ação)",
-  "04. Educação Prática & Transformação Aplicável",
-  "05. Bastidores da Execução & Provas Reais",
-  "06. Superação de Objeções & Condução para Oferta",
-];
-
 const JOURNEY_STAGES: readonly CustomerJourneyStage[] = [
   "Descoberta",
   "Consideração",
@@ -323,14 +329,6 @@ const MAP_ORIGIN_FILTER_OPTIONS: readonly CustomSelectOption<
   { value: "Objetivo & Momento", label: "Objetivo & Momento" },
 ];
 
-const MAP_PILLAR_FILTER_OPTIONS: readonly CustomSelectOption<string>[] = [
-  { value: "all", label: "Pilar ROMA: Todos" },
-  ...DEFAULT_ROMA_PILLARS.map((p) => ({
-    value: p,
-    label: p,
-  })),
-];
-
 const MAP_RETINA_FILTER_OPTIONS: readonly CustomSelectOption<
   "all" | RetinaTypeKey
 >[] = [
@@ -369,12 +367,6 @@ const MAP_FORMAT_FILTER_OPTIONS: readonly CustomSelectOption<
     label: FORMAT_META[f].shortLabel,
   })),
 ];
-
-const INLINE_PILLAR_OPTIONS: readonly CustomSelectOption<string>[] =
-  DEFAULT_ROMA_PILLARS.map((p) => ({
-    value: p,
-    label: p,
-  }));
 
 const INLINE_RETINA_OPTIONS: readonly CustomSelectOption<RetinaTypeKey>[] = (
   Object.keys(RETINA_META) as RetinaTypeKey[]
@@ -419,563 +411,268 @@ const SIMULATION_SCENARIO_OPTIONS: readonly CustomSelectOption<SimulationScenari
   ];
 
 /* ========================================================================== */
-/* GERADOR INICIAL DE REPERTÓRIO CANÔNICO DA BIBLIOTECA                       */
+/* MAPEAMENTO DETERMINÍSTICO ENTRE SCHEMA BACKEND BFF E UI DA FUNÇÃO 02       */
 /* ========================================================================== */
 
-function createInitialThemeLibrary(
-  niche: string,
-  subniche: string
-): StrategicThemeRecord[] {
-  const n = niche || "Finanças";
-  const sub = subniche || "Algorithmic Trading";
+const OBJECT_ID_REGEX = /^[0-9a-fA-F]{24}$/;
 
-  return [
-    {
-      id: "thm-init-01",
-      title: `Por que repetir o padrão tradicional de ${n} drena sua margem mesmo trabalhando mais`,
-      origin: "ROMA & Avatar",
-      techniqueUsed: "Técnica 3 · Quebra de Mito para chegar à ROMA",
-      romaPillar: DEFAULT_ROMA_PILLARS[0],
-      retinaType: "Engajamento",
-      consciousnessAxis: "Sintoma",
-      journeyStage: "Descoberta",
-      recommendedFormat: "reel_curto",
-      recommendedPlatform: "Instagram",
-      painDesireOrObjection:
-        "Mito de que esforço bruto sem sistema gera previsibilidade.",
-      status: "priority_next_cycle",
-      isFavorite: true,
-      isPriorityNextCycle: true,
-      isSavedForSales: false,
-      isMarketTest: false,
-      allocatedSlotIds: ["slot-w1-d2-1"],
-      createdAt: "Sincronizado",
-    },
-    {
-      id: "thm-init-02",
-      title: `Como diagnosticar gargalos operacionais em ${sub} em 15 minutos usando 4 critérios`,
-      origin: "ROMA & Avatar",
-      techniqueUsed: "Técnica 1 · Subárea Estrutural da ROMA",
-      romaPillar: DEFAULT_ROMA_PILLARS[3],
-      retinaType: "Transformacao",
-      consciousnessAxis: "Solução",
-      journeyStage: "Consideração",
-      recommendedFormat: "carrossel",
-      recommendedPlatform: "Instagram",
-      painDesireOrObjection:
-        "Desejo de possuir um protocolo prático que caiba na rotina real.",
-      status: "favorite",
-      isFavorite: true,
-      isPriorityNextCycle: true,
-      isSavedForSales: false,
-      isMarketTest: false,
-      allocatedSlotIds: ["slot-w1-d2-2"],
-      createdAt: "Sincronizado",
-    },
-    {
-      id: "thm-init-03",
-      title: `A parte que ninguém te explicou sobre gestão de risco em ${sub} quando você tem pouco tempo`,
-      origin: "Dados de Mercado",
-      techniqueUsed:
-        "Técnica 7 · Engenharia Reversa de Comentários ('Mas e se...?')",
-      romaPillar: DEFAULT_ROMA_PILLARS[1],
-      retinaType: "Transformacao",
-      consciousnessAxis: "Solução",
-      journeyStage: "Consideração",
-      recommendedFormat: "video_longo",
-      recommendedPlatform: "YouTube",
-      painDesireOrObjection:
-        "Atrito invisível mapeado nos comentários dos vídeos mais vistos do nicho.",
-      status: "active",
-      isFavorite: false,
-      isPriorityNextCycle: true,
-      isSavedForSales: false,
-      isMarketTest: false,
-      allocatedSlotIds: ["slot-w1-d4-1"],
-      createdAt: "Sincronizado",
-    },
-    {
-      id: "thm-init-04",
-      title: `Quando a regra de "diversificar tudo" em ${n} te sabota em vez de te proteger`,
-      origin: "Dados de Mercado",
-      techniqueUsed: "Técnica 10 · Desconstrução de Estereótipos (Anti-Clichê)",
-      romaPillar: DEFAULT_ROMA_PILLARS[0],
-      retinaType: "Engajamento",
-      consciousnessAxis: "Sintoma",
-      journeyStage: "Descoberta",
-      recommendedFormat: "reel_curto",
-      recommendedPlatform: "TikTok",
-      painDesireOrObjection:
-        "Quebra de dogma repetido pelo mercado que atrai atenção imediata.",
-      status: "market_test",
-      isFavorite: false,
-      isPriorityNextCycle: false,
-      isSavedForSales: false,
-      isMarketTest: true,
-      allocatedSlotIds: [],
-      createdAt: "Sincronizado",
-    },
-    {
-      id: "thm-init-05",
-      title: `"Não tenho tempo para acompanhar ${sub} o dia inteiro" — O protocolo de 45 minutos semanais`,
-      origin: "Objetivo & Momento",
-      techniqueUsed: "Técnica 3 · Árvore de Objeções Críticas",
-      romaPillar: DEFAULT_ROMA_PILLARS[5],
-      retinaType: "NiveisDeConsciencia",
-      consciousnessAxis: "Objeção",
-      journeyStage: "Conversão/Compra",
-      recommendedFormat: "reel_curto",
-      recommendedPlatform: "Instagram",
-      painDesireOrObjection:
-        "Objeção principal de falta de tempo na rotina do comprador.",
-      status: "saved_for_sales",
-      isFavorite: true,
-      isPriorityNextCycle: true,
-      isSavedForSales: true,
-      isMarketTest: false,
-      allocatedSlotIds: ["slot-w1-d5-1"],
-      createdAt: "Sincronizado",
-    },
-    {
-      id: "thm-init-06",
-      title: `Estudo de Caso Real: Como estruturamos a tomada de decisão em ${sub} sem depender de improviso`,
-      origin: "ROMA & Avatar",
-      techniqueUsed: "Técnica 5 · Estudo de Caso que Remove Objeção",
-      romaPillar: DEFAULT_ROMA_PILLARS[4],
-      retinaType: "Autoridade",
-      consciousnessAxis: "Objeção",
-      journeyStage: "Conversão/Compra",
-      recommendedFormat: "carrossel",
-      recommendedPlatform: "Instagram",
-      painDesireOrObjection:
-        "Prova prática de aplicação do Mecanismo Único da Oferta (MUV).",
-      status: "saved_for_sales",
-      isFavorite: true,
-      isPriorityNextCycle: true,
-      isSavedForSales: true,
-      isMarketTest: false,
-      allocatedSlotIds: [],
-      createdAt: "Sincronizado",
-    },
-    {
-      id: "thm-init-07",
-      title: `Onde clicar exatamente para validar sua configuração de ${sub} antes de alocar capital`,
-      origin: "Dados de Mercado",
-      techniqueUsed: "Técnica 12 · Mapeamento de Ilhas de Competência",
-      romaPillar: DEFAULT_ROMA_PILLARS[3],
-      retinaType: "Transformacao",
-      consciousnessAxis: "Solução",
-      journeyStage: "Consideração",
-      recommendedFormat: "carrossel",
-      recommendedPlatform: "Instagram",
-      painDesireOrObjection:
-        "Resolver o detalhe técnico ultra-específico onde o público trava.",
-      status: "active",
-      isFavorite: false,
-      isPriorityNextCycle: false,
-      isSavedForSales: false,
-      isMarketTest: false,
-      allocatedSlotIds: [],
-      createdAt: "Sincronizado",
-    },
-    {
-      id: "thm-init-08",
-      title: `3 princípios inegociáveis que separam operadores profissionais de amadores em ${n}`,
-      origin: "ROMA & Avatar",
-      techniqueUsed: "Técnica 2 · Identificação de Valores & Visão de Mundo",
-      romaPillar: DEFAULT_ROMA_PILLARS[0],
-      retinaType: "Relacionamento",
-      consciousnessAxis: "Sintoma",
-      journeyStage: "Descoberta",
-      recommendedFormat: "post_estatico",
-      recommendedPlatform: "Instagram",
-      painDesireOrObjection:
-        "Conexão por visão de mundo e qualificação de audiência madura.",
-      status: "active",
-      isFavorite: false,
-      isPriorityNextCycle: false,
-      isSavedForSales: false,
-      isMarketTest: false,
-      allocatedSlotIds: [],
-      createdAt: "Sincronizado",
-    },
-    {
-      id: "thm-init-09",
-      title: `Diagnóstico Interativo: Qual dessas 3 travas mais impede sua escala em ${sub} hoje?`,
-      origin: "Objetivo & Momento",
-      techniqueUsed: "Técnica 6 · Lacuna de Atrito (Friction Gap)",
-      romaPillar: DEFAULT_ROMA_PILLARS[1],
-      retinaType: "Interacao",
-      consciousnessAxis: "Sintoma",
-      journeyStage: "Consideração",
-      recommendedFormat: "post_estatico",
-      recommendedPlatform: "Instagram",
-      painDesireOrObjection:
-        "Levantamento de dores ativas para abordagem no Direct.",
-      status: "active",
-      isFavorite: false,
-      isPriorityNextCycle: true,
-      isSavedForSales: false,
-      isMarketTest: false,
-      allocatedSlotIds: [],
-      createdAt: "Sincronizado",
-    },
-    {
-      id: "thm-init-10",
-      title: `Consultoria Ao Vivo: Destravando o plano de ação de ${sub} para os próximos 30 dias`,
-      origin: "Objetivo & Momento",
-      techniqueUsed: "Técnica 4 · Atalhos e Oportunidades para a ROMA",
-      romaPillar: DEFAULT_ROMA_PILLARS[5],
-      retinaType: "Autoridade",
-      consciousnessAxis: "Objeção",
-      journeyStage: "Conversão/Compra",
-      recommendedFormat: "live_semanal",
-      recommendedPlatform: "YouTube",
-      painDesireOrObjection:
-        "Quebra de objeções ao vivo com demonstração do método.",
-      status: "saved_for_sales",
-      isFavorite: true,
-      isPriorityNextCycle: true,
-      isSavedForSales: true,
-      isMarketTest: false,
-      allocatedSlotIds: [],
-      createdAt: "Sincronizado",
-    },
-  ];
+const ALLOWED_VOLUMES = new Set<string>([
+  "12",
+  "15",
+  "18",
+  "20",
+  "24",
+  "30",
+  "45",
+  "50",
+  "100",
+]);
+
+function normalizeThemeVolume(count: number, fallback: ThemeVolume): ThemeVolume {
+  const str = String(count);
+  return (ALLOWED_VOLUMES.has(str) ? str : fallback) as ThemeVolume;
 }
 
-/* ========================================================================== */
-/* GERADOR DE LOTES DE TEMAS POR MODO (10 A 15+ TEMAS PARA CURADORIA)         */
-/* ========================================================================== */
+function mapBackendOriginToUi(origin?: string): ThemeOriginMode {
+  if (origin === "market") return "Dados de Mercado";
+  if (origin === "objective") return "Objetivo & Momento";
+  return "ROMA & Avatar";
+}
 
-function generateBatchForMode(params: {
-  readonly mode: ThemeOriginMode;
-  readonly niche: string;
-  readonly subniche: string;
-  readonly count: number;
-  readonly selectedPillars: readonly string[];
-  readonly retinaFocus: "all" | RetinaTypeKey;
-  readonly marketLinks?: string;
-  readonly marketComments?: string;
-  readonly marketReviews?: string;
-  readonly cycleObjective?: string;
-  readonly businessMoment?: string;
-  readonly platforms?: readonly string[];
-}): StrategicThemeRecord[] {
-  const {
-    mode,
-    niche,
-    subniche,
-    count,
-    selectedPillars,
-    retinaFocus,
-    marketComments,
-    marketReviews,
-    cycleObjective,
-    businessMoment,
-    platforms,
-  } = params;
+function mapUiOriginToBackend(
+  origin: ThemeOriginMode
+): "roma_avatar" | "market" | "objective" {
+  if (origin === "Dados de Mercado") return "market";
+  if (origin === "Objetivo & Momento") return "objective";
+  return "roma_avatar";
+}
 
-  const pillarsToUse =
-    selectedPillars.length > 0 ? selectedPillars : DEFAULT_ROMA_PILLARS;
-  const targetPlatforms =
-    platforms && platforms.length > 0
-      ? platforms
-      : ["Instagram", "YouTube", "TikTok"];
-
-  const templatesRoma: readonly {
-    readonly titleFn: (p: string) => string;
-    readonly technique: string;
-    readonly retina: RetinaTypeKey;
-    readonly axis: ConsciousnessAxis;
-    readonly journey: CustomerJourneyStage;
-    readonly format: SlotContentFormat;
-    readonly pain: string;
-  }[] = [
-    {
-      titleFn: () =>
-        `O erro invisível que impede seu avanço em ${subniche} mesmo dedicando horas toda semana`,
-      technique: "Técnica 1 · Subárea 1 da ROMA (Diagnóstico Raiz)",
-      retina: "Engajamento",
-      axis: "Sintoma",
-      journey: "Descoberta",
-      format: "reel_curto",
-      pain: "Frustração de trabalhar muito na operação sem ver retorno proporcional.",
-    },
-    {
-      titleFn: () =>
-        `Os 4 pilares práticos para sair do improviso em ${niche} e construir previsibilidade`,
-      technique: "Técnica 1 · Subárea 2 da ROMA (Estrutura e Método)",
-      retina: "Transformacao",
-      axis: "Solução",
-      journey: "Consideração",
-      format: "carrossel",
-      pain: "Desejo de ter um passo a passo claro e replicável.",
-    },
-    {
-      titleFn: () =>
-        `O mito número 1 sobre ${subniche} que faz profissionais maduros perderem tempo e margem`,
-      technique: "Técnica 3 · Mitos que bloqueiam a chegada na ROMA",
-      retina: "NiveisDeConsciencia",
-      axis: "Objeção",
-      journey: "Consideração",
-      format: "reel_curto",
-      pain: "Crença equivocada instalada por conselhos genéricos do mercado.",
-    },
-    {
-      titleFn: () =>
-        `Atalho estratégico: Como reduzir em 50% o tempo de análise em ${subniche} com um checklist`,
-      technique: "Técnica 4 · 10 Atalhos e Oportunidades para a ROMA",
-      retina: "Transformacao",
-      axis: "Solução",
-      journey: "Consideração",
-      format: "carrossel",
-      pain: "Falta de tempo operacional na rotina intensa do ICP.",
-    },
-    {
-      titleFn: () =>
-        `Bastidor Real: Como um especialista em ${niche} superou a trava de tempo e validou o método`,
-      technique: "Técnica 5 · Estudo de Caso que Remove Objeção",
-      retina: "Autoridade",
-      axis: "Objeção",
-      journey: "Conversão/Compra",
-      format: "video_longo",
-      pain: "Objeção: 'Será que funciona para alguém com a rotina corrida como a minha?'",
-    },
-    {
-      titleFn: () =>
-        `Por que decidimos construir ${subniche} com foco em fundamento técnico e não em modismos`,
-      technique: "Técnica 2 · Avatar (Sonhos, Valores e Visão de Mundo)",
-      retina: "Relacionamento",
-      axis: "Sintoma",
-      journey: "Descoberta",
-      format: "post_estatico",
-      pain: "Desejo de se conectar com referências sérias e íntegras.",
-    },
-    {
-      titleFn: () =>
-        `Como preparar sua estrutura de ${subniche} hoje para não travar no próximo ciclo de escala`,
-      technique: "Técnica 2 · Avatar (Vencer Dores & Chegar aos Desejos)",
-      retina: "Transformacao",
-      axis: "Solução",
-      journey: "Consideração",
-      format: "video_longo",
-      pain: "Medo de crescer de forma desorganizada e perder qualidade.",
-    },
-    {
-      titleFn: () =>
-        `"Já tentei organizar ${subniche} antes e parei na metade" — O que faltou na sua fundação`,
-      technique: "Técnica 3 · Árvore de Objeções Principal e Secundária",
-      retina: "NiveisDeConsciencia",
-      axis: "Objeção",
-      journey: "Conversão/Compra",
-      format: "reel_curto",
-      pain: "Fracasso passado com ferramentas ou cursos desconectados do contexto.",
-    },
-    {
-      titleFn: () =>
-        `Enquete de Diagnóstico: Em qual destas 3 fases da jornada de ${niche} você está travado?`,
-      technique: "Técnica 6 · Análise de Lacunas de Atrito (Friction Gap)",
-      retina: "Interacao",
-      axis: "Sintoma",
-      journey: "Consideração",
-      format: "post_estatico",
-      pain: "Falta de clareza sobre qual é a prioridade número 1 do momento.",
-    },
-    {
-      titleFn: () =>
-        `Sequência Diária de Bastidores: 4 tomadas de decisão reais na nossa operação de ${subniche}`,
-      technique: "Técnica 5 · Prova Prática Cotidiana",
-      retina: "Relacionamento",
-      axis: "Solução",
-      journey: "Experiência compartilhada",
-      format: "sequencia_stories",
-      pain: "Desejo de ver o método funcionando na prática em tempo real.",
-    },
-  ];
-
-  const customCommentSnippet = marketComments?.trim()
-    ? marketComments.trim().split(/\r?\n/)[0]?.slice(0, 65)
-    : `trabalhar com rotina intensa sem tempo para planilhas complexas`;
-
-  const customReviewSnippet = marketReviews?.trim()
-    ? marketReviews.trim().split(/\r?\n/)[0]?.slice(0, 65)
-    : `explicar como aplicar na prática sem precisar de equipe grande`;
-
-  const templatesMercado: typeof templatesRoma = [
-    {
-      titleFn: () =>
-        `A parte que ninguém te explicou sobre ${subniche} quando você precisa conciliar com ${customCommentSnippet}`,
-      technique:
-        "Técnica 7 · Engenharia Reversa de Comentários ('Mas e se...?')",
-      retina: "Transformacao",
-      axis: "Solução",
-      journey: "Consideração",
-      format: "reel_curto",
-      pain: `Dúvida real extraída de comentários: "${customCommentSnippet}"`,
-    },
-    {
-      titleFn: () =>
-        `Quando seguir a "regra de ouro" de ${niche} sabota seu resultado em vez de ajudar`,
-      technique: "Técnica 10 · Desconstrução de Estereótipos (Anti-Clichê)",
-      retina: "Engajamento",
-      axis: "Sintoma",
-      journey: "Descoberta",
-      format: "reel_curto",
-      pain: "Cansaço de ver os mesmos conselhos superficiais repetidos no feed.",
-    },
-    {
-      titleFn: () =>
-        `Como resolver ${customReviewSnippet} em ${subniche} direto pelo celular em 3 passos`,
-      technique:
-        "Técnica 11 · Engenharia Reversa de Reviews (1★ e 5★ Amazon/Hotmart)",
-      retina: "Transformacao",
-      axis: "Solução",
-      journey: "Consideração",
-      format: "carrossel",
-      pain: `Frustração recorrente mapeada em reviews: "${customReviewSnippet}"`,
-    },
-    {
-      titleFn: () =>
-        `Onde clicar exatamente para configurar seu controle de ${subniche} sem rasgar orçamento`,
-      technique:
-        "Técnica 12 · Mapeamento de Ilhas de Competência (Ultra-específico)",
-      retina: "Transformacao",
-      axis: "Solução",
-      journey: "Consideração",
-      format: "carrossel",
-      pain: "O mercado ensina a teoria geral ('continente'), mas o cliente trava no botão ('ilha').",
-    },
-    {
-      titleFn: () =>
-        `Como executar ${subniche} mesmo em semana de plantão, viagem ou agenda lotada`,
-      technique: "Técnica 9 · Termos Periféricos Invisíveis da Rotina do ICP",
-      retina: "Relacionamento",
-      axis: "Sintoma",
-      journey: "Descoberta",
-      format: "reel_curto",
-      pain: "Conectar o tema técnico ao contexto real de vida do comprador.",
-    },
-    {
-      titleFn: () =>
-        `O erro estratégico de grandes operações do mercado e o que isso ensina para seu negócio de ${niche}`,
-      technique:
-        "Técnica 13 · Cruzamento de Interesses Analógicos & Cultura Pop",
-      retina: "Engajamento",
-      axis: "Sintoma",
-      journey: "Descoberta",
-      format: "carrossel",
-      pain: "Furar a bolha do algoritmo usando metáfora universal de alto interesse.",
-    },
-    {
-      titleFn: () =>
-        `O micro-atrito invisível no primeiro passo de ${subniche} (e como destravar hoje)`,
-      technique: "Técnica 6 · Análise de Lacunas de Atrito (Friction Gap)",
-      retina: "NiveisDeConsciencia",
-      axis: "Objeção",
-      journey: "Conversão/Compra",
-      format: "video_longo",
-      pain: "Resolver a trava inicial que impede o lead de dar o primeiro passo.",
-    },
-  ];
-
-  const templatesObjetivo: typeof templatesRoma = [
-    {
-      titleFn: () =>
-        `Plano de Ação para ${businessMoment || "esta fase"}: Os 3 movimentos prioritários em ${subniche}`,
-      technique: `Alinhamento Direto · ${cycleObjective || "Objetivo do Período"}`,
-      retina: "Autoridade",
-      axis: "Solução",
-      journey: "Consideração",
-      format: "carrossel",
-      pain: `Direcionar a atenção da audiência para ${cycleObjective || "a meta atual"}.`,
-    },
-    {
-      titleFn: () =>
-        `Por que adiar sua decisão em ${subniche} durante ${businessMoment || "este ciclo"} custa o dobro depois`,
-      technique: "Prioridade de Ciclo · Quebra de Objeção Imediata",
-      retina: "NiveisDeConsciencia",
-      axis: "Objeção",
-      journey: "Conversão/Compra",
-      format: "reel_curto",
-      pain: "Urgência legítima conectada ao momento atual da operação.",
-    },
-    {
-      titleFn: () =>
-        `Por dentro do Mecanismo Único: Como entregamos resultado em ${niche} passo a passo`,
-      technique: "Prioridade de Ciclo · Demonstração de Oferta & MUV",
-      retina: "Autoridade",
-      axis: "Objeção",
-      journey: "Conversão/Compra",
-      format: "video_longo",
-      pain: "Tangibilizar os entregáveis da oferta principal para leads conscientes.",
-    },
-    {
-      titleFn: () =>
-        `Perguntas & Respostas de Aquecimento: Respondendo as 5 maiores dúvidas sobre ${subniche}`,
-      technique: "Prioridade de Ciclo · Levantamento de Demanda Qualificada",
-      retina: "Interacao",
-      axis: "Objeção",
-      journey: "Conversão/Compra",
-      format: "live_semanal",
-      pain: "Remover dúvidas finais antes da abertura ou fechamento de campanha.",
-    },
-    {
-      titleFn: () =>
-        `Checklist Prático: Você cumpre os pré-requisitos para escalar em ${subniche}?`,
-      technique: "Prioridade de Ciclo · Qualificação de Compradores",
-      retina: "Transformacao",
-      axis: "Solução",
-      journey: "Consideração",
-      format: "carrossel",
-      pain: "Elevar consciência da solução e filtrar leads prontos.",
-    },
-  ];
-
-  const basePool =
-    mode === "ROMA & Avatar"
-      ? templatesRoma
-      : mode === "Dados de Mercado"
-        ? templatesMercado
-        : templatesObjetivo;
-
-  const generated: StrategicThemeRecord[] = [];
-
-  for (let i = 0; i < count; i++) {
-    const tpl = basePool[i % basePool.length]!;
-    const pillar = pillarsToUse[i % pillarsToUse.length]!;
-    const platform = targetPlatforms[i % targetPlatforms.length]!;
-    const chosenRetina = retinaFocus !== "all" ? retinaFocus : tpl.retina;
-    const cycleSuffix =
-      i >= basePool.length
-        ? ` (Ângulo #${Math.floor(i / basePool.length) + 1})`
-        : "";
-
-    generated.push({
-      id: `thm-batch-${Date.now()}-${i}`,
-      title: `${tpl.titleFn(pillar)}${cycleSuffix}`,
-      origin: mode,
-      techniqueUsed: tpl.technique,
-      romaPillar: pillar,
-      retinaType: chosenRetina,
-      consciousnessAxis: tpl.axis,
-      journeyStage: tpl.journey,
-      recommendedFormat: tpl.format,
-      recommendedPlatform: platform,
-      painDesireOrObjection: tpl.pain,
-      status:
-        mode === "Dados de Mercado" && i % 3 === 0 ? "market_test" : "active",
-      isFavorite: i < 3,
-      isPriorityNextCycle: mode === "Objetivo & Momento" || i < 4,
-      isSavedForSales:
-        chosenRetina === "NiveisDeConsciencia" || chosenRetina === "Autoridade",
-      isMarketTest: mode === "Dados de Mercado" && i % 3 === 0,
-      allocatedSlotIds: [],
-      createdAt: "Gerado neste lote",
-    });
+function mapUiRetinaToBackend(retina: RetinaTypeKey) {
+  switch (retina) {
+    case "Relacionamento":
+      return "relacionamento" as const;
+    case "Engajamento":
+      return "engajamento" as const;
+    case "Transformacao":
+      return "transformacao" as const;
+    case "Interacao":
+      return "interacao" as const;
+    case "NiveisDeConsciencia":
+      return "nivel_consciencia" as const;
+    case "Autoridade":
+      return "autoridade" as const;
   }
+}
 
-  return generated;
+function mapRetinaPriorityToBackend(
+  focus: "all" | RetinaTypeKey
+): RetinaPriority {
+  if (focus === "all") return "balanced";
+  return mapUiRetinaToBackend(focus);
+}
+
+function mapBackendAxisToUi(level?: string): ConsciousnessAxis {
+  const val = String(level || "").toLowerCase();
+  if (val.includes("sintoma")) return "Sintoma";
+  if (val.includes("obje")) return "Objeção";
+  return "Solução";
+}
+
+function mapUiAxisToBackend(
+  axis: ConsciousnessAxis
+): "sintoma" | "solucao" | "objecao" {
+  if (axis === "Sintoma") return "sintoma";
+  if (axis === "Objeção") return "objecao";
+  return "solucao";
+}
+
+function mapBackendJourneyToUi(stage?: string): CustomerJourneyStage {
+  const val = String(stage || "").toLowerCase();
+  if (val.includes("considera")) return "Consideração";
+  if (val.includes("conver")) return "Conversão/Compra";
+  if (val.includes("compart")) return "Experiência compartilhada";
+  if (val.includes("experi")) return "Experiência do comprador";
+  return "Descoberta";
+}
+
+function mapUiJourneyToBackend(
+  stage: CustomerJourneyStage
+): "descoberta" | "consideracao" | "conversao" | "experiencia" | "compartilhamento" {
+  switch (stage) {
+    case "Descoberta":
+      return "descoberta";
+    case "Consideração":
+      return "consideracao";
+    case "Conversão/Compra":
+      return "conversao";
+    case "Experiência do comprador":
+      return "experiencia";
+    case "Experiência compartilhada":
+      return "compartilhamento";
+  }
+}
+
+function mapObjectiveLabelToBackend(label: string): ThemeObjective {
+  const val = label.toLowerCase();
+  if (val.includes("audi")) return "grow_audience";
+  if (val.includes("engaj")) return "increase_engagement";
+  if (val.includes("relacionamento")) return "increase_relationship";
+  if (val.includes("aquecer")) return "warm_up_sales";
+  if (val.includes("lançamento") || val.includes("lancamento")) return "sell_launch";
+  if (val.includes("perpétuo") || val.includes("perpetuo")) return "sell_evergreen";
+  if (val.includes("nutrir") || val.includes("pós-venda")) return "nurture_customers";
+  return "strengthen_authority";
+}
+
+function mapMomentLabelToBackend(label: string): BusinessMoment {
+  const val = label.toLowerCase();
+  if (val.includes("audi")) return "building_audience";
+  if (val.includes("autoridade")) return "building_authority";
+  if (val.includes("pré-venda") || val.includes("pre-venda")) return "pre_sale";
+  if (val.includes("carrinho")) return "cart_open";
+  if (val.includes("pós-vendas") || val.includes("pos-vendas")) return "post_sale";
+  return "organic_maintenance";
+}
+
+function mapUiPlatformsToBackend(platforms: readonly string[]): Platform[] {
+  const mapped: Platform[] = [];
+  for (const p of platforms) {
+    const lower = p.toLowerCase();
+    if (lower.includes("instagram")) mapped.push("instagram");
+    else if (lower.includes("youtube")) mapped.push("youtube");
+    else if (lower.includes("tiktok")) mapped.push("tiktok");
+    else if (lower.includes("linkedin")) mapped.push("linkedin");
+  }
+  return mapped.length > 0 ? Array.from(new Set(mapped)) : ["instagram"];
+}
+
+function mapBackendPlatformToLabel(platforms?: readonly string[], single?: string): string {
+  if (single) return single;
+  const first = platforms?.[0];
+  if (first === "youtube") return "YouTube";
+  if (first === "tiktok") return "TikTok";
+  if (first === "linkedin") return "LinkedIn";
+  return "Instagram";
+}
+
+export function mapBackendThemeToRecord(
+  t: Theme | Record<string, any>
+): StrategicThemeRecord {
+  const id = String((t as any).id || (t as any)._id || "");
+  const statusRaw = String(t.status || "active");
+  const validStatuses: ThemeLibraryStatus[] = [
+    "active",
+    "archived",
+    "favorite",
+    "priority_next_cycle",
+    "saved_for_sales",
+    "market_test",
+  ];
+  const status: ThemeLibraryStatus = validStatuses.includes(statusRaw as ThemeLibraryStatus)
+    ? (statusRaw as ThemeLibraryStatus)
+    : "active";
+
+  const createdLabel =
+    t.createdAt instanceof Date
+      ? t.createdAt.toLocaleDateString("pt-BR")
+      : typeof t.createdAt === "string"
+        ? new Date(t.createdAt).toLocaleDateString("pt-BR")
+        : "Sincronizado";
+
+  return {
+    id,
+    title: String(t.title || "Tema estratégico"),
+    origin: mapBackendOriginToUi(t.origin),
+    techniqueUsed:
+      (t as any).techniqueUsed ||
+      (t as any).approach ||
+      "Motor Editorial ROMA & RETINA",
+    romaPillar: (t as any).romaPillar || t.pillar || "Posicionamento & Valor",
+    retinaType: mapBackendRetinaToUi(t.retinaType),
+    consciousnessAxis: mapBackendAxisToUi(
+      (t as any).consciousnessAxis || t.consciousnessLevel
+    ),
+    journeyStage: mapBackendJourneyToUi(t.journeyStage),
+    recommendedFormat: mapBackendFormatToUi(
+      (t as any).recommendedFormat || t.format
+    ),
+    recommendedPlatform: mapBackendPlatformToLabel(
+      t.platforms,
+      (t as any).recommendedPlatform
+    ),
+    painDesireOrObjection:
+      (t as any).painDesireOrObjection ||
+      (t as any).angle ||
+      (t as any).sourceContext ||
+      "Conectado aos pilares estratégicos do projeto.",
+    status,
+    isFavorite: Boolean((t as any).isFavorite ?? status === "favorite"),
+    isPriorityNextCycle: Boolean(
+      (t as any).isPriorityNextCycle ??
+        (status === "priority_next_cycle" ||
+          (Array.isArray(t.flags) && t.flags.includes("prioritario_proximo_ciclo")))
+    ),
+    isSavedForSales: Boolean(
+      (t as any).isSavedForSales ??
+        (status === "saved_for_sales" ||
+          (Array.isArray(t.flags) && t.flags.includes("guardado_para_vendas")))
+    ),
+    isMarketTest: Boolean((t as any).isMarketTest ?? status === "market_test"),
+    allocatedSlotIds: Array.isArray((t as any).allocatedSlotIds)
+      ? (t as any).allocatedSlotIds.map(String)
+      : [],
+    createdAt: createdLabel,
+  };
+}
+
+function mapThemeRecordToBackendPayload(
+  t: StrategicThemeRecord
+): Record<string, unknown> {
+  return {
+    origin: mapUiOriginToBackend(t.origin),
+    title: t.title,
+    pillar: t.romaPillar,
+    romaPillar: t.romaPillar,
+    retinaType: mapUiRetinaToBackend(t.retinaType),
+    consciousnessLevel: mapUiAxisToBackend(t.consciousnessAxis),
+    consciousnessAxis: t.consciousnessAxis,
+    journeyStage: mapUiJourneyToBackend(t.journeyStage),
+    format: mapUiFormatToBackend(t.recommendedFormat),
+    recommendedFormat: t.recommendedFormat,
+    platforms: mapUiPlatformsToBackend([t.recommendedPlatform]),
+    recommendedPlatform: t.recommendedPlatform,
+    techniqueUsed: t.techniqueUsed,
+    painDesireOrObjection: t.painDesireOrObjection,
+    status: t.status,
+    isFavorite: t.isFavorite,
+    isPriorityNextCycle: t.isPriorityNextCycle,
+    isSavedForSales: t.isSavedForSales,
+    isMarketTest: t.isMarketTest,
+    allocatedSlotIds: [...t.allocatedSlotIds],
+  };
+}
+
+function mapBackendVersionToSavedVersion(
+  v: CalendarThemeVersion | any
+): SavedCalendarThemeVersion {
+  const start = v.period?.startDate
+    ? new Date(v.period.startDate).toLocaleDateString("pt-BR")
+    : "";
+  const end = v.period?.endDate
+    ? new Date(v.period.endDate).toLocaleDateString("pt-BR")
+    : "";
+  return {
+    id: String(v.id || v._id || ""),
+    versionName: String(v.name || "Versão salva"),
+    periodLabel: start && end ? `${start} → ${end}` : "Ciclo editorial",
+    objectiveUsed: String(v.configuration?.objective || ""),
+    businessMomentUsed: String(v.configuration?.businessMoment || ""),
+    savedAt: v.createdAt
+      ? new Date(v.createdAt).toLocaleDateString("pt-BR")
+      : "Salvo recentemente",
+    allocatedCount: Array.isArray(v.slots) ? v.slots.length : 0,
+    slotsSnapshot: [],
+  };
 }
 
 /* ========================================================================== */
@@ -983,19 +680,12 @@ function generateBatchForMode(params: {
 /* ========================================================================== */
 
 export function TemasEditorialModule(props: TemasEditorialModuleProps) {
-  const resolvedProjectId = props.projectId || "proj-default";
-  const resolvedNiche =
-    props.projectNiche || props.niche || "Finanças & Investimentos";
-  const resolvedSubniche =
-    props.projectSubniche || props.subniche || "Algorithmic Trading";
-  const resolvedObjective =
-    props.projectObjective || props.currentObjective || "Conversão";
-  const resolvedPhase = props.currentPhase || "Aquecimento — Semana 2 de 4";
+  const resolvedProjectId = props.projectId || "";
+  const hasValidProjectId = OBJECT_ID_REGEX.test(resolvedProjectId);
+  const resolvedNiche = props.projectNiche || props.niche || "Nicho não informado";
+  const resolvedSubniche = props.projectSubniche || props.subniche || "Subnicho";
+  const resolvedPhase = props.currentPhase || "Ciclo editorial atual";
   const hasActiveLine = props.hasActiveLine ?? true;
-
-  const themesStorageKey = `la-temas-editorial-v2-${resolvedProjectId}`;
-  const calendarStorageKey = `la-calendario-editorial-v2-${resolvedProjectId}`;
-  const versionsStorageKey = `la-calendario-temas-versions-${resolvedProjectId}`;
 
   /* Subáreas oficiais da Função 02 */
   const [activeSubTab, setActiveSubTab] = useState<
@@ -1007,10 +697,12 @@ export function TemasEditorialModule(props: TemasEditorialModuleProps) {
     "hub" | "roma_avatar" | "dados_mercado" | "objetivo_momento"
   >(props.initialGeneratorMode || "hub");
 
-  /* Biblioteca Oficial de Temas Aprovados do Projeto */
+  /* Biblioteca Oficial de Temas Aprovados do Projeto (MongoDB via BFF) */
   const [themesLibrary, setThemesLibrary] = useState<
     readonly StrategicThemeRecord[]
-  >(() => createInitialThemeLibrary(resolvedNiche, resolvedSubniche));
+  >([]);
+  const [detectedPillars, setDetectedPillars] = useState<readonly string[]>([]);
+  const [isLoadingData, setIsLoadingData] = useState<boolean>(hasValidProjectId);
 
   /* Lote em Revisão Humana */
   const [stagedBatch, setStagedBatch] = useState<
@@ -1035,16 +727,10 @@ export function TemasEditorialModule(props: TemasEditorialModuleProps) {
 
   /* Parâmetros do Modo 2 — Dados de Mercado Wizard */
   const [mode2Step, setMode2Step] = useState<1 | 2 | 3>(1);
-  const [mode2VideoLinks, setMode2VideoLinks] = useState<string>(
-    "https://youtube.com/watch?v=video-mais-visto-nicho-01\nhttps://instagram.com/reel/post-alta-interacao-02"
-  );
-  const [mode2CommentsAndTerms, setMode2CommentsAndTerms] = useState<string>(
-    'Comentário recorrente: "Mas e se eu tiver pouco tempo na rotina para acompanhar o mercado?"\nTermo periférico: "plantão", "rotina corrida", "organizar pelo celular"'
-  );
+  const [mode2VideoLinks, setMode2VideoLinks] = useState<string>("");
+  const [mode2CommentsAndTerms, setMode2CommentsAndTerms] = useState<string>("");
   const [mode2ReviewsAndFeedbacks, setMode2ReviewsAndFeedbacks] =
-    useState<string>(
-      'Review 1 estrela: "O método é bom, mas as planilhas são complexas demais para usar no dia a dia."\nReview 5 estrelas: "A virada de chave foi ter um checklist simples de 15 minutos."'
-    );
+    useState<string>("");
   const [mode2Volume, setMode2Volume] = useState<number>(12);
 
   /* Parâmetros do Modo 3 — Objetivo & Momento do Negócio */
@@ -1092,8 +778,7 @@ export function TemasEditorialModule(props: TemasEditorialModuleProps) {
   const [calendarsFromF01, setCalendarsFromF01] = useState<
     readonly EditorialCalendarRecord[]
   >([]);
-  const [selectedCalendarId, setSelectedCalendarId] =
-    useState<string>("cal-nov-2026");
+  const [selectedCalendarId, setSelectedCalendarId] = useState<string>("");
   const [integrationPeriodFilter, setIntegrationPeriodFilter] = useState<
     "all" | 1 | 2 | 3 | 4 | "empty_only"
   >("all");
@@ -1115,285 +800,125 @@ export function TemasEditorialModule(props: TemasEditorialModuleProps) {
   >([]);
   const [isSaveVersionModalOpen, setIsSaveVersionModalOpen] =
     useState<boolean>(false);
-  const [newVersionTitle, setNewVersionTitle] = useState<string>(
-    "Calendário – Versão A (Pré-lançamento)"
-  );
+  const [newVersionTitle, setNewVersionTitle] = useState<string>("");
   const [integrationBanner, setIntegrationBanner] = useState<string | null>(
     null
   );
+  const [isRebalancing, setIsRebalancing] = useState<boolean>(false);
 
-  /* Sincroniza Biblioteca de Temas e Calendário da Função 01 via localStorage */
-  useEffect(() => {
+  const titleSyncTimersRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(
+    new Map()
+  );
+
+  const loadWorkspaceThemesData = useCallback(async () => {
+    if (!hasValidProjectId) {
+      setIsLoadingData(false);
+      return;
+    }
+
+    setIsLoadingData(true);
     try {
-      const savedThemes = window.localStorage.getItem(themesStorageKey);
-      if (savedThemes) {
-        const parsed = JSON.parse(savedThemes) as StrategicThemeRecord[];
-        if (Array.isArray(parsed) && parsed.length > 0) {
-          setThemesLibrary(parsed);
-        }
-      }
+      const [rawThemes, pillars, rawCalendars] = await Promise.all([
+        themesService.listLibrary(resolvedProjectId),
+        themesService.detectPillars(resolvedProjectId),
+        editorialService.listCalendars(resolvedProjectId),
+      ]);
 
-      const savedCals = window.localStorage.getItem(calendarStorageKey);
-      if (savedCals) {
-        const parsedCals = JSON.parse(savedCals) as EditorialCalendarRecord[];
-        if (Array.isArray(parsedCals) && parsedCals.length > 0) {
-          setCalendarsFromF01(parsedCals);
-          setSelectedCalendarId(parsedCals[0]?.id || "cal-nov-2026");
-        }
-      }
+      setThemesLibrary(rawThemes.map(mapBackendThemeToRecord));
+      setDetectedPillars(pillars);
 
-      const savedVers = window.localStorage.getItem(versionsStorageKey);
-      if (savedVers) {
-        const parsedVers = JSON.parse(
-          savedVers
-        ) as SavedCalendarThemeVersion[];
-        if (Array.isArray(parsedVers)) {
-          setSavedCalendarVersions(parsedVers);
-        }
+      const mappedCalendars = rawCalendars.map((c) =>
+        mapBackendCalendarToRecord(c, "Linha Editorial")
+      );
+      setCalendarsFromF01(mappedCalendars);
+
+      const defaultCal =
+        mappedCalendars.find((c) => c.status === "active") ?? mappedCalendars[0];
+      if (defaultCal) {
+        setSelectedCalendarId((prev) =>
+          prev && mappedCalendars.some((c) => c.id === prev) ? prev : defaultCal.id
+        );
       }
     } catch {
-      /* Ignora bloqueio de storage */
+      setBatchFeedbackBanner(
+        "Não foi possível carregar os temas ou calendários do servidor agora."
+      );
+    } finally {
+      setIsLoadingData(false);
     }
-  }, [themesStorageKey, calendarStorageKey, versionsStorageKey]);
+  }, [hasValidProjectId, resolvedProjectId]);
 
-  const persistThemesLibrary = useCallback(
-    (nextThemes: readonly StrategicThemeRecord[]) => {
-      setThemesLibrary(nextThemes);
-      try {
-        window.localStorage.setItem(
-          themesStorageKey,
-          JSON.stringify(nextThemes)
-        );
-      } catch {
-        /* Ignora erro */
-      }
-    },
-    [themesStorageKey]
-  );
+  useEffect(() => {
+    void loadWorkspaceThemesData();
+  }, [loadWorkspaceThemesData]);
 
-  const persistCalendarsToF01 = useCallback(
-    (nextCalendars: readonly EditorialCalendarRecord[]) => {
-      setCalendarsFromF01(nextCalendars);
-      try {
-        window.localStorage.setItem(
-          calendarStorageKey,
-          JSON.stringify(nextCalendars)
-        );
-      } catch {
-        /* Ignora erro */
-      }
-    },
-    [calendarStorageKey]
-  );
+  useEffect(() => {
+    if (!hasValidProjectId || !OBJECT_ID_REGEX.test(selectedCalendarId)) {
+      setSavedCalendarVersions([]);
+      return;
+    }
 
-  /* Fallback caso o usuário ainda não tenha aberto a aba Calendário na sessão */
-  const activeCalendarRecord = useMemo((): EditorialCalendarRecord => {
-    const found =
-      calendarsFromF01.find((c) => c.id === selectedCalendarId) ??
-      calendarsFromF01[0];
-    if (found) return found;
+    let cancelled = false;
+    themesService
+      .listVersions(resolvedProjectId, selectedCalendarId)
+      .then((versions) => {
+        if (!cancelled) {
+          setSavedCalendarVersions(
+            versions.map(mapBackendVersionToSavedVersion)
+          );
+        }
+      })
+      .catch(() => {
+        if (!cancelled) setSavedCalendarVersions([]);
+      });
 
-    const fallbackSlots: CalendarSlotItem[] = [
-      {
-        id: "slot-w1-d2-1",
-        dateISO: "2026-11-02",
-        dayNumber: 2,
-        monthShort: "Nov",
-        weekNumber: 1,
-        dayOfWeekIndex: 0,
-        dayOfWeekLabel: "Segunda-feira",
-        provisionalTitle: `Mito #1 que trava resultados em ${resolvedSubniche}`,
-        format: "reel_curto",
-        retinaType: "Engajamento",
-        platforms: ["Instagram", "TikTok"],
-        suggestedTime: "12:00",
-        strategicObjective:
-          "Atrair audiência qualificada quebrando uma crença comum",
-        secondaryObjective: "Alcance qualificado",
-        editorialLineName: "Linha Editorial v1",
-        editorialPillar: DEFAULT_ROMA_PILLARS[0],
-        mainTheme: "",
-        aiSuggestedThemes: [],
-        icpPainDesireOrObjection: "Mito do volume sem direção",
-        icpAwarenessLevel: "Consciente do Problema",
-        referenceLink: "",
-        executionNotes: "",
-        status: "planned",
-        eligibleForComplementaryMaterial: false,
-        complementaryMaterialType: "Nenhum",
-      },
-      {
-        id: "slot-w1-d2-2",
-        dateISO: "2026-11-02",
-        dayNumber: 2,
-        monthShort: "Nov",
-        weekNumber: 1,
-        dayOfWeekIndex: 0,
-        dayOfWeekLabel: "Segunda-feira",
-        provisionalTitle: `Passo a passo estrutural em ${resolvedSubniche}`,
-        format: "carrossel",
-        retinaType: "Transformacao",
-        platforms: ["Instagram", "LinkedIn"],
-        suggestedTime: "19:00",
-        strategicObjective:
-          "Gerar salvamentos qualificados e provar competência",
-        secondaryObjective: "Educar sobre o MUV",
-        editorialLineName: "Linha Editorial v1",
-        editorialPillar: DEFAULT_ROMA_PILLARS[3],
-        mainTheme: "",
-        aiSuggestedThemes: [],
-        icpPainDesireOrObjection: "Desejo de método prático",
-        icpAwarenessLevel: "Consciente da Solução",
-        referenceLink: "",
-        executionNotes: "",
-        status: "planned",
-        eligibleForComplementaryMaterial: true,
-        complementaryMaterialType: "Checklist PDF",
-      },
-      {
-        id: "slot-w1-d3-1",
-        dateISO: "2026-11-03",
-        dayNumber: 3,
-        monthShort: "Nov",
-        weekNumber: 1,
-        dayOfWeekIndex: 1,
-        dayOfWeekLabel: "Terça-feira",
-        provisionalTitle: `Ajuste prático para destravar ${resolvedSubniche}`,
-        format: "reel_curto",
-        retinaType: "Transformacao",
-        platforms: ["Instagram"],
-        suggestedTime: "12:30",
-        strategicObjective: "Vitória rápida acionável",
-        secondaryObjective: "Salvamentos",
-        editorialLineName: "Linha Editorial v1",
-        editorialPillar: DEFAULT_ROMA_PILLARS[3],
-        mainTheme: "",
-        aiSuggestedThemes: [],
-        icpPainDesireOrObjection: "Falta de tempo operacional",
-        icpAwarenessLevel: "Consciente da Solução",
-        referenceLink: "",
-        executionNotes: "",
-        status: "planned",
-        eligibleForComplementaryMaterial: false,
-        complementaryMaterialType: "Nenhum",
-      },
-      {
-        id: "slot-w1-d4-1",
-        dateISO: "2026-11-04",
-        dayNumber: 4,
-        monthShort: "Nov",
-        weekNumber: 1,
-        dayOfWeekIndex: 2,
-        dayOfWeekLabel: "Quarta-feira",
-        provisionalTitle: `Aula Profunda: Engenharia do Método em ${resolvedSubniche}`,
-        format: "video_longo",
-        retinaType: "Transformacao",
-        platforms: ["YouTube"],
-        suggestedTime: "17:00",
-        strategicObjective: "Aprofundar consciência e autoridade técnica",
-        secondaryObjective: "Gerar leads qualificados",
-        editorialLineName: "Linha Editorial v1",
-        editorialPillar: DEFAULT_ROMA_PILLARS[2],
-        mainTheme: "",
-        aiSuggestedThemes: [],
-        icpPainDesireOrObjection: "Precisa ver profundidade técnica",
-        icpAwarenessLevel: "Consciente da Solução",
-        referenceLink: "",
-        executionNotes: "",
-        status: "planned",
-        eligibleForComplementaryMaterial: true,
-        complementaryMaterialType: "Planilha Executiva",
-      },
-      {
-        id: "slot-w1-d5-1",
-        dateISO: "2026-11-05",
-        dayNumber: 5,
-        monthShort: "Nov",
-        weekNumber: 1,
-        dayOfWeekIndex: 3,
-        dayOfWeekLabel: "Quinta-feira",
-        provisionalTitle: `Quebra de Objeção: Falta de tempo em ${resolvedSubniche}`,
-        format: "reel_curto",
-        retinaType: "NiveisDeConsciencia",
-        platforms: ["Instagram", "TikTok"],
-        suggestedTime: "12:00",
-        strategicObjective: "Quebrar objeção de rotina e conduzir para oferta",
-        secondaryObjective: "Conversão",
-        editorialLineName: "Linha Editorial v1",
-        editorialPillar: DEFAULT_ROMA_PILLARS[5],
-        mainTheme: "",
-        aiSuggestedThemes: [],
-        icpPainDesireOrObjection: "Objeção de falta de tempo",
-        icpAwarenessLevel: "Consciente do Produto",
-        referenceLink: "",
-        executionNotes: "",
-        status: "planned",
-        eligibleForComplementaryMaterial: false,
-        complementaryMaterialType: "Nenhum",
-      },
-      {
-        id: "slot-w1-d6-1",
-        dateISO: "2026-11-06",
-        dayNumber: 6,
-        monthShort: "Nov",
-        weekNumber: 1,
-        dayOfWeekIndex: 4,
-        dayOfWeekLabel: "Sexta-feira",
-        provisionalTitle: `Live Semanal #1: Consultoria Ao Vivo & Quebra de Travas`,
-        format: "live_semanal",
-        retinaType: "Autoridade",
-        platforms: ["Instagram", "YouTube"],
-        suggestedTime: "20:00",
-        strategicObjective: "Interagir ao vivo e conduzir para a oferta",
-        secondaryObjective: "Fechamento",
-        editorialLineName: "Linha Editorial v1",
-        editorialPillar: DEFAULT_ROMA_PILLARS[5],
-        mainTheme: "",
-        aiSuggestedThemes: [],
-        icpPainDesireOrObjection: "Dúvida sobre aderência ao caso específico",
-        icpAwarenessLevel: "Totalmente Consciente",
-        referenceLink: "",
-        executionNotes: "",
-        status: "planned",
-        eligibleForComplementaryMaterial: true,
-        complementaryMaterialType: "Resumo Executivo da Live",
-      },
-    ];
-
-    return {
-      id: "cal-nov-2026",
-      name: `Calendário Editorial — ${resolvedPhase}`,
-      status: "active",
-      periodLabel: "02/11/2026 → 29/11/2026",
-      periodStart: "02/11/2026",
-      periodEnd: "29/11/2026",
-      mainObjective: resolvedObjective,
-      linkedLineName: "Linha Editorial v1",
-      platforms: ["Instagram", "YouTube", "TikTok"],
-      weeklyCapacity: {
-        reels: 4,
-        longVideos: 1,
-        carousels: 3,
-        staticPosts: 2,
-        lives: 1,
-        dailyStorySequences: 4,
-        storiesPerSequence: 5,
-      },
-      updatedAt: "Hoje",
-      reviewSuggestions: [],
-      slots: fallbackSlots,
+    return () => {
+      cancelled = true;
     };
-  }, [
-    calendarsFromF01,
-    selectedCalendarId,
-    resolvedSubniche,
-    resolvedPhase,
-    resolvedObjective,
-  ]);
+  }, [hasValidProjectId, resolvedProjectId, selectedCalendarId]);
+
+  /* Opções dinâmicas de pilares com base na Linha Editorial ativa e biblioteca real */
+  const availablePillars = useMemo(() => {
+    const set = new Set<string>(detectedPillars);
+    for (const t of themesLibrary) {
+      if (t.romaPillar) set.add(t.romaPillar);
+    }
+    return Array.from(set);
+  }, [detectedPillars, themesLibrary]);
+
+  const mapPillarFilterOptions = useMemo<readonly CustomSelectOption<string>[]>(
+    () => [
+      { value: "all", label: "Pilar ROMA: Todos" },
+      ...availablePillars.map((p) => ({ value: p, label: p })),
+    ],
+    [availablePillars]
+  );
+
+  const inlinePillarOptions = useMemo<readonly CustomSelectOption<string>[]>(
+    () =>
+      availablePillars.length > 0
+        ? availablePillars.map((p) => ({ value: p, label: p }))
+        : [{ value: "Posicionamento & Valor", label: "Posicionamento & Valor" }],
+    [availablePillars]
+  );
+
+  const activeCalendarRecord =
+    useMemo((): EditorialCalendarRecord | null => {
+      return (
+        calendarsFromF01.find((c) => c.id === selectedCalendarId) ??
+        calendarsFromF01[0] ??
+        null
+      );
+    }, [calendarsFromF01, selectedCalendarId]);
+
+  const activeSlots = useMemo(
+    () => activeCalendarRecord?.slots ?? [],
+    [activeCalendarRecord]
+  );
 
   /* Slots de Feed/Vídeo do Calendário Ativo para a Mesa de Integração */
   const integrationSlots = useMemo(() => {
-    const feedSlots = activeCalendarRecord.slots.filter(
+    const feedSlots = activeSlots.filter(
       (s) => s.format !== "sequencia_stories"
     );
     if (integrationPeriodFilter === "empty_only") {
@@ -1403,114 +928,174 @@ export function TemasEditorialModule(props: TemasEditorialModuleProps) {
       return feedSlots.filter((s) => s.weekNumber === integrationPeriodFilter);
     }
     return feedSlots;
-  }, [activeCalendarRecord.slots, integrationPeriodFilter]);
+  }, [activeSlots, integrationPeriodFilter]);
 
   const unallocatedSlotsCount = useMemo(() => {
-    return activeCalendarRecord.slots.filter(
+    return activeSlots.filter(
       (s) => s.format !== "sequencia_stories" && !s.mainTheme.trim()
     ).length;
-  }, [activeCalendarRecord.slots]);
+  }, [activeSlots]);
 
   /* ======================================================================== */
   /* HANDLERS DE GERAÇÃO EM LOTE E CURADORIA HUMANA (SUBÁREA 1)               */
   /* ======================================================================== */
 
-  const handleRunModeGeneration = (mode: ThemeOriginMode) => {
+  const handleRunModeGeneration = async (mode: ThemeOriginMode) => {
+    if (!hasValidProjectId) return;
     setIsGeneratingBatch(true);
     setBatchFeedbackBanner(null);
 
-    setTimeout(() => {
-      const count =
+    try {
+      const request =
         mode === "ROMA & Avatar"
-          ? mode1Volume
+          ? {
+              mode: "roma_avatar" as const,
+              params: {
+                volume: normalizeThemeVolume(mode1Volume, "15"),
+                pillars:
+                  mode1SelectedPillars.length > 0
+                    ? [...mode1SelectedPillars]
+                    : undefined,
+                retinaPriority: mapRetinaPriorityToBackend(mode1RetinaPriority),
+              },
+              persist: false,
+            }
           : mode === "Dados de Mercado"
-            ? mode2Volume
-            : mode3Volume;
+            ? {
+                mode: "market" as const,
+                params: {
+                  volume: normalizeThemeVolume(mode2Volume, "12"),
+                  videoLinks: mode2VideoLinks
+                    .split("\n")
+                    .map((v) => v.trim())
+                    .filter(Boolean)
+                    .slice(0, 10),
+                  comments: mode2CommentsAndTerms
+                    .split("\n")
+                    .map((v) => v.trim())
+                    .filter(Boolean),
+                  reviews: mode2ReviewsAndFeedbacks
+                    .split("\n")
+                    .map((v) => v.trim())
+                    .filter(Boolean),
+                },
+                persist: false,
+              }
+            : {
+                mode: "objective" as const,
+                params: {
+                  volume: normalizeThemeVolume(mode3Volume, "12"),
+                  objective: mapObjectiveLabelToBackend(mode3Objective),
+                  businessMoment: mapMomentLabelToBackend(mode3Moment),
+                  platforms: mapUiPlatformsToBackend(mode3Platforms),
+                },
+                persist: false,
+              };
 
-      const batch = generateBatchForMode({
-        mode,
-        niche: resolvedNiche,
-        subniche: resolvedSubniche,
-        count,
-        selectedPillars: mode1SelectedPillars,
-        retinaFocus: mode === "ROMA & Avatar" ? mode1RetinaPriority : "all",
-        marketLinks: mode2VideoLinks,
-        marketComments: mode2CommentsAndTerms,
-        marketReviews: mode2ReviewsAndFeedbacks,
-        cycleObjective: mode3Objective,
-        businessMoment: mode3Moment,
-        platforms: mode3Platforms,
-      });
+      const res = await themesService.generate(resolvedProjectId, request);
+      const batch = res.themes.map(mapBackendThemeToRecord);
 
       setStagedBatch(batch);
       setSelectedBatchIds(batch.map((b) => b.id));
-      setIsGeneratingBatch(false);
       setBatchFeedbackBanner(
-        `Lote de ${batch.length} temas estratégicos gerado a partir de "${mode}"! Revise os títulos completos abaixo, marque favoritos ou gere variações na mesma linha antes de aprovar para o Mapa de Temas.`
+        `Lote de ${batch.length} temas estratégicos gerado a partir de "${mode}"! Revise os títulos abaixo antes de salvar na biblioteca.`
       );
-    }, 420);
+    } catch {
+      setBatchFeedbackBanner(
+        "Erro ao acionar o gerador de temas no servidor. Verifique sua conexão e tente novamente."
+      );
+    } finally {
+      setIsGeneratingBatch(false);
+    }
   };
 
-  /* Botão "Gerar mais temas na mesma linha" (Aprofundar cluster) */
-  const handleGenerateMoreLikeThisInBatch = (
+  /* Botão "Gerar mais temas na mesma linha" (Aprofundar cluster via backend) */
+  const handleGenerateMoreLikeThisInBatch = async (
     seedTheme: StrategicThemeRecord
   ) => {
-    const variations: StrategicThemeRecord[] = [
-      {
-        ...seedTheme,
-        id: `thm-cluster-${Date.now()}-1`,
-        title: `${seedTheme.title} — Parte 2: O protocolo prático de execução`,
-        recommendedFormat: "carrossel",
-        consciousnessAxis: "Solução",
-      },
-      {
-        ...seedTheme,
-        id: `thm-cluster-${Date.now()}-2`,
-        title: `Estudo de Caso: Como resolvemos "${seedTheme.title.slice(0, 48)}..." na prática`,
-        recommendedFormat: "video_longo",
-        retinaType: "Autoridade",
-        consciousnessAxis: "Objeção",
-      },
-      {
-        ...seedTheme,
-        id: `thm-cluster-${Date.now()}-3`,
-        title: `A pergunta que todo comprador faz sobre: ${seedTheme.title.slice(0, 48)}...`,
-        recommendedFormat: "reel_curto",
-        retinaType: "NiveisDeConsciencia",
-        consciousnessAxis: "Objeção",
-      },
-    ];
+    if (!hasValidProjectId || isGeneratingBatch) return;
+    setIsGeneratingBatch(true);
 
-    setStagedBatch((prev) => [...variations, ...prev]);
-    setSelectedBatchIds((prev) => [
-      ...variations.map((v) => v.id),
-      ...prev,
-    ]);
-    setBatchFeedbackBanner(
-      `3 temas derivados gerados na mesma linha de "${seedTheme.title.slice(0, 45)}..."!`
-    );
+    try {
+      let generated: StrategicThemeRecord[] = [];
+      if (OBJECT_ID_REGEX.test(seedTheme.id)) {
+        const res = await themesService.generateMore(
+          resolvedProjectId,
+          seedTheme.id,
+          3
+        );
+        generated = res.map(mapBackendThemeToRecord);
+      } else {
+        const res = await themesService.generate(resolvedProjectId, {
+          mode: "market",
+          params: {
+            marketNotes: seedTheme.title,
+            volume: "12",
+          },
+          persist: false,
+        });
+        generated = res.themes.slice(0, 3).map((item, idx) => ({
+          ...mapBackendThemeToRecord(item),
+          id: `preview-cluster-${Date.now()}-${idx}`,
+          romaPillar: seedTheme.romaPillar,
+        }));
+      }
+
+      setStagedBatch((prev) => [...generated, ...prev]);
+      setSelectedBatchIds((prev) => [
+        ...generated.map((v) => v.id),
+        ...prev,
+      ]);
+      setBatchFeedbackBanner(
+        `${generated.length} temas derivados gerados na linha de "${seedTheme.title.slice(0, 45)}...".`
+      );
+    } catch {
+      setBatchFeedbackBanner(
+        "Não foi possível gerar variações adicionais neste momento."
+      );
+    } finally {
+      setIsGeneratingBatch(false);
+    }
   };
 
-  /* Aprovar Selecionados do Lote e Enviar para a Biblioteca / Mapa de Temas */
-  const handleApproveBatchToLibrary = (goToIntegrationAfter = false) => {
+  /* Aprovar Selecionados do Lote e Persistir na Biblioteca MongoDB via BFF */
+  const handleApproveBatchToLibrary = async (goToIntegrationAfter = false) => {
+    if (!hasValidProjectId) return;
     const approvedItems = stagedBatch.filter((item) =>
       selectedBatchIds.includes(item.id)
     );
     if (approvedItems.length === 0) return;
 
-    const nextLibrary = [...approvedItems, ...themesLibrary];
-    persistThemesLibrary(nextLibrary);
-    setStagedBatch([]);
-    setSelectedBatchIds([]);
-    setGeneratorMode("hub");
+    setIsGeneratingBatch(true);
+    try {
+      const res = await themesService.createBatch(resolvedProjectId, {
+        themes: approvedItems.map(mapThemeRecordToBackendPayload),
+        batchName: `Lote ${generatorMode}`,
+      });
 
-    if (goToIntegrationAfter) {
-      setActiveSubTab("integracao");
-      setIntegrationBanner(
-        `${approvedItems.length} novos temas aprovados e prontos para encaixar nos slots do Calendário Editorial!`
+      const savedRecords = Array.isArray(res.themes)
+        ? res.themes.map(mapBackendThemeToRecord)
+        : approvedItems;
+
+      setThemesLibrary((prev) => [...savedRecords, ...prev]);
+      setStagedBatch([]);
+      setSelectedBatchIds([]);
+      setGeneratorMode("hub");
+
+      if (goToIntegrationAfter) {
+        setActiveSubTab("integracao");
+        setIntegrationBanner(
+          `${savedRecords.length} novos temas salvos e prontos para encaixar nos slots do Calendário Editorial.`
+        );
+      } else {
+        setActiveSubTab("mapa");
+      }
+    } catch {
+      setBatchFeedbackBanner(
+        "Erro ao salvar o lote aprovado no servidor. Tente novamente."
       );
-    } else {
-      setActiveSubTab("mapa");
+    } finally {
+      setIsGeneratingBatch(false);
     }
   };
 
@@ -1521,12 +1106,73 @@ export function TemasEditorialModule(props: TemasEditorialModuleProps) {
   const updateLibraryTheme = useCallback(
     (
       themeId: string,
-      updater: (prev: StrategicThemeRecord) => StrategicThemeRecord
+      updater: (prev: StrategicThemeRecord) => StrategicThemeRecord,
+      options?: { debounceTitle?: boolean }
     ) => {
-      const next = themesLibrary.map((t) => (t.id === themeId ? updater(t) : t));
-      persistThemesLibrary(next);
+      let updatedSnapshot: StrategicThemeRecord | null = null;
+      setThemesLibrary((prevList) =>
+        prevList.map((t) => {
+          if (t.id !== themeId) return t;
+          updatedSnapshot = updater(t);
+          return updatedSnapshot;
+        })
+      );
+
+      if (!hasValidProjectId || !OBJECT_ID_REGEX.test(themeId)) return;
+
+      const sendUpdate = async () => {
+        if (!updatedSnapshot) return;
+        try {
+          const patch = {
+            title: updatedSnapshot.title,
+            pillar: updatedSnapshot.romaPillar,
+            romaPillar: updatedSnapshot.romaPillar,
+            retinaType: mapUiRetinaToBackend(updatedSnapshot.retinaType),
+            consciousnessLevel: mapUiAxisToBackend(
+              updatedSnapshot.consciousnessAxis
+            ),
+            consciousnessAxis: updatedSnapshot.consciousnessAxis,
+            journeyStage: mapUiJourneyToBackend(updatedSnapshot.journeyStage),
+            format: mapUiFormatToBackend(updatedSnapshot.recommendedFormat),
+            recommendedFormat: updatedSnapshot.recommendedFormat,
+            status: updatedSnapshot.status,
+            isFavorite: updatedSnapshot.isFavorite,
+            isPriorityNextCycle: updatedSnapshot.isPriorityNextCycle,
+            isSavedForSales: updatedSnapshot.isSavedForSales,
+            isMarketTest: updatedSnapshot.isMarketTest,
+          };
+          await themesService.updateTheme(resolvedProjectId, themeId, patch);
+        } catch {
+          /* Mantém UI responsiva e evita travamento em digitação */
+        }
+      };
+
+      if (options?.debounceTitle) {
+        const existing = titleSyncTimersRef.current.get(themeId);
+        if (existing) clearTimeout(existing);
+        const timer = setTimeout(() => {
+          titleSyncTimersRef.current.delete(themeId);
+          void sendUpdate();
+        }, 500);
+        titleSyncTimersRef.current.set(themeId, timer);
+      } else {
+        void sendUpdate();
+      }
     },
-    [themesLibrary, persistThemesLibrary]
+    [hasValidProjectId, resolvedProjectId]
+  );
+
+  const handleDeleteLibraryTheme = useCallback(
+    async (themeId: string) => {
+      if (!hasValidProjectId || !OBJECT_ID_REGEX.test(themeId)) return;
+      try {
+        await themesService.deleteTheme(resolvedProjectId, themeId);
+        setThemesLibrary((prev) => prev.filter((t) => t.id !== themeId));
+      } catch {
+        setBatchFeedbackBanner("Não foi possível excluir o tema selecionado.");
+      }
+    },
+    [hasValidProjectId, resolvedProjectId]
   );
 
   const filteredMapThemes = useMemo(() => {
@@ -1625,9 +1271,10 @@ export function TemasEditorialModule(props: TemasEditorialModuleProps) {
   );
 
   const handleAssignThemeToCalendarSlot = useCallback(
-    (slotId: string, theme: StrategicThemeRecord) => {
-      const targetCalendar = activeCalendarRecord;
-      const updatedSlots = targetCalendar.slots.map((s) => {
+    async (slotId: string, theme: StrategicThemeRecord) => {
+      if (!activeCalendarRecord || !hasValidProjectId) return;
+
+      const updatedSlots = activeCalendarRecord.slots.map((s) => {
         if (s.id !== slotId) return s;
         return {
           ...s,
@@ -1638,43 +1285,56 @@ export function TemasEditorialModule(props: TemasEditorialModuleProps) {
       });
 
       const updatedCalendar: EditorialCalendarRecord = {
-        ...targetCalendar,
+        ...activeCalendarRecord,
         updatedAt: "Tema integrado agora",
         slots: updatedSlots,
       };
 
-      const nextCalendars =
-        calendarsFromF01.length > 0
-          ? calendarsFromF01.map((c) =>
-              c.id === updatedCalendar.id ? updatedCalendar : c
-            )
-          : [updatedCalendar];
-
-      persistCalendarsToF01(nextCalendars);
-
-      const nextThemes = themesLibrary.map((t) => {
-        if (t.id !== theme.id) return t;
-        const nextSlotIds = t.allocatedSlotIds.includes(slotId)
-          ? t.allocatedSlotIds
-          : [...t.allocatedSlotIds, slotId];
-        return { ...t, allocatedSlotIds: nextSlotIds };
-      });
-      persistThemesLibrary(nextThemes);
-
-      setIntegrationBanner(
-        `Tema "${theme.title.slice(0, 48)}..." vinculado com sucesso ao slot do Calendário!`
+      setCalendarsFromF01((prev) =>
+        prev.map((c) => (c.id === updatedCalendar.id ? updatedCalendar : c))
       );
+
+      setThemesLibrary((prev) =>
+        prev.map((t) => {
+          if (t.id !== theme.id) return t;
+          const nextSlotIds = t.allocatedSlotIds.includes(slotId)
+            ? t.allocatedSlotIds
+            : [...t.allocatedSlotIds, slotId];
+          return { ...t, allocatedSlotIds: nextSlotIds };
+        })
+      );
+
+      try {
+        await themesService.assignTheme(resolvedProjectId, activeCalendarRecord.id, {
+          calendarItemId: slotId,
+          themeId: OBJECT_ID_REGEX.test(theme.id) ? theme.id : undefined,
+          title: theme.title,
+        });
+        setIntegrationBanner(
+          `Tema "${theme.title.slice(0, 48)}..." vinculado com sucesso ao slot do Calendário!`
+        );
+      } catch {
+        setIntegrationBanner(
+          "Não foi possível persistir a vinculação do tema neste slot."
+        );
+        void loadWorkspaceThemesData();
+      }
     },
     [
       activeCalendarRecord,
-      calendarsFromF01,
-      persistCalendarsToF01,
-      themesLibrary,
-      persistThemesLibrary,
+      hasValidProjectId,
+      resolvedProjectId,
+      loadWorkspaceThemesData,
     ]
   );
 
-  const handleClearSlotTheme = (slotId: string) => {
+  const handleClearSlotTheme = async (slotId: string) => {
+    if (!activeCalendarRecord || !hasValidProjectId) return;
+
+    const linkedTheme = themesLibrary.find((t) =>
+      t.allocatedSlotIds.includes(slotId)
+    );
+
     const updatedSlots = activeCalendarRecord.slots.map((s) =>
       s.id === slotId ? { ...s, mainTheme: "" } : s
     );
@@ -1682,123 +1342,92 @@ export function TemasEditorialModule(props: TemasEditorialModuleProps) {
       ...activeCalendarRecord,
       slots: updatedSlots,
     };
-    const nextCals =
-      calendarsFromF01.length > 0
-        ? calendarsFromF01.map((c) =>
-            c.id === updatedCal.id ? updatedCal : c
-          )
-        : [updatedCal];
-    persistCalendarsToF01(nextCals);
-
-    const nextThemes = themesLibrary.map((t) => ({
-      ...t,
-      allocatedSlotIds: t.allocatedSlotIds.filter((id) => id !== slotId),
-    }));
-    persistThemesLibrary(nextThemes);
-  };
-
-  const handleAutoRebalanceCalendar = () => {
-    const usedThemeIds = new Set<string>();
-    const nextSlotAllocations: Record<string, StrategicThemeRecord> = {};
-
-    const updatedSlots = activeCalendarRecord.slots.map((slot) => {
-      if (slot.format === "sequencia_stories") return slot;
-
-      let targetRetina = slot.retinaType;
-      if (
-        simulationScenario === "more_transformation" &&
-        slot.retinaType === "Engajamento"
-      ) {
-        targetRetina = "Transformacao";
-      } else if (
-        simulationScenario === "sales_push" &&
-        (slot.retinaType === "Engajamento" ||
-          slot.retinaType === "Relacionamento")
-      ) {
-        targetRetina = "NiveisDeConsciencia";
-      } else if (
-        simulationScenario === "top_of_funnel" &&
-        slot.retinaType === "NiveisDeConsciencia"
-      ) {
-        targetRetina = "Engajamento";
-      }
-
-      const bestMatch =
-        themesLibrary.find(
-          (t) =>
-            !usedThemeIds.has(t.id) &&
-            t.retinaType === targetRetina &&
-            t.recommendedFormat === slot.format
-        ) ??
-        themesLibrary.find(
-          (t) => !usedThemeIds.has(t.id) && t.retinaType === targetRetina
-        ) ??
-        themesLibrary.find((t) => !usedThemeIds.has(t.id)) ??
-        themesLibrary[0];
-
-      if (bestMatch) {
-        usedThemeIds.add(bestMatch.id);
-        nextSlotAllocations[slot.id] = bestMatch;
-        return {
-          ...slot,
-          retinaType: targetRetina,
-          mainTheme: bestMatch.title,
-          editorialPillar: bestMatch.romaPillar,
-          icpPainDesireOrObjection: bestMatch.painDesireOrObjection,
-        };
-      }
-      return slot;
-    });
-
-    const updatedCal: EditorialCalendarRecord = {
-      ...activeCalendarRecord,
-      updatedAt: "Reequilibrado automaticamente pela IA",
-      slots: updatedSlots,
-    };
-
-    const nextCals =
-      calendarsFromF01.length > 0
-        ? calendarsFromF01.map((c) =>
-            c.id === updatedCal.id ? updatedCal : c
-          )
-        : [updatedCal];
-    persistCalendarsToF01(nextCals);
-
-    setIntegrationBanner(
-      "Calendário reequilibrado pela IA! Todos os slots do período foram preenchidos respeitando a Matriz RETINA e a Jornada de 5 Passos."
+    setCalendarsFromF01((prev) =>
+      prev.map((c) => (c.id === updatedCal.id ? updatedCal : c))
     );
-  };
+    setThemesLibrary((prev) =>
+      prev.map((t) => ({
+        ...t,
+        allocatedSlotIds: t.allocatedSlotIds.filter((id) => id !== slotId),
+      }))
+    );
 
-  const handleSaveCalendarThemeVersion = (e: FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    const allocatedCount = activeCalendarRecord.slots.filter(
-      (s) => s.format !== "sequencia_stories" && Boolean(s.mainTheme.trim())
-    ).length;
-
-    const record: SavedCalendarThemeVersion = {
-      id: `cal-ver-${Date.now()}`,
-      versionName:
-        newVersionTitle.trim() ||
-        `Calendário – Versão ${savedCalendarVersions.length + 1} (${resolvedPhase})`,
-      periodLabel: `${activeCalendarRecord.periodStart} → ${activeCalendarRecord.periodEnd}`,
-      objectiveUsed: mode3Objective,
-      businessMomentUsed: mode3Moment,
-      savedAt: "Salvo hoje",
-      allocatedCount,
-      slotsSnapshot: activeCalendarRecord.slots,
-    };
-
-    const next = [record, ...savedCalendarVersions];
-    setSavedCalendarVersions(next);
     try {
-      window.localStorage.setItem(versionsStorageKey, JSON.stringify(next));
+      await themesService.assignTheme(resolvedProjectId, activeCalendarRecord.id, {
+        calendarItemId: slotId,
+        themeId:
+          linkedTheme && OBJECT_ID_REGEX.test(linkedTheme.id)
+            ? linkedTheme.id
+            : undefined,
+        unassign: true,
+      });
     } catch {
-      /* Ignora erro */
+      void loadWorkspaceThemesData();
     }
-    setIsSaveVersionModalOpen(false);
-    setIntegrationBanner(
-      `Versão "${record.versionName}" salva com ${allocatedCount} slots preenchidos!`
-    );
+  };
+
+  const handleAutoRebalanceCalendar = async () => {
+    if (!activeCalendarRecord || !hasValidProjectId || isRebalancing) return;
+    setIsRebalancing(true);
+    try {
+      const scenarioMap: Record<SimulationScenarioKey, string> = {
+        none: "DISTRIBUICAO_PADRAO",
+        more_transformation: "MAIS_TRANSFORMACAO",
+        sales_push: "INTENSIFICACAO_VENDAS",
+        top_of_funnel: "TOPO_DE_FUNIL",
+      };
+
+      await themesService.rebalance(resolvedProjectId, activeCalendarRecord.id, {
+        scenario: scenarioMap[simulationScenario],
+        objective: mapObjectiveLabelToBackend(mode3Objective),
+        businessMoment: mapMomentLabelToBackend(mode3Moment),
+        persist: true,
+      });
+
+      await loadWorkspaceThemesData();
+      setIntegrationBanner(
+        "Calendário reequilibrado pela IA e persistido no servidor!"
+      );
+    } catch {
+      setIntegrationBanner(
+        "Não foi possível reequilibrar o calendário agora."
+      );
+    } finally {
+      setIsRebalancing(false);
+    }
+  };
+
+  const handleSaveCalendarThemeVersion = async (
+    e: FormEvent<HTMLFormElement>
+  ) => {
+    e.preventDefault();
+    if (!activeCalendarRecord || !hasValidProjectId) return;
+
+    const versionTitle =
+      newVersionTitle.trim() ||
+      `Calendário – Versão ${savedCalendarVersions.length + 1} (${resolvedPhase})`;
+
+    try {
+      const saved = await themesService.saveVersion(
+        resolvedProjectId,
+        activeCalendarRecord.id,
+        {
+          name: versionTitle,
+          objective: mapObjectiveLabelToBackend(mode3Objective),
+          businessMoment: mapMomentLabelToBackend(mode3Moment),
+        }
+      );
+
+      const record = mapBackendVersionToSavedVersion(saved);
+      setSavedCalendarVersions((prev) => [record, ...prev]);
+      setIsSaveVersionModalOpen(false);
+      setNewVersionTitle("");
+      setIntegrationBanner(
+        `Versão "${record.versionName}" salva com sucesso no histórico!`
+      );
+    } catch {
+      setIntegrationBanner("Não foi possível salvar a versão do calendário.");
+    }
   };
 
   const retinaHeatmap = useMemo(() => {
@@ -1810,7 +1439,7 @@ export function TemasEditorialModule(props: TemasEditorialModuleProps) {
       NiveisDeConsciencia: 0,
       Autoridade: 0,
     };
-    const feedSlots = activeCalendarRecord.slots.filter(
+    const feedSlots = activeSlots.filter(
       (s) => s.format !== "sequencia_stories"
     );
     for (const s of feedSlots) {
@@ -1818,7 +1447,7 @@ export function TemasEditorialModule(props: TemasEditorialModuleProps) {
     }
     const total = Math.max(1, feedSlots.length);
     return { counts, total };
-  }, [activeCalendarRecord.slots]);
+  }, [activeSlots]);
 
   return (
     <div className="flex flex-col gap-6">
@@ -2246,32 +1875,38 @@ export function TemasEditorialModule(props: TemasEditorialModuleProps) {
                 </div>
 
                 <div className="mt-2.5 flex flex-wrap gap-2">
-                  {DEFAULT_ROMA_PILLARS.map((pil) => {
-                    const selected =
-                      mode1SelectedPillars.length === 0 ||
-                      mode1SelectedPillars.includes(pil);
-                    return (
-                      <button
-                        key={pil}
-                        type="button"
-                        onClick={() =>
-                          setMode1SelectedPillars((prev) =>
-                            prev.includes(pil)
-                              ? prev.filter((p) => p !== pil)
-                              : [...prev, pil]
-                          )
-                        }
-                        className={clsx(
-                          "rounded-la-md border px-3 py-1.5 font-la-sans text-[0.75rem] transition-colors",
-                          selected
-                            ? "border-la-border-gold bg-la-gold-faint font-medium text-la-gold-light"
-                            : "border-white/10 bg-black/50 text-la-text-muted"
-                        )}
-                      >
-                        {pil}
-                      </button>
-                    );
-                  })}
+                  {availablePillars.length > 0 ? (
+                    availablePillars.map((pil) => {
+                      const selected =
+                        mode1SelectedPillars.length === 0 ||
+                        mode1SelectedPillars.includes(pil);
+                      return (
+                        <button
+                          key={pil}
+                          type="button"
+                          onClick={() =>
+                            setMode1SelectedPillars((prev) =>
+                              prev.includes(pil)
+                                ? prev.filter((p) => p !== pil)
+                                : [...prev, pil]
+                            )
+                          }
+                          className={clsx(
+                            "rounded-la-md border px-3 py-1.5 font-la-sans text-[0.75rem] transition-colors",
+                            selected
+                              ? "border-la-border-gold bg-la-gold-faint font-medium text-la-gold-light"
+                              : "border-white/10 bg-black/50 text-la-text-muted"
+                          )}
+                        >
+                          {pil}
+                        </button>
+                      );
+                    })
+                  ) : (
+                    <p className="font-la-mono text-[0.6875rem] text-la-text-muted">
+                      Nenhum pilar personalizado detectado na Linha Editorial ativa ainda — o motor usará automaticamente os dados estratégicos disponíveis do projeto.
+                    </p>
+                  )}
                 </div>
               </div>
             </section>
@@ -2378,6 +2013,7 @@ export function TemasEditorialModule(props: TemasEditorialModuleProps) {
                     rows={4}
                     value={mode2CommentsAndTerms}
                     onChange={(e) => setMode2CommentsAndTerms(e.target.value)}
+                    placeholder='Ex.: Comentário recorrente: "Mas e se eu tiver pouco tempo na rotina?"'
                     className="mt-1 w-full rounded-la-md border border-white/14 bg-black/70 p-3 font-la-sans text-[0.8125rem] text-la-text-primary"
                   />
                 </div>
@@ -2400,6 +2036,7 @@ export function TemasEditorialModule(props: TemasEditorialModuleProps) {
                     onChange={(e) =>
                       setMode2ReviewsAndFeedbacks(e.target.value)
                     }
+                    placeholder="Cole aqui avaliações positivas (5★) e negativas (1★/2★) ou feedbacks reais de clientes."
                     className="mt-1 w-full rounded-la-md border border-white/14 bg-black/70 p-3 font-la-sans text-[0.8125rem] text-la-text-primary"
                   />
                 </div>
@@ -2856,7 +2493,7 @@ export function TemasEditorialModule(props: TemasEditorialModuleProps) {
               <DarkCustomSelect
                 fullWidth
                 value={mapPillarFilter}
-                options={MAP_PILLAR_FILTER_OPTIONS}
+                options={mapPillarFilterOptions}
                 onChange={setMapPillarFilter}
                 ariaLabel="Filtrar por pilar ROMA"
               />
@@ -2907,6 +2544,38 @@ export function TemasEditorialModule(props: TemasEditorialModuleProps) {
 
           {/* Lista Executiva do Mapa de Temas (Zero Scroll Horizontal, Título 100% Visível + Dor/Objeção Abaixo) */}
           <div className="flex flex-col gap-3.5 pb-40">
+            {isLoadingData ? (
+              <div className="rounded-la-xl border border-white/10 bg-[#0A0E18]/95 p-8 text-center font-la-mono text-[0.75rem] text-la-text-secondary">
+                Carregando biblioteca de temas do projeto...
+              </div>
+            ) : filteredMapThemes.length === 0 ? (
+              <div className="flex flex-col items-center gap-3 rounded-la-xl border border-dashed border-la-border-gold/40 bg-[#0A0E18]/80 p-8 text-center">
+                <Lightbulb className="h-7 w-7 text-la-gold" />
+                <div>
+                  <h4 className="font-la-sans text-[1rem] font-semibold text-la-text-primary">
+                    {themesLibrary.length === 0
+                      ? "Nenhum tema estratégico na biblioteca deste projeto ainda"
+                      : "Nenhum tema encontrado com os filtros aplicados"}
+                  </h4>
+                  <p className="mt-1 font-la-sans text-[0.8125rem] text-la-text-secondary">
+                    {themesLibrary.length === 0
+                      ? "Utilize os 3 modos de geração na Subárea 1 para criar e aprovar seu primeiro lote de temas."
+                      : "Ajuste ou limpe os filtros acima para visualizar outros temas cadastrados."}
+                  </p>
+                </div>
+                {themesLibrary.length === 0 ? (
+                  <button
+                    type="button"
+                    onClick={() => setActiveSubTab("gerar")}
+                    className="inline-flex items-center gap-1.5 rounded-la-md bg-la-gold px-4 py-2 font-la-sans text-[0.8125rem] font-semibold text-la-text-inverse"
+                  >
+                    <Sparkles className="h-4 w-4" />
+                    <span>Ir para Gerar Temas</span>
+                  </button>
+                ) : null}
+              </div>
+            ) : null}
+
             {filteredMapThemes.map((theme, idx) => (
               <article
                 key={theme.id}
@@ -2935,10 +2604,14 @@ export function TemasEditorialModule(props: TemasEditorialModuleProps) {
                       indexBadge={String(idx + 1).padStart(2, "0")}
                       value={theme.title}
                       onChange={(nextTitle) =>
-                        updateLibraryTheme(theme.id, (prev) => ({
-                          ...prev,
-                          title: nextTitle,
-                        }))
+                        updateLibraryTheme(
+                          theme.id,
+                          (prev) => ({
+                            ...prev,
+                            title: nextTitle,
+                          }),
+                          { debounceTitle: true }
+                        )
                       }
                       ariaLabel={`Título do tema ${idx + 1}`}
                     />
@@ -3038,6 +2711,16 @@ export function TemasEditorialModule(props: TemasEditorialModuleProps) {
                           <ArrowRight className="h-3.5 w-3.5" />
                         </button>
                       ) : null}
+
+                      <button
+                        type="button"
+                        onClick={() => handleDeleteLibraryTheme(theme.id)}
+                        title="Excluir tema"
+                        aria-label={`Excluir tema ${theme.title}`}
+                        className="inline-flex h-9 w-9 items-center justify-center rounded-la-md border border-white/10 bg-black/45 text-la-text-muted transition-colors hover:border-rose-400/50 hover:text-rose-300"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </button>
                     </div>
                   </div>
                 </div>
@@ -3051,7 +2734,7 @@ export function TemasEditorialModule(props: TemasEditorialModuleProps) {
                     <DarkCustomSelect
                       fullWidth
                       value={theme.romaPillar}
-                      options={INLINE_PILLAR_OPTIONS}
+                      options={inlinePillarOptions}
                       onChange={(nextPillar) =>
                         updateLibraryTheme(theme.id, (prev) => ({
                           ...prev,
@@ -3176,17 +2859,27 @@ export function TemasEditorialModule(props: TemasEditorialModuleProps) {
 
                 <button
                   type="button"
+                  disabled={isRebalancing || !activeCalendarRecord}
                   onClick={handleAutoRebalanceCalendar}
-                  className="inline-flex min-h-[2.625rem] items-center gap-1.5 rounded-la-md bg-la-gold px-4 py-1.5 font-la-sans text-[0.8125rem] font-semibold text-la-text-inverse shadow-[var(--la-elevation-gold)] hover:bg-la-gold-light"
+                  className="inline-flex min-h-[2.625rem] items-center gap-1.5 rounded-la-md bg-la-gold px-4 py-1.5 font-la-sans text-[0.8125rem] font-semibold text-la-text-inverse shadow-[var(--la-elevation-gold)] hover:bg-la-gold-light disabled:cursor-not-allowed disabled:opacity-50"
                 >
-                  <Sparkles className="h-4 w-4" />
-                  <span>Reequilibrar Calendário com IA</span>
+                  {isRebalancing ? (
+                    <RefreshCw className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <Sparkles className="h-4 w-4" />
+                  )}
+                  <span>
+                    {isRebalancing
+                      ? "Reequilibrando..."
+                      : "Reequilibrar Calendário com IA"}
+                  </span>
                 </button>
 
                 <button
                   type="button"
+                  disabled={!activeCalendarRecord}
                   onClick={() => setIsSaveVersionModalOpen(true)}
-                  className="inline-flex min-h-[2.625rem] items-center gap-1.5 rounded-la-md border border-la-border-gold/60 bg-la-gold-faint px-3.5 py-1.5 font-la-sans text-[0.8125rem] font-semibold text-la-gold-light hover:bg-la-gold hover:text-la-text-inverse"
+                  className="inline-flex min-h-[2.625rem] items-center gap-1.5 rounded-la-md border border-la-border-gold/60 bg-la-gold-faint px-3.5 py-1.5 font-la-sans text-[0.8125rem] font-semibold text-la-gold-light hover:bg-la-gold hover:text-la-text-inverse disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   <Save className="h-4 w-4" />
                   <span>Salvar Versão com Temas</span>
@@ -3276,6 +2969,33 @@ export function TemasEditorialModule(props: TemasEditorialModuleProps) {
               </div>
 
               <div className="flex max-h-[54rem] flex-col gap-3.5 overflow-y-auto pr-1">
+                {integrationSlots.length === 0 ? (
+                  <div className="flex flex-col items-center gap-3 rounded-la-xl border border-dashed border-la-border-gold/40 bg-[#090D16]/90 p-8 text-center">
+                    <CalendarIcon className="h-7 w-7 text-la-gold" />
+                    <div>
+                      <h4 className="font-la-sans text-[1rem] font-semibold text-la-text-primary">
+                        {activeCalendarRecord
+                          ? "Nenhum slot encontrado para este filtro"
+                          : "Nenhum calendário editorial encontrado neste projeto"}
+                      </h4>
+                      <p className="mt-1 font-la-sans text-[0.8125rem] text-la-text-secondary">
+                        {activeCalendarRecord
+                          ? "Altere o filtro acima ou adicione novos slots na aba Calendário Editorial."
+                          : "Crie e gere um calendário na aba Calendário Editorial para integrar os temas da sua biblioteca."}
+                      </p>
+                    </div>
+                    {!activeCalendarRecord && props.onGoToCalendarTab ? (
+                      <button
+                        type="button"
+                        onClick={props.onGoToCalendarTab}
+                        className="rounded-la-md bg-la-gold px-4 py-2 font-la-sans text-[0.8125rem] font-semibold text-la-text-inverse"
+                      >
+                        Ir para Calendário Editorial
+                      </button>
+                    ) : null}
+                  </div>
+                ) : null}
+
                 {integrationSlots.map((slot) => {
                   const fmtMeta = FORMAT_META[slot.format];
                   const retMeta = RETINA_META[slot.retinaType];
@@ -3493,7 +3213,7 @@ export function TemasEditorialModule(props: TemasEditorialModuleProps) {
                       onlyCompatibleWithSelectedSlot &&
                       activeSlotIdForAllocation
                     ) {
-                      const focusedSlot = activeCalendarRecord.slots.find(
+                      const focusedSlot = activeSlots.find(
                         (s) => s.id === activeSlotIdForAllocation
                       );
                       if (

@@ -11,6 +11,7 @@ export abstract class EditorialProjectRepository {
     allowedProjectIds?: string[],
   ): Promise<IEditorialProject[]>;
   abstract findById(id: string): Promise<IEditorialProject | null>;
+  abstract findByIds(ids: string[]): Promise<IEditorialProject[]>;
   abstract create(data: ICreateEditorialProject): Promise<IEditorialProject>;
   abstract update(
     id: string,

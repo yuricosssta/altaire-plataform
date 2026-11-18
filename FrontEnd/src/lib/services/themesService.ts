@@ -210,4 +210,15 @@ export const themesService = {
       createdAt: new Date(response.data.createdAt),
     };
   },
+
+  createBatch: async (
+    projectId: string,
+    data: { themes: Record<string, unknown>[]; batchName?: string },
+  ) => {
+    const response = await localClient.post(
+      `/editorial/projects/${projectId}/themes/batch`,
+      data,
+    );
+    return response.data;
+  },
 };

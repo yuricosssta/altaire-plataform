@@ -11,6 +11,7 @@ export abstract class EditorialThemeRepository {
     projectId: string,
     filters?: IThemeFilters,
   ): Promise<IEditorialTheme[]>;
+  abstract findAllByProjects(projectIds: string[]): Promise<IEditorialTheme[]>;
   abstract findById(id: string): Promise<IEditorialTheme | null>;
   abstract findByIds(ids: string[]): Promise<IEditorialTheme[]>;
   abstract createMany(

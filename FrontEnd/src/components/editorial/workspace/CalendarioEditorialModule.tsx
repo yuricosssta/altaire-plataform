@@ -40,6 +40,7 @@ import {
   DarkCustomSelect,
   type CustomSelectOption,
 } from "@/components/ui/DarkCustomSelect";
+import { editorialService } from "@/lib/services/editorialService";
 
 /* ========================================================================== */
 /* CONTRATOS E TIPAGENS ESTRITAS DA FUNÇÃO 01 — PARTE 2 (CALENDÁRIO)          */
@@ -434,529 +435,227 @@ const PERIOD_DURATION_OPTIONS: readonly CustomSelectOption<string>[] =
   }));
 
 /* ========================================================================== */
-/* GERADOR DE GRADE MENSAL COMPLETA (28 DIAS REAIS — 4 SEMANAS CANÔNICAS)     */
+/* HELPERS DE NORMALIZAÇÃO ENTRE BACKEND BFF E GRADE EDITORIAL DO WORKSPACE   */
 /* ========================================================================== */
 
-function generateCanonicalMonthSlots(
-  niche: string,
-  subniche: string,
-  lineName: string
-): CalendarSlotItem[] {
-  const slots: CalendarSlotItem[] = [];
+export function mapBackendFormatToUi(raw?: string): SlotContentFormat {
+  const val = String(raw || "").toLowerCase();
+  if (val === "reel" || val === "reel_curto") return "reel_curto";
+  if (val === "long_video" || val === "video_longo") return "video_longo";
+  if (val === "carousel" || val === "carrossel") return "carrossel";
+  if (val === "static_post" || val === "post_estatico") return "post_estatico";
+  if (val === "live" || val === "live_semanal") return "live_semanal";
+  if (val === "stories_sequence" || val === "sequencia_stories")
+    return "sequencia_stories";
+  return "reel_curto";
+}
 
-  for (let dayOffset = 0; dayOffset < 28; dayOffset++) {
-    const dayNumber = 2 + dayOffset;
-    const dateISO = `2026-11-${String(dayNumber).padStart(2, "0")}`;
-    const weekNumber = (Math.floor(dayOffset / 7) + 1) as 1 | 2 | 3 | 4;
-    const dayOfWeekIndex = (dayOffset % 7) as 0 | 1 | 2 | 3 | 4 | 5 | 6;
-    const dayOfWeekLabel = WEEKDAY_HEADERS[dayOfWeekIndex].full;
+export function mapUiFormatToBackend(
+  raw: SlotContentFormat,
+): "reel" | "long_video" | "carousel" | "static_post" | "live" | "stories_sequence" {
+  switch (raw) {
+    case "reel_curto":
+      return "reel";
+    case "video_longo":
+      return "long_video";
+    case "carrossel":
+      return "carousel";
+    case "post_estatico":
+      return "static_post";
+    case "live_semanal":
+      return "live";
+    case "sequencia_stories":
+      return "stories_sequence";
+  }
+}
 
-    // Segunda: Reel de Engajamento + Carrossel de Transformação
-    if (dayOfWeekIndex === 0) {
-      slots.push({
-        id: `slot-w${weekNumber}-d${dayNumber}-1`,
-        dateISO,
-        dayNumber,
-        monthShort: "Nov",
-        weekNumber,
-        dayOfWeekIndex,
-        dayOfWeekLabel,
-        provisionalTitle: `Mito #${weekNumber} que trava resultados em ${subniche || niche}`,
-        format: "reel_curto",
-        retinaType: "Engajamento",
-        platforms: ["Instagram", "TikTok"],
-        suggestedTime: "12:00",
-        strategicObjective:
-          "Atrair audiência qualificada quebrando uma crença comum",
-        secondaryObjective:
-          "Gerar compartilhamentos e novos seguidores no perfil",
-        editorialLineName: lineName,
-        editorialPillar: AVAILABLE_PILLARS[0],
-        mainTheme:
-          weekNumber <= 2
-            ? `Por que repetir o padrão tradicional de ${niche} drena sua margem`
-            : "",
-        aiSuggestedThemes: [
-          `Por que repetir o padrão tradicional de ${niche} drena sua margem`,
-          `O erro invisível que 90% cometem ao iniciar em ${subniche}`,
-          `A verdade que ninguém fala sobre velocidade vs. direção em ${niche}`,
-        ],
-        icpPainDesireOrObjection:
-          "Mito de que volume bruto sem direção estratégica gera resultado consistente.",
-        icpAwarenessLevel: "Consciente do Problema",
-        referenceLink: "https://instagram.com/p/exemplo-reel-contraste",
-        executionNotes:
-          "Abrir nos primeiros 3 segundos com afirmação contraintuitiva. Ritmo dinâmico e CTA final para ler a legenda.",
-        status:
-          weekNumber === 1
-            ? "published"
-            : weekNumber === 2
-              ? "script_ready"
-              : "planned",
-        eligibleForComplementaryMaterial: false,
-        complementaryMaterialType: "Nenhum",
-      });
+export function mapBackendRetinaToUi(raw?: string): RetinaTypeKey {
+  const val = String(raw || "").toLowerCase();
+  if (val.includes("relac")) return "Relacionamento";
+  if (val.includes("engaj")) return "Engajamento";
+  if (val.includes("transf")) return "Transformacao";
+  if (val.includes("inter")) return "Interacao";
+  if (val.includes("consci")) return "NiveisDeConsciencia";
+  return "Autoridade";
+}
 
-      slots.push({
-        id: `slot-w${weekNumber}-d${dayNumber}-2`,
-        dateISO,
-        dayNumber,
-        monthShort: "Nov",
-        weekNumber,
-        dayOfWeekIndex,
-        dayOfWeekLabel,
-        provisionalTitle: `Passo a passo estrutural: Matriz de decisão em ${subniche}`,
-        format: "carrossel",
-        retinaType: "Transformacao",
-        platforms: ["Instagram", "LinkedIn"],
-        suggestedTime: "19:00",
-        strategicObjective:
-          "Gerar salvamentos qualificados e provar competência técnica",
-        secondaryObjective: "Educar o comprador sobre o método proprietário (MUV)",
-        editorialLineName: lineName,
-        editorialPillar: AVAILABLE_PILLARS[3],
-        mainTheme:
-          weekNumber === 1
-            ? `Como diagnosticar gargalos operacionais em ${subniche} em 15 minutos`
-            : "",
-        aiSuggestedThemes: [
-          `Como diagnosticar gargalos operacionais em ${subniche} em 15 minutos`,
-          `Os 5 critérios técnicos para validar uma decisão em ${niche}`,
-          `Guia visual: do improviso ao controle previsível em 4 etapas`,
-        ],
-        icpPainDesireOrObjection:
-          "Desejo de ter um método prático e aplicável que caiba na rotina real.",
-        icpAwarenessLevel: "Consciente da Solução",
-        referenceLink: "https://instagram.com/p/exemplo-carrossel-transformacao",
-        executionNotes:
-          "Carrossel de 8 a 10 lâminas (4:5). Lâmina 1 com promessa clara, lâminas 2-8 com framework prático, lâmina final com CTA de salvamento e material complementar.",
-        status: weekNumber === 1 ? "published" : "in_production",
-        eligibleForComplementaryMaterial: true,
-        complementaryMaterialType: "Checklist / Diagnóstico PDF Prático",
-      });
-    }
+function parsePeriodStartDate(raw?: string | Date): Date {
+  if (raw instanceof Date && !Number.isNaN(raw.getTime())) return raw;
+  const str = String(raw || "");
+  if (/^\d{4}-\d{2}-\d{2}/.test(str)) {
+    const d = new Date(str);
+    if (!Number.isNaN(d.getTime())) return d;
+  }
+  const brMatch = /^(\d{2})\/(\d{2})\/(\d{4})$/.exec(str);
+  if (brMatch) {
+    return new Date(
+      Number(brMatch[3]),
+      Number(brMatch[2]) - 1,
+      Number(brMatch[1]),
+    );
+  }
+  return new Date();
+}
 
-    // Terça: Reel de Transformação + Post Estático de Interação
-    if (dayOfWeekIndex === 1) {
-      slots.push({
-        id: `slot-w${weekNumber}-d${dayNumber}-1`,
-        dateISO,
-        dayNumber,
-        monthShort: "Nov",
-        weekNumber,
-        dayOfWeekIndex,
-        dayOfWeekLabel,
-        provisionalTitle: `Ajuste imediato para destravar sua operação de ${subniche}`,
-        format: "reel_curto",
-        retinaType: "Transformacao",
-        platforms: ["Instagram", "TikTok"],
-        suggestedTime: "12:30",
-        strategicObjective: "Entregar vitória rápida acionável para o ICP",
-        secondaryObjective: "Aumentar taxa de salvamento e autoridade prática",
-        editorialLineName: lineName,
-        editorialPillar: AVAILABLE_PILLARS[3],
-        mainTheme: `3 ajustes práticos em ${subniche} que reduzem o retrabalho pela metade`,
-        aiSuggestedThemes: [
-          `3 ajustes práticos em ${subniche} que reduzem o retrabalho pela metade`,
-          `Como corrigir a falha número 1 de execução em ${niche}`,
-          `O protocolo de 10 minutos para validar sua estratégia semanal`,
-        ],
-        icpPainDesireOrObjection:
-          "Dor da falta de tempo operacional e excesso de tarefas sem retorno.",
-        icpAwarenessLevel: "Consciente da Solução",
-        referenceLink: "",
-        executionNotes:
-          "Gravar em ambiente de trabalho real mostrando tela ou quadro branco.",
-        status: weekNumber === 1 ? "recorded" : "planned",
-        eligibleForComplementaryMaterial: false,
-        complementaryMaterialType: "Nenhum",
-      });
+function formatDateBr(date: Date | string | undefined): string {
+  if (!date) return "";
+  const d = typeof date === "string" ? new Date(date) : date;
+  if (Number.isNaN(d.getTime())) return String(date);
+  return d.toLocaleDateString("pt-BR");
+}
 
-      slots.push({
-        id: `slot-w${weekNumber}-d${dayNumber}-2`,
-        dateISO,
-        dayNumber,
-        monthShort: "Nov",
-        weekNumber,
-        dayOfWeekIndex,
-        dayOfWeekLabel,
-        provisionalTitle: `Enquete de Diagnóstico: Qual é o seu maior gargalo hoje?`,
-        format: "post_estatico",
-        retinaType: "Interacao",
-        platforms: ["Instagram"],
-        suggestedTime: "18:30",
-        strategicObjective:
-          "Gerar comentários qualificados e mapear objeções no Direct",
-        secondaryObjective: "Identificar leads prontos para abordagem consultiva",
-        editorialLineName: lineName,
-        editorialPillar: AVAILABLE_PILLARS[1],
-        mainTheme: `Diagnóstico comparativo: Operador Amador vs. Estrategista em ${niche}`,
-        aiSuggestedThemes: [
-          `Diagnóstico comparativo: Operador Amador vs. Estrategista em ${niche}`,
-          `Qual dessas 3 travas mais impede seu avanço hoje? Comente o número`,
-          `Matriz comparativa: Improviso Diário vs. Sistema Editorial`,
-        ],
-        icpPainDesireOrObjection:
-          "Dúvida sobre em qual estágio o próprio negócio está travado.",
-        icpAwarenessLevel: "Consciente do Problema",
-        referenceLink: "",
-        executionNotes:
-          "Arte estática em alto contraste Dark/Gold com chamada direta para comentar.",
-        status: "planned",
-        eligibleForComplementaryMaterial: false,
-        complementaryMaterialType: "Nenhum",
-      });
-    }
+export function mapBackendCalendarToRecord(
+  cal: any,
+  activeLineNameFallback: string,
+): EditorialCalendarRecord {
+  const id = String(cal.id || cal._id || "");
+  const cap = cal.capacity || {};
+  const wc = cal.weeklyCapacity || {};
 
-    // Quarta: Vídeo Longo de Transformação + Carrossel de Autoridade
-    if (dayOfWeekIndex === 2) {
-      slots.push({
-        id: `slot-w${weekNumber}-d${dayNumber}-1`,
-        dateISO,
-        dayNumber,
-        monthShort: "Nov",
-        weekNumber,
-        dayOfWeekIndex,
-        dayOfWeekLabel,
-        provisionalTitle: `Aula Profunda #${weekNumber}: A Engenharia Completa do Método em ${subniche}`,
-        format: "video_longo",
-        retinaType: "Transformacao",
-        platforms: ["YouTube"],
-        suggestedTime: "17:00",
-        strategicObjective:
-          "Aprofundar nível de consciência e demonstrar domínio técnico absoluto",
-        secondaryObjective:
-          "Gerar leads altamente qualificados para a oferta principal",
-        editorialLineName: lineName,
-        editorialPillar: AVAILABLE_PILLARS[2],
-        mainTheme: `Como estruturar o Mecanismo Único de ${subniche} do zero até a conversão`,
-        aiSuggestedThemes: [
-          `Como estruturar o Mecanismo Único de ${subniche} do zero até a conversão`,
-          `Masterclass: Por que métodos comuns falham em ${niche} e como blindar sua operação`,
-          `Análise completa de caso real: Da estagnação à previsibilidade em 30 dias`,
-        ],
-        icpPainDesireOrObjection:
-          "Objeção: 'Meu subnicho é técnico demais, preciso ver profundidade real antes de confiar.'",
-        icpAwarenessLevel: "Consciente da Solução",
-        referenceLink: "https://youtube.com/watch?v=exemplo-aula-magna",
-        executionNotes:
-          "Vídeo de 14 a 20 minutos estruturado em: Gancho de retenção (0-45s), Problema Estrutural, Mecanismo Único (3 pilares), Aplicação Prática e CTA para material complementar / aplicação.",
-        status: weekNumber === 1 ? "script_ready" : "planned",
-        eligibleForComplementaryMaterial: true,
-        complementaryMaterialType: "Planilha Executiva / Mapa Mental da Aula",
-      });
+  const periodStartDate = parsePeriodStartDate(
+    cal.period?.startDate || cal.periodStart,
+  );
+  const startIso = periodStartDate.toISOString().slice(0, 10);
 
-      slots.push({
-        id: `slot-w${weekNumber}-d${dayNumber}-2`,
-        dateISO,
-        dayNumber,
-        monthShort: "Nov",
-        weekNumber,
-        dayOfWeekIndex,
-        dayOfWeekLabel,
-        provisionalTitle: `Estudo de Caso & Bastidor Técnico: Decisões sob pressão`,
-        format: "carrossel",
-        retinaType: "Autoridade",
-        platforms: ["Instagram", "LinkedIn"],
-        suggestedTime: "20:00",
-        strategicObjective:
-          "Reforçar autoridade incontestável com prova lógica e técnica",
-        secondaryObjective: "Apoiar o vídeo longo publicado no YouTube",
-        editorialLineName: lineName,
-        editorialPillar: AVAILABLE_PILLARS[4],
-        mainTheme: `Análise de bastidor: Os 4 indicadores que definem o sucesso em ${subniche}`,
-        aiSuggestedThemes: [
-          `Análise de bastidor: Os 4 indicadores que definem o sucesso em ${subniche}`,
-          `O que aprendemos analisando dezenas de operações reais de ${niche}`,
-          `Raio-X Técnico: Como tomamos decisões estratégicas sem depender de sorte`,
-        ],
-        icpPainDesireOrObjection:
-          "Desejo de aprender com quem realmente executa no campo de batalha.",
-        icpAwarenessLevel: "Consciente do Produto",
-        referenceLink: "",
-        executionNotes: "Conectar o último slide ao vídeo longo do YouTube.",
-        status: "planned",
-        eligibleForComplementaryMaterial: false,
-        complementaryMaterialType: "Nenhum",
-      });
-    }
-
-    // Quinta: Reel de Nível de Consciência + Post Estático de Relacionamento
-    if (dayOfWeekIndex === 3) {
-      slots.push({
-        id: `slot-w${weekNumber}-d${dayNumber}-1`,
-        dateISO,
-        dayNumber,
-        monthShort: "Nov",
-        weekNumber,
-        dayOfWeekIndex,
-        dayOfWeekLabel,
-        provisionalTitle: `Quebra de Objeção Crítica: O custo invisível de adiar sua estrutura`,
-        format: "reel_curto",
-        retinaType: "NiveisDeConsciencia",
-        platforms: ["Instagram", "TikTok"],
-        suggestedTime: "12:00",
-        strategicObjective:
-          "Quebrar objeção de tempo/rotina e preparar para a oferta",
-        secondaryObjective:
-          "Levar o lead de Consciente da Solução para Consciente do Produto",
-        editorialLineName: lineName,
-        editorialPillar: AVAILABLE_PILLARS[5],
-        mainTheme:
-          weekNumber <= 2
-            ? `"Não tenho tempo para estruturar ${subniche}" — Como resolver isso em 1 hora por semana`
-            : "",
-        aiSuggestedThemes: [
-          `"Não tenho tempo para estruturar ${subniche}" — Como resolver isso em 1 hora por semana`,
-          `Por que esperar o "momento ideal" custa caro demais em ${niche}`,
-          `A diferença entre gastar energia no improviso e investir em um sistema`,
-        ],
-        icpPainDesireOrObjection:
-          "Objeção: 'Minha rotina é corrida demais, não vou dar conta de aplicar.'",
-        icpAwarenessLevel: "Consciente do Produto",
-        referenceLink: "",
-        executionNotes:
-          "Tom direto, firme e empático. Mostrar que a falta de tempo é consequência da falta de método.",
-        status: "planned",
-        eligibleForComplementaryMaterial: false,
-        complementaryMaterialType: "Nenhum",
-      });
-
-      slots.push({
-        id: `slot-w${weekNumber}-d${dayNumber}-2`,
-        dateISO,
-        dayNumber,
-        monthShort: "Nov",
-        weekNumber,
-        dayOfWeekIndex,
-        dayOfWeekLabel,
-        provisionalTitle: `Visão de Mundo & Princípios: O que não negociamos na nossa operação`,
-        format: "post_estatico",
-        retinaType: "Relacionamento",
-        platforms: ["Instagram"],
-        suggestedTime: "19:30",
-        strategicObjective:
-          "Gerar identificação profunda por valores e visão de mundo",
-        secondaryObjective: "Afastar curiosos que buscam atalhos rasos",
-        editorialLineName: lineName,
-        editorialPillar: AVAILABLE_PILLARS[0],
-        mainTheme: `Por que recusamos atalhos superficiais em ${niche} e priorizamos fundação sólida`,
-        aiSuggestedThemes: [
-          `Por que recusamos atalhos superficiais em ${niche} e priorizamos fundação sólida`,
-          `3 princípios inegociáveis para quem constrói autoridade de longo prazo`,
-          `Carta aberta para profissionais que cansaram do teatro digital`,
-        ],
-        icpPainDesireOrObjection:
-          "Desejo de pertencer a um grupo de alto nível com valores sérios.",
-        icpAwarenessLevel: "Consciente da Solução",
-        referenceLink: "",
-        executionNotes: "Fotografia autoral ou tipografia editorial limpa.",
-        status: "planned",
-        eligibleForComplementaryMaterial: false,
-        complementaryMaterialType: "Nenhum",
-      });
-    }
-
-    // Sexta: Live Semanal + Carrossel de Autoridade
-    if (dayOfWeekIndex === 4) {
-      slots.push({
-        id: `slot-w${weekNumber}-d${dayNumber}-1`,
-        dateISO,
-        dayNumber,
-        monthShort: "Nov",
-        weekNumber,
-        dayOfWeekIndex,
-        dayOfWeekLabel,
-        provisionalTitle: `Live Semanal #${weekNumber}: Consultoria Ao Vivo & Quebra de Travas`,
-        format: "live_semanal",
-        retinaType: "Autoridade",
-        platforms: ["Instagram", "YouTube"],
-        suggestedTime: "20:00",
-        strategicObjective:
-          "Interagir ao vivo, demonstrar repertório e conduzir para a oferta",
-        secondaryObjective: "Responder objeções reais da audiência em tempo real",
-        editorialLineName: lineName,
-        editorialPillar: AVAILABLE_PILLARS[5],
-        mainTheme: `Análise Ao Vivo: Destravando o planejamento de ${subniche} para o próximo mês`,
-        aiSuggestedThemes: [
-          `Análise Ao Vivo: Destravando o planejamento de ${subniche} para o próximo mês`,
-          `Live de Aquecimento: Os 3 pilares da oferta e como aplicar no seu caso`,
-          `Perguntas & Respostas Estratégicas: Diagnóstico de operações ao vivo`,
-        ],
-        icpPainDesireOrObjection:
-          "Objeção: 'Será que esse método funciona especificamente para o meu modelo?'",
-        icpAwarenessLevel: "Totalmente Consciente",
-        referenceLink: "",
-        executionNotes:
-          "Duração prevista: 45 a 60 min. Abrir com tese central de 15 min e abrir para 3 análises ao vivo + pitch consultivo.",
-        status: "planned",
-        eligibleForComplementaryMaterial: true,
-        complementaryMaterialType: "Resumo Executivo da Live + Diagnóstico",
-      });
-
-      slots.push({
-        id: `slot-w${weekNumber}-d${dayNumber}-2`,
-        dateISO,
-        dayNumber,
-        monthShort: "Nov",
-        weekNumber,
-        dayOfWeekIndex,
-        dayOfWeekLabel,
-        provisionalTitle: `Síntese Executiva da Semana: O que separa o plano da execução`,
-        format: "carrossel",
-        retinaType: "Autoridade",
-        platforms: ["Instagram", "LinkedIn"],
-        suggestedTime: "13:00",
-        strategicObjective:
-          "Consolidar a tese da semana e convidar para a Live das 20h",
-        secondaryObjective:
-          "Gerar salvamentos e lembretes para a transmissão ao vivo",
-        editorialLineName: lineName,
-        editorialPillar: AVAILABLE_PILLARS[2],
-        mainTheme: `O mapa mental completo para dominar ${subniche} sem improviso`,
-        aiSuggestedThemes: [
-          `O mapa mental completo para dominar ${subniche} sem improviso`,
-          `5 lições práticas dos bastidores desta semana em ${niche}`,
-          `Prepare-se para a Live de hoje às 20h: Os pontos que vamos destrinchar`,
-        ],
-        icpPainDesireOrObjection:
-          "Desejo de ter clareza visual de todo o sistema antes de dar o próximo passo.",
-        icpAwarenessLevel: "Consciente do Produto",
-        referenceLink: "",
-        executionNotes:
-          "Último slide com chamada direta para ativar o lembrete da Live das 20h.",
-        status: "planned",
-        eligibleForComplementaryMaterial: false,
-        complementaryMaterialType: "Nenhum",
-      });
-    }
-
-    // Sábado: Reel de Relacionamento
-    if (dayOfWeekIndex === 5) {
-      slots.push({
-        id: `slot-w${weekNumber}-d${dayNumber}-1`,
-        dateISO,
-        dayNumber,
-        monthShort: "Nov",
-        weekNumber,
-        dayOfWeekIndex,
-        dayOfWeekLabel,
-        provisionalTitle: `Bastidores Reais & Visão de Longo Prazo em ${niche}`,
-        format: "reel_curto",
-        retinaType: "Relacionamento",
-        platforms: ["Instagram"],
-        suggestedTime: "11:30",
-        strategicObjective:
-          "Humanizar o especialista e gerar conexão com o estilo de vida/trabalho",
-        secondaryObjective:
-          "Manter proximidade no fim de semana sem perder posicionamento",
-        editorialLineName: lineName,
-        editorialPillar: AVAILABLE_PILLARS[4],
-        mainTheme: `O que acontece nos bastidores de uma operação de ${subniche} organizada`,
-        aiSuggestedThemes: [
-          `O que acontece nos bastidores de uma operação de ${subniche} organizada`,
-          `Reflexão de sábado: O verdadeiro preço da falta de direção estratégica`,
-          `Como reviso meus indicadores da semana em 20 minutos`,
-        ],
-        icpPainDesireOrObjection:
-          "Desejo de ter paz mental e controle sobre o negócio sem trabalhar 16h/dia no caos.",
-        icpAwarenessLevel: "Consciente do Problema",
-        referenceLink: "",
-        executionNotes: "Formato mais conversacional e próximo.",
-        status: "planned",
-        eligibleForComplementaryMaterial: false,
-        complementaryMaterialType: "Nenhum",
-      });
-    }
-
-    // Sequências Diárias de Stories (Seg a Dom)
-    const dailyStoriesCount =
-      dayOfWeekIndex === 2 || dayOfWeekIndex === 4 ? 4 : 3;
-
-    slots.push({
-      id: `slot-w${weekNumber}-d${dayNumber}-stories`,
-      dateISO,
-      dayNumber,
-      monthShort: "Nov",
-      weekNumber,
-      dayOfWeekIndex,
-      dayOfWeekLabel,
-      provisionalTitle: `${dailyStoriesCount} Sequências de Stories do Dia (${dailyStoriesCount * 5} stories)`,
-      format: "sequencia_stories",
-      retinaType:
-        dayOfWeekIndex === 4
-          ? "NiveisDeConsciencia"
-          : dayOfWeekIndex === 6
-            ? "Relacionamento"
-            : "Interacao",
-      platforms: ["Instagram"],
-      suggestedTime: "08:30 • 12:30 • 16:30 • 20:30",
-      strategicObjective:
-        dayOfWeekIndex === 6
-          ? "Rotina, conexão genuína, abertura de caixinha e antecipação da nova semana"
-          : "Sustentar narrativa fracionada ao longo do dia (Manhã, Almoço, Tarde e Noite)",
-      secondaryObjective:
-        "Gerar respostas no Direct, enquetes qualificadoras e retenção diária",
-      editorialLineName: lineName,
-      editorialPillar:
-        AVAILABLE_PILLARS[dayOfWeekIndex % AVAILABLE_PILLARS.length],
-      mainTheme: `Narrativa Diária de Stories — ${dayOfWeekLabel} (Semana ${weekNumber})`,
-      aiSuggestedThemes: [
-        `Sequência de Diagnóstico + Bastidor Real + Caixinha de Dúvidas em ${subniche}`,
-        `Estudo de Caso Fracionado em 4 Blocos + Enquete de Qualificação`,
-        `Quebra de Objeção do Dia + Prova Social + Chamada para Direct`,
-      ],
-      icpPainDesireOrObjection:
-        "Manter o comprador aquecido diariamente combinando relacionamento, prova e interação.",
-      icpAwarenessLevel: "Consciente da Solução",
-      referenceLink: "",
-      executionNotes:
-        "Seguir o modelo canônico: 3 a 4 sequências no dia, com 4 a 5 stories encadeados em cada sequência.",
-      status: weekNumber === 1 && dayOfWeekIndex <= 2 ? "published" : "planned",
-      eligibleForComplementaryMaterial: false,
-      complementaryMaterialType: "Nenhum",
-      storySequencesBreakdown: [
-        {
-          period: "Manhã",
-          suggestedTime: "08:30",
-          storiesCount: 5,
-          retinaFocus: "Relacionamento",
-          narrativeDirection:
-            "Abertura do dia com ritual de trabalho, visão de mundo e contextualização do tema central (5 stories).",
-          hasQAndABox: false,
-        },
-        {
-          period: "Almoço",
-          suggestedTime: "12:30",
-          storiesCount: 4,
-          retinaFocus: "Transformacao",
-          narrativeDirection:
-            "Bastidor técnico de execução + micro-lição prática aplicável com enquete diagnóstica (4 stories).",
-          hasQAndABox: false,
-        },
-        {
-          period: "Tarde",
-          suggestedTime: "16:30",
-          storiesCount: 5,
-          retinaFocus: "Autoridade",
-          narrativeDirection:
-            "Prova real, análise de caso ou resposta aprofundada de caixinha conectada ao MUV (5 stories).",
-          hasQAndABox: true,
-        },
-        {
-          period: "Noite",
-          suggestedTime: "20:30",
-          storiesCount: 4,
-          retinaFocus: "NiveisDeConsciencia",
-          narrativeDirection:
-            "Fechamento reflexivo, quebra de objeção silenciosa e convite para interação/Direct (4 stories).",
-          hasQAndABox: true,
-        },
-      ],
+  let rawSlots: any[] = [];
+  if (Array.isArray(cal.slots) && cal.slots.length > 0) {
+    rawSlots = cal.slots;
+  } else if (Array.isArray(cal.days)) {
+    cal.days.forEach((day: any, dayIdx: number) => {
+      const dayDate = day.date ? new Date(day.date) : new Date(periodStartDate);
+      const dayIso = Number.isNaN(dayDate.getTime())
+        ? startIso
+        : dayDate.toISOString().slice(0, 10);
+      for (const item of day.items || []) {
+        rawSlots.push({
+          ...item,
+          id: String(item.id || item._id || `item-${dayIdx}-${rawSlots.length}`),
+          date: dayIso,
+          weekNumber: Math.min(4, Math.floor(dayIdx / 7) + 1),
+          dayOfWeekIndex: dayIdx % 7,
+        });
+      }
     });
   }
 
-  return slots;
+  const mappedSlots: CalendarSlotItem[] = rawSlots.map((s: any, idx: number) => {
+    const slotDate = parsePeriodStartDate(s.dateISO || s.date || periodStartDate);
+    const dateISO = slotDate.toISOString().slice(0, 10);
+    const dayNumber = Number(s.dayNumber) || slotDate.getDate();
+    const diffDays = Math.max(
+      0,
+      Math.round(
+        (slotDate.getTime() - periodStartDate.getTime()) / (1000 * 60 * 60 * 24),
+      ),
+    );
+    const weekNumber = Math.min(
+      4,
+      Math.max(1, Number(s.weekNumber) || Math.floor(diffDays / 7) + 1),
+    ) as 1 | 2 | 3 | 4;
+    const dayOfWeekIndex = ((Number(s.dayOfWeekIndex) ||
+      ((slotDate.getDay() + 6) % 7)) %
+      7) as 0 | 1 | 2 | 3 | 4 | 5 | 6;
+    const monthShort =
+      s.monthShort ||
+      slotDate
+        .toLocaleDateString("pt-BR", { month: "short" })
+        .replace(".", "");
+
+    return {
+      id: String(s.id || s._id || `slot-${idx}`),
+      dateISO,
+      dayNumber,
+      monthShort,
+      weekNumber,
+      dayOfWeekIndex,
+      dayOfWeekLabel:
+        s.dayOfWeekLabel ||
+        s.dayOfWeek ||
+        WEEKDAY_HEADERS[dayOfWeekIndex]?.full ||
+        "Dia",
+      provisionalTitle:
+        s.provisionalTitle ||
+        s.provisionalName ||
+        s.mainTheme ||
+        s.theme ||
+        "Slot Planejado",
+      format: mapBackendFormatToUi(s.format),
+      retinaType: mapBackendRetinaToUi(s.retinaType || s.retinaBadge),
+      platforms: Array.isArray(s.platforms)
+        ? s.platforms
+        : s.platform
+          ? [String(s.platform)]
+          : ["Instagram"],
+      suggestedTime: s.suggestedTime || s.scheduledTime || "12:00",
+      strategicObjective:
+        s.strategicObjective || s.primaryObjective || "Posicionamento",
+      secondaryObjective: s.secondaryObjective || "",
+      editorialLineName:
+        s.editorialLineName || cal.linkedLineName || activeLineNameFallback,
+      editorialPillar:
+        s.editorialPillar || s.pillar || AVAILABLE_PILLARS[0],
+      mainTheme: s.mainTheme || s.theme || "",
+      aiSuggestedThemes: Array.isArray(s.aiSuggestedThemes)
+        ? s.aiSuggestedThemes
+        : [],
+      icpPainDesireOrObjection:
+        s.icpPainDesireOrObjection || s.painDesireObjection || "",
+      icpAwarenessLevel:
+        (s.icpAwarenessLevel as IcpAwarenessLevel) || "Consciente do Problema",
+      referenceLink: s.referenceLink || s.referenceUrl || "",
+      executionNotes: s.executionNotes || s.observations || "",
+      status: (s.status as SlotExecutionStatus) || "planned",
+      eligibleForComplementaryMaterial: Boolean(
+        s.eligibleForComplementaryMaterial,
+      ),
+      complementaryMaterialType: s.complementaryMaterialType || "Nenhum",
+      storySequencesBreakdown: Array.isArray(s.storySequencesBreakdown)
+        ? s.storySequencesBreakdown
+        : undefined,
+    };
+  });
+
+  return {
+    id,
+    name: cal.name || "Calendário Editorial",
+    status: (cal.status as CalendarRecordStatus) || "active",
+    periodLabel:
+      cal.periodLabel || cal.period?.label || "4 semanas planejadas (28 dias)",
+    periodStart:
+      cal.periodStart || formatDateBr(cal.period?.startDate) || "",
+    periodEnd: cal.periodEnd || formatDateBr(cal.period?.endDate) || "",
+    mainObjective: cal.mainObjective || PERIOD_OBJECTIVES[0],
+    linkedLineName: cal.linkedLineName || activeLineNameFallback,
+    platforms: Array.isArray(cal.platforms)
+      ? cal.platforms
+      : ["Instagram"],
+    weeklyCapacity: {
+      reels: Number(wc.reels ?? cap.reelsPerWeek ?? 4),
+      longVideos: Number(wc.longVideos ?? cap.longVideosPerWeek ?? 1),
+      carousels: Number(wc.carousels ?? cap.carouselsPerWeek ?? 2),
+      staticPosts: Number(wc.staticPosts ?? cap.staticPostsPerWeek ?? 2),
+      lives: Number(wc.lives ?? cap.livesPerWeek ?? 1),
+      dailyStorySequences: Number(
+        wc.storiesPerDay ?? wc.dailyStorySequences ?? cap.storySequencesPerDay ?? 3,
+      ),
+      storiesPerSequence: Number(
+        wc.storiesPerSequence ?? cap.storiesPerSequence ?? 5,
+      ),
+    },
+    updatedAt: cal.updatedAt
+      ? new Date(cal.updatedAt).toLocaleDateString("pt-BR")
+      : "Sincronizado",
+    reviewSuggestions: Array.isArray(cal.reviewSuggestions)
+      ? cal.reviewSuggestions.map((r: any, rIdx: number) => ({
+          id: String(r.id || r._id || `rev-${rIdx + 1}`),
+          title: r.title || "Recomendação editorial",
+          reason: r.reason || r.description || "",
+          actionLabel: r.actionLabel || "Aplicar ajuste",
+          applied: Boolean(r.applied),
+        }))
+      : [],
+    slots: mappedSlots,
+  };
 }
 
 /* ========================================================================== */
@@ -1005,71 +704,12 @@ export function CalendarioEditorialModule(
     [props.onGoToScriptsTab, props.onRequestGoToScripts]
   );
 
-  const storageKey = `la-calendario-editorial-v2-${resolvedProjectId}`;
-  const sharedSlotsKey = `la-shared-calendar-slots-${resolvedProjectId}`;
-
-  /* Estado dos Calendários do Projeto */
+  /* Estado dos Calendários do Projeto (carregado via BFF/MongoDB) */
   const [calendars, setCalendars] = useState<readonly EditorialCalendarRecord[]>(
-    () => [
-      {
-        id: "cal-nov-2026",
-        name: `Calendário Editorial — ${resolvedPhase}`,
-        status: "active",
-        periodLabel: "4 semanas planejadas (28 dias)",
-        periodStart: "02/11/2026",
-        periodEnd: "29/11/2026",
-        mainObjective: PERIOD_OBJECTIVES[0],
-        linkedLineName: activeLineName,
-        platforms: ["Instagram", "YouTube", "TikTok", "LinkedIn"],
-        weeklyCapacity: {
-          reels: 4,
-          longVideos: 1,
-          carousels: 3,
-          staticPosts: 2,
-          lives: 1,
-          dailyStorySequences: 4,
-          storiesPerSequence: 5,
-        },
-        updatedAt: "Sincronizado hoje",
-        reviewSuggestions: [
-          {
-            id: "rev-1",
-            title: "Aumentar conteúdos de Transformação nas terças e quartas",
-            reason:
-              "Conteúdos práticos de Transformação estão gerando o maior volume de salvamentos qualificados do ciclo.",
-            actionLabel: "Aplicar reforço de Transformação",
-            applied: false,
-          },
-          {
-            id: "rev-2",
-            title:
-              "Elevar peso de Níveis de Consciência e Autoridade na Semana 3 e 4",
-            reason:
-              "Com a aproximação do momento de conversão, é recomendável intensificar a quebra de objeções.",
-            actionLabel: "Equilibrar Semanas 3 e 4",
-            applied: false,
-          },
-          {
-            id: "rev-3",
-            title:
-              "Preencher os slots restantes que ainda estão sem tema principal",
-            reason:
-              "Existem slots na primeira e segunda semana com espaço aberto para vincular temas da Biblioteca Estratégica.",
-            actionLabel: "Vincular Temas Recomendados",
-            applied: false,
-          },
-        ],
-        slots: generateCanonicalMonthSlots(
-          resolvedNiche,
-          resolvedSubniche,
-          activeLineName
-        ),
-      },
-    ]
+    [],
   );
-
-  const [selectedCalendarId, setSelectedCalendarId] =
-    useState<string>("cal-nov-2026");
+  const [isLoadingCalendars, setIsLoadingCalendars] = useState<boolean>(true);
+  const [selectedCalendarId, setSelectedCalendarId] = useState<string>("");
 
   /* Controle de Telas da Subfunção */
   const [viewMode, setViewMode] = useState<
@@ -1127,51 +767,84 @@ export function CalendarioEditorialModule(
     "saved"
   );
 
-  /* Carrega do localStorage */
-  useEffect(() => {
+  const loadCalendars = useCallback(async () => {
+    if (!resolvedProjectId || resolvedProjectId === "proj-default") {
+      setIsLoadingCalendars(false);
+      return;
+    }
+    setIsLoadingCalendars(true);
     try {
-      const saved = window.localStorage.getItem(storageKey);
-      if (saved) {
-        const parsed = JSON.parse(saved) as EditorialCalendarRecord[];
-        if (Array.isArray(parsed) && parsed.length > 0) {
-          setCalendars(parsed);
-          setSelectedCalendarId(parsed[0]?.id || "cal-nov-2026");
-        }
+      const apiCals = await editorialService.listCalendars(resolvedProjectId);
+      const mapped = (apiCals || []).map((c: any) =>
+        mapBackendCalendarToRecord(c, activeLineName),
+      );
+      setCalendars(mapped);
+      if (mapped.length > 0) {
+        const active = mapped.find((c) => c.status === "active") || mapped[0];
+        setSelectedCalendarId((prev) =>
+          mapped.some((m) => m.id === prev) ? prev : active.id,
+        );
       }
     } catch {
-      /* Ignora erro de storage */
+      /* Mantém vazio se erro ou nenhum calendário criado */
+    } finally {
+      setIsLoadingCalendars(false);
     }
-  }, [storageKey]);
+  }, [resolvedProjectId, activeLineName]);
+
+  useEffect(() => {
+    void loadCalendars();
+  }, [loadCalendars]);
 
   const persistCalendars = useCallback(
-    (nextCalendars: readonly EditorialCalendarRecord[]) => {
+    async (nextCalendars: readonly EditorialCalendarRecord[]) => {
       setAutosaveStatus("saving");
       setCalendars(nextCalendars);
+
+      const active =
+        nextCalendars.find((c) => c.id === selectedCalendarId) ||
+        nextCalendars[0];
+      if (!active || active.id === "cal-fallback") {
+        setAutosaveStatus("saved");
+        return;
+      }
+
       try {
-        window.localStorage.setItem(storageKey, JSON.stringify(nextCalendars));
-        const activeCal = nextCalendars[0];
-        if (activeCal) {
-          window.localStorage.setItem(
-            sharedSlotsKey,
-            JSON.stringify(activeCal.slots)
-          );
-        }
-        setTimeout(() => setAutosaveStatus("saved"), 240);
-      } catch {
+        await editorialService.updateCalendar(active.id, {
+          name: active.name,
+          periodLabel: active.periodLabel,
+          mainObjective: active.mainObjective,
+          weeklyCapacity: active.weeklyCapacity as unknown as Record<
+            string,
+            number
+          >,
+          capacity: {
+            reelsPerWeek: active.weeklyCapacity.reels,
+            longVideosPerWeek: active.weeklyCapacity.longVideos,
+            carouselsPerWeek: active.weeklyCapacity.carousels,
+            staticPostsPerWeek: active.weeklyCapacity.staticPosts,
+            livesPerWeek: active.weeklyCapacity.lives,
+            storySequencesPerDay: active.weeklyCapacity.dailyStorySequences,
+            storiesPerSequence: active.weeklyCapacity.storiesPerSequence,
+          },
+          reviewSuggestions: active.reviewSuggestions as any,
+          slots: active.slots as any,
+        } as any);
+      } finally {
         setAutosaveStatus("saved");
       }
     },
-    [storageKey, sharedSlotsKey]
+    [selectedCalendarId],
   );
 
   const currentCalendar = useMemo(() => {
-    const fallback: EditorialCalendarRecord = calendars[0] ?? {
+    const emptyFallback: EditorialCalendarRecord = {
       id: "cal-fallback",
       name: `Calendário Editorial — ${resolvedPhase}`,
       status: "active",
       periodLabel: "4 semanas planejadas (28 dias)",
-      periodStart: "02/11/2026",
-      periodEnd: "29/11/2026",
+      periodStart: new Date().toLocaleDateString("pt-BR"),
+      periodEnd: "",
       mainObjective: PERIOD_OBJECTIVES[0],
       linkedLineName: activeLineName,
       platforms: ["Instagram", "YouTube"],
@@ -1181,33 +854,68 @@ export function CalendarioEditorialModule(
         carousels: 2,
         staticPosts: 2,
         lives: 1,
-        dailyStorySequences: 4,
+        dailyStorySequences: 3,
         storiesPerSequence: 5,
       },
-      updatedAt: "Hoje",
+      updatedAt: "Não salvo",
       reviewSuggestions: [],
       slots: [],
     };
+    if (calendars.length === 0) return emptyFallback;
     return (
       calendars.find((c) => c.id === selectedCalendarId) ??
       calendars.find((c) => c.status === "active") ??
-      fallback
+      calendars[0]
     );
   }, [calendars, selectedCalendarId, resolvedPhase, activeLineName]);
 
   const updateSlotById = useCallback(
     (slotId: string, updater: (prev: CalendarSlotItem) => CalendarSlotItem) => {
+      let updatedSlot: CalendarSlotItem | null = null;
       const next = calendars.map((cal) => {
         if (cal.id !== currentCalendar.id) return cal;
         return {
           ...cal,
-          updatedAt: "Salvo automaticamente agora",
-          slots: cal.slots.map((s) => (s.id === slotId ? updater(s) : s)),
+          updatedAt: "Salvo agora",
+          slots: cal.slots.map((s) => {
+            if (s.id !== slotId) return s;
+            updatedSlot = updater(s);
+            return updatedSlot;
+          }),
         };
       });
-      persistCalendars(next);
+      setCalendars(next);
+      if (updatedSlot && currentCalendar.id !== "cal-fallback") {
+        const s = updatedSlot as CalendarSlotItem;
+        setAutosaveStatus("saving");
+        void editorialService
+          .updateCalendarItem(currentCalendar.id, slotId, {
+            provisionalTitle: s.provisionalTitle,
+            provisionalName: s.provisionalTitle,
+            mainTheme: s.mainTheme,
+            theme: s.mainTheme,
+            suggestedTime: s.suggestedTime,
+            scheduledTime: s.suggestedTime,
+            editorialPillar: s.editorialPillar,
+            pillar: s.editorialPillar,
+            strategicObjective: s.strategicObjective,
+            primaryObjective: s.strategicObjective,
+            secondaryObjective: s.secondaryObjective,
+            icpPainDesireOrObjection: s.icpPainDesireOrObjection,
+            icpAwarenessLevel: s.icpAwarenessLevel,
+            referenceLink: s.referenceLink,
+            referenceUrl: s.referenceLink,
+            executionNotes: s.executionNotes,
+            observations: s.executionNotes,
+            status: s.status as any,
+            eligibleForComplementaryMaterial:
+              s.eligibleForComplementaryMaterial,
+            complementaryMaterialType: s.complementaryMaterialType,
+          } as any)
+          .finally(() => setAutosaveStatus("saved"));
+      }
     },
-    [calendars, currentCalendar.id, persistCalendars]
+    [calendars, currentCalendar.id],
   );
 
   const selectedSlot = useMemo(() => {
@@ -1245,6 +953,7 @@ export function CalendarioEditorialModule(
   }, [currentCalendar.slots]);
 
   const calendarDaysMatrix = useMemo(() => {
+    const startDate = parsePeriodStartDate(currentCalendar.periodStart);
     const days: {
       readonly dayNumber: number;
       readonly dateISO: string;
@@ -1256,15 +965,25 @@ export function CalendarioEditorialModule(
       readonly slots: CalendarSlotItem[];
     }[] = [];
 
+    const todayIso = new Date().toISOString().slice(0, 10);
+
     for (let offset = 0; offset < 28; offset++) {
-      const dayNumber = 2 + offset;
-      const dateISO = `2026-11-${String(dayNumber).padStart(2, "0")}`;
+      const currentDayDate = new Date(startDate);
+      currentDayDate.setDate(startDate.getDate() + offset);
+      const dayNumber = currentDayDate.getDate();
+      const dateISO = currentDayDate.toISOString().slice(0, 10);
+      const monthShort = currentDayDate
+        .toLocaleDateString("pt-BR", { month: "short" })
+        .replace(".", "");
       const weekNumber = (Math.floor(offset / 7) + 1) as 1 | 2 | 3 | 4;
       const dayOfWeekIndex = (offset % 7) as 0 | 1 | 2 | 3 | 4 | 5 | 6;
       const dayOfWeekLabel = WEEKDAY_HEADERS[dayOfWeekIndex].full;
 
       const daySlots = currentCalendar.slots.filter((s) => {
-        if (s.dayNumber !== dayNumber) return false;
+        const matchDate =
+          s.dateISO === dateISO ||
+          (!s.dateISO && s.dayNumber === dayNumber);
+        if (!matchDate) return false;
         if (!showDailyStoriesInGrid && s.format === "sequencia_stories") {
           return false;
         }
@@ -1280,11 +999,11 @@ export function CalendarioEditorialModule(
       days.push({
         dayNumber,
         dateISO,
-        monthShort: "Nov",
+        monthShort,
         weekNumber,
         dayOfWeekIndex,
         dayOfWeekLabel,
-        isToday: dayNumber === 9,
+        isToday: dateISO === todayIso,
         slots: daySlots,
       });
     }
@@ -1294,6 +1013,7 @@ export function CalendarioEditorialModule(
     }
     return days;
   }, [
+    currentCalendar.periodStart,
     currentCalendar.slots,
     selectedWeekFilter,
     showDailyStoriesInGrid,
@@ -1301,43 +1021,34 @@ export function CalendarioEditorialModule(
     retinaFilter,
   ]);
 
-  const handleAddSlotToDay = (e: FormEvent<HTMLFormElement>) => {
+  const handleAddSlotToDay = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    if (!addingSlotForDate) return;
+    if (!addingSlotForDate || currentCalendar.id === "cal-fallback") return;
 
     const formatMeta = FORMAT_META[newSlotFormat];
-    const newSlot: CalendarSlotItem = {
-      id: `slot-custom-${Date.now()}`,
-      dateISO: addingSlotForDate.dateISO,
-      dayNumber: addingSlotForDate.dayNumber,
-      monthShort: "Nov",
+    const provisionalTitle =
+      newSlotTitle.trim() ||
+      `${formatMeta.shortLabel} de ${RETINA_META[newSlotRetina].label} — ${addingSlotForDate.dayOfWeekLabel}`;
+
+    const backendSlotPayload = {
       weekNumber: addingSlotForDate.weekNumber,
-      dayOfWeekIndex: addingSlotForDate.dayOfWeekIndex,
-      dayOfWeekLabel: addingSlotForDate.dayOfWeekLabel,
-      provisionalTitle:
-        newSlotTitle.trim() ||
-        `${formatMeta.shortLabel} de ${RETINA_META[newSlotRetina].label} — ${addingSlotForDate.dayOfWeekLabel}`,
-      format: newSlotFormat,
-      retinaType: newSlotRetina,
-      platforms:
-        newSlotFormat === "video_longo" ? ["YouTube"] : ["Instagram"],
-      suggestedTime: newSlotTime || "18:00",
-      strategicObjective: RETINA_META[newSlotRetina].purpose,
+      dayOfWeek: addingSlotForDate.dayOfWeekLabel,
+      date: addingSlotForDate.dateISO,
+      scheduledTime: newSlotTime || "18:00",
+      format: mapUiFormatToBackend(newSlotFormat),
+      formatLabel: formatMeta.shortLabel,
+      platform: newSlotFormat === "video_longo" ? "YouTube" : "Instagram",
+      primaryObjective: RETINA_META[newSlotRetina].purpose,
       secondaryObjective: `Apoiar ${currentCalendar.mainObjective}`,
-      editorialLineName: currentCalendar.linkedLineName,
       editorialPillar: AVAILABLE_PILLARS[0],
+      retinaBadge: RETINA_META[newSlotRetina].label,
       mainTheme: newSlotTitle.trim(),
-      aiSuggestedThemes: [
-        `Como evitar o erro invisível de ${resolvedSubniche}`,
-        `O método passo a passo para gerar previsibilidade em ${resolvedNiche}`,
-        `Estudo prático: o que diferencia amadores de profissionais em ${resolvedSubniche}`,
-      ],
+      provisionalTitle,
       icpPainDesireOrObjection:
         "Dor ou objeção prioritária mapeada na Base Estratégica do projeto.",
       icpAwarenessLevel: "Consciente da Solução",
-      referenceLink: "",
-      executionNotes: "Slot adicionado diretamente na grade do calendário.",
       status: "planned",
+      executionNotes: "Slot adicionado diretamente na grade do calendário.",
       eligibleForComplementaryMaterial:
         newSlotFormat === "carrossel" || newSlotFormat === "video_longo",
       complementaryMaterialType:
@@ -1346,96 +1057,172 @@ export function CalendarioEditorialModule(
           : "Nenhum",
     };
 
-    const next = calendars.map((cal) =>
-      cal.id === currentCalendar.id
-        ? { ...cal, slots: [...cal.slots, newSlot] }
-        : cal
-    );
-    persistCalendars(next);
-    setAddingSlotForDate(null);
-    setNewSlotTitle("");
-    setSelectedSlotId(newSlot.id);
-  };
-
-  const handleDeleteSlot = (slotId: string) => {
-    const next = calendars.map((cal) =>
-      cal.id === currentCalendar.id
-        ? { ...cal, slots: cal.slots.filter((s) => s.id !== slotId) }
-        : cal
-    );
-    persistCalendars(next);
-    if (selectedSlotId === slotId) {
-      setSelectedSlotId(null);
+    try {
+      const updatedCal = await editorialService.addCalendarSlot(
+        currentCalendar.id,
+        backendSlotPayload,
+      );
+      const mappedCal = mapBackendCalendarToRecord(updatedCal, activeLineName);
+      setCalendars((prev) =>
+        prev.map((c) => (c.id === mappedCal.id ? mappedCal : c)),
+      );
+      const added = mappedCal.slots[mappedCal.slots.length - 1];
+      setAddingSlotForDate(null);
+      setNewSlotTitle("");
+      if (added) setSelectedSlotId(added.id);
+    } catch {
+      setAutosaveStatus("saved");
     }
   };
 
-  const handleCreateNewCalendar = (e: FormEvent<HTMLFormElement>) => {
+  const handleDeleteSlot = async (slotId: string) => {
+    setCalendars((prev) =>
+      prev.map((cal) =>
+        cal.id === currentCalendar.id
+          ? { ...cal, slots: cal.slots.filter((s) => s.id !== slotId) }
+          : cal,
+      ),
+    );
+    if (selectedSlotId === slotId) {
+      setSelectedSlotId(null);
+    }
+    if (currentCalendar.id !== "cal-fallback") {
+      try {
+        await editorialService.deleteCalendarItem(currentCalendar.id, slotId);
+      } catch {
+        void loadCalendars();
+      }
+    }
+  };
+
+  const handleCreateNewCalendar = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    const created: EditorialCalendarRecord = {
-      id: `cal-${Date.now()}`,
-      name:
-        newCalName.trim() || `Calendário Editorial — ${newCalPeriodLabel}`,
-      status: "active",
-      periodLabel: newCalPeriodLabel,
-      periodStart: newCalStart,
-      periodEnd: newCalEnd,
-      mainObjective: newCalObjective,
-      linkedLineName: activeLineName,
-      platforms: currentCalendar.platforms,
-      weeklyCapacity: { ...currentCalendar.weeklyCapacity },
-      updatedAt: "Criado agora",
-      reviewSuggestions: currentCalendar.reviewSuggestions,
-      slots: generateCanonicalMonthSlots(
-        resolvedNiche,
-        resolvedSubniche,
-        activeLineName
-      ),
-    };
+    if (!resolvedProjectId) return;
 
-    const next = [
-      created,
-      ...calendars.map((c) =>
-        c.status === "active" ? { ...c, status: "archived" as const } : c
-      ),
-    ];
-    persistCalendars(next);
-    setSelectedCalendarId(created.id);
-    setNewCalName("");
-    setViewMode("calendar");
+    const startDate = parsePeriodStartDate(newCalStart);
+    const endDate = parsePeriodStartDate(newCalEnd);
+    const validEnd =
+      endDate > startDate
+        ? endDate
+        : new Date(startDate.getTime() + 27 * 24 * 60 * 60 * 1000);
+
+    const periodType = newCalPeriodLabel.toLowerCase().includes("quinzen")
+      ? "two_weeks"
+      : newCalPeriodLabel.toLowerCase().includes("aquecimento")
+        ? "four_weeks_warmup"
+        : "one_month";
+
+    const objectiveCode = newCalObjective.toLowerCase().includes("audiência")
+      ? "increase_audience"
+      : newCalObjective.toLowerCase().includes("autoridade")
+        ? "reinforce_authority"
+        : newCalObjective.toLowerCase().includes("relacionamento")
+          ? "increase_relationship"
+          : "warmup_sales";
+
+    try {
+      setAutosaveStatus("saving");
+      const createdApi = await editorialService.createCalendar(
+        resolvedProjectId,
+        {
+          periodType,
+          startDate,
+          endDate: validEnd,
+          periodLabel: newCalPeriodLabel,
+          periodStart: startDate.toISOString().slice(0, 10),
+          periodEnd: validEnd.toISOString().slice(0, 10),
+          mainObjective: newCalObjective,
+          linkedLineName: activeLineName,
+          platforms: ["instagram", "youtube"],
+          objective: objectiveCode,
+          customName:
+            newCalName.trim() || `Calendário Editorial — ${newCalPeriodLabel}`,
+          capacity: {
+            reelsPerWeek: currentCalendar.weeklyCapacity.reels,
+            longVideosPerWeek: currentCalendar.weeklyCapacity.longVideos,
+            carouselsPerWeek: currentCalendar.weeklyCapacity.carousels,
+            staticPostsPerWeek: currentCalendar.weeklyCapacity.staticPosts,
+            livesPerWeek: currentCalendar.weeklyCapacity.lives,
+            storySequencesPerDay:
+              currentCalendar.weeklyCapacity.dailyStorySequences,
+            storiesPerSequence:
+              currentCalendar.weeklyCapacity.storiesPerSequence,
+          },
+        } as any,
+      );
+      const created = mapBackendCalendarToRecord(createdApi, activeLineName);
+      setCalendars((prev) => [
+        created,
+        ...prev.map((c) =>
+          c.status === "active" ? { ...c, status: "archived" as const } : c,
+        ),
+      ]);
+      setSelectedCalendarId(created.id);
+      setNewCalName("");
+      setViewMode("calendar");
+    } finally {
+      setAutosaveStatus("saved");
+    }
   };
 
-  const handleDuplicateCalendar = (cal: EditorialCalendarRecord) => {
-    const dup: EditorialCalendarRecord = {
-      ...cal,
-      id: `cal-dup-${Date.now()}`,
-      name: `${cal.name} (Cópia)`,
-      status: "draft",
-      updatedAt: "Duplicado agora",
-      slots: cal.slots.map((s) => ({ ...s, id: `${s.id}-copy-${Date.now()}` })),
-    };
-    persistCalendars([dup, ...calendars]);
-    setSelectedCalendarId(dup.id);
+  const handleDuplicateCalendar = async (cal: EditorialCalendarRecord) => {
+    try {
+      const dupApi = await editorialService.duplicateCalendar(cal.id);
+      const dup = mapBackendCalendarToRecord(dupApi, activeLineName);
+      setCalendars((prev) => [dup, ...prev]);
+      setSelectedCalendarId(dup.id);
+    } catch {
+      /* Ignora erro */
+    }
   };
 
-  const handleApplyReviewSuggestion = (suggestionId: string) => {
+  const handleApplyReviewSuggestion = async (suggestionId: string) => {
     const next = calendars.map((cal) => {
       if (cal.id !== currentCalendar.id) return cal;
       return {
         ...cal,
         reviewSuggestions: cal.reviewSuggestions.map((r) =>
-          r.id === suggestionId ? { ...r, applied: true } : r
+          r.id === suggestionId ? { ...r, applied: true } : r,
         ),
         slots:
           suggestionId === "rev-3"
             ? cal.slots.map((s) =>
                 !s.mainTheme.trim() && s.aiSuggestedThemes[0]
                   ? { ...s, mainTheme: s.aiSuggestedThemes[0] }
-                  : s
+                  : s,
               )
             : cal.slots,
       };
     });
-    persistCalendars(next);
+    await persistCalendars(next);
+  };
+
+  const handleRefreshAiReview = async () => {
+    if (currentCalendar.id === "cal-fallback") return;
+    setAutosaveStatus("saving");
+    try {
+      const suggestions = await editorialService.generateCalendarReview(
+        currentCalendar.id,
+      );
+      setCalendars((prev) =>
+        prev.map((cal) =>
+          cal.id !== currentCalendar.id
+            ? cal
+            : {
+                ...cal,
+                reviewSuggestions: (suggestions || []).map((r: any, idx: number) => ({
+                  id: String(r.id || r._id || `rev-${idx + 1}`),
+                  title: r.title || "Sugestão",
+                  reason: r.reason || r.description || "",
+                  actionLabel: r.actionLabel || "Aplicar ajuste",
+                  applied: Boolean(r.applied),
+                })),
+              },
+        ),
+      );
+    } finally {
+      setAutosaveStatus("saved");
+    }
   };
 
   return (
@@ -1628,6 +1415,25 @@ export function CalendarioEditorialModule(
       {/* =================================================================== */}
       {viewMode === "calendar" ? (
         <div className="flex flex-col gap-5">
+          {!isLoadingCalendars && calendars.length === 0 ? (
+            <section className="flex flex-col items-center justify-center gap-3 rounded-la-xl border border-dashed border-la-border-gold/40 bg-[#080B12]/90 p-10 text-center">
+              <CalendarIcon className="h-8 w-8 text-la-gold" />
+              <h3 className="font-la-sans text-[1.125rem] font-semibold text-la-text-primary">
+                Nenhum Calendário Editorial criado ainda
+              </h3>
+              <p className="max-w-[34rem] font-la-sans text-[0.875rem] text-la-text-secondary">
+                Defina sua capacidade semanal real e gere o calendário deste projeto no backend.
+              </p>
+              <button
+                type="button"
+                onClick={() => setViewMode("setup")}
+                className="mt-2 inline-flex min-h-[2.625rem] items-center gap-2 rounded-la-md bg-la-gold px-5 py-2 font-la-sans text-[0.8125rem] font-semibold text-la-text-inverse hover:bg-la-gold-light"
+              >
+                <Plus className="h-4 w-4 stroke-[2.5]" />
+                <span>Configurar Primeiro Calendário</span>
+              </button>
+            </section>
+          ) : null}
           <section className="flex flex-col gap-4 rounded-la-xl border border-white/10 bg-[#080B12]/95 p-4">
             <div className="flex flex-col justify-between gap-3 lg:flex-row lg:items-center">
               <div className="flex flex-wrap items-center gap-1.5 rounded-la-lg border border-white/10 bg-black/60 p-1">
@@ -2444,13 +2250,23 @@ export function CalendarioEditorialModule(
       {/* =================================================================== */}
       {viewMode === "review" ? (
         <section className="flex flex-col gap-4 rounded-la-xl border border-white/10 bg-[#080B12]/95 p-6">
-          <div>
-            <span className="font-la-mono text-[0.625rem] font-semibold uppercase tracking-[0.08em] text-la-gold-light">
-              INFRAESTRUTURA VIVA · REVISÃO PERIÓDICA RECOMENDADA PELA IA
-            </span>
-            <h3 className="mt-1 font-la-sans text-[1.375rem] font-semibold text-la-text-primary">
-              Diagnóstico de Equilíbrio e Sugestões de Ajuste da Agenda
-            </h3>
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <span className="font-la-mono text-[0.625rem] font-semibold uppercase tracking-[0.08em] text-la-gold-light">
+                INFRAESTRUTURA VIVA · REVISÃO PERIÓDICA RECOMENDADA PELA IA
+              </span>
+              <h3 className="mt-1 font-la-sans text-[1.375rem] font-semibold text-la-text-primary">
+                Diagnóstico de Equilíbrio e Sugestões de Ajuste da Agenda
+              </h3>
+            </div>
+            <button
+              type="button"
+              onClick={handleRefreshAiReview}
+              className="inline-flex items-center gap-1.5 rounded-la-md border border-la-border-gold/55 bg-la-gold-faint px-4 py-2 font-la-sans text-[0.8125rem] font-semibold text-la-gold-light hover:bg-la-gold hover:text-la-text-inverse"
+            >
+              <Sparkles className="h-4 w-4" />
+              <span>Atualizar Diagnóstico com IA</span>
+            </button>
           </div>
 
           <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
@@ -2512,6 +2328,13 @@ export function CalendarioEditorialModule(
       {/* =================================================================== */}
       {viewMode === "list" ? (
         <section className="flex flex-col gap-4">
+          {!isLoadingCalendars && calendars.length === 0 ? (
+            <div className="rounded-la-xl border border-dashed border-white/15 bg-[#080B12]/90 p-8 text-center">
+              <p className="font-la-sans text-[0.875rem] text-la-text-secondary">
+                Nenhum calendário cadastrado para este projeto ainda.
+              </p>
+            </div>
+          ) : null}
           {calendars.map((cal) => (
             <article
               key={cal.id}

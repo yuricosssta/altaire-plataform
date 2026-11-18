@@ -34,8 +34,12 @@ import {
 import { clsx } from "clsx";
 import {
   useEditorialWorkspace,
+  type EditorialProjectModel,
   type ProjectStatus,
 } from "@/lib/context/EditorialWorkspaceContext";
+import { editorialService } from "@/lib/services/editorialService";
+import { themesService } from "@/lib/services/themesService";
+import { scriptsService } from "@/lib/services/scriptsService";
 import { LinhaEditorialModule } from "@/components/editorial/workspace/LinhaEditorialModule";
 import { CalendarioEditorialModule } from "@/components/editorial/workspace/CalendarioEditorialModule";
 import { TemasEditorialModule } from "@/components/editorial/workspace/TemasEditorialModule";
@@ -211,46 +215,187 @@ export default function ProjectWorkspacePage() {
   const router = useRouter();
   const searchParams = useSearchParams();
 
-  const projectId = params?.projectId || "proj-produto-x";
+  const projectId = params?.projectId || "";
 
   const {
     projects,
+    isLoading: isWorkspaceLoading,
     tasks,
     activityEvents,
     duplicateProject,
     toggleArchiveProject,
     addManualTask,
     toggleTaskCompleted,
+    refreshWorkspace,
   } = useEditorialWorkspace();
+
+  const [fetchedProject, setFetchedProject] =
+    useState<EditorialProjectModel | null>(null);
+  const [isLoadingProjectData, setIsLoadingProjectData] =
+    useState<boolean>(true);
+  const [projectVersions, setProjectVersions] = useState<readonly any[]>([]);
+  const [projectCalendars, setProjectCalendars] = useState<readonly any[]>([]);
+  const [themesList, setThemesList] = useState<readonly ThemeLibraryItem[]>([]);
+  const [scriptsList, setScriptsList] = useState<readonly ScriptItemModel[]>([]);
+
+  useEffect(() => {
+    if (!projectId) {
+      setIsLoadingProjectData(false);
+      return;
+    }
+
+    let cancelled = false;
+    setIsLoadingProjectData(true);
+
+    const loadAll = async () => {
+      try {
+        const [projRes, verRes, calRes, thmRes, scrRes] =
+          await Promise.allSettled([
+            editorialService.getProject(projectId),
+            editorialService.listVersions(projectId),
+            editorialService.listCalendars(projectId),
+            themesService.listLibrary(projectId),
+            scriptsService.listScripts(projectId),
+          ]);
+
+        if (cancelled) return;
+
+        if (projRes.status === "fulfilled" && projRes.value) {
+          const p = projRes.value as any;
+          setFetchedProject({
+            id: String(p.id || p._id || projectId),
+            name: p.name || "Projeto Editorial",
+            brandOrClientName: p.brandOrClientName || p.name || "",
+            niche: p.niche || "",
+            subniche: p.subniche || "",
+            operationTypeLabel: p.operationTypeLabel || "Orgânico",
+            currentObjectiveLabel:
+              p.currentObjectiveLabel || p.currentObjective || "Posicionamento",
+            currentPhaseLabel: p.currentPhaseLabel || "Estruturação Inicial",
+            status: (p.status as ProjectStatus) || "in_setup",
+            hasActiveLineEditorial: Boolean(
+              p.hasActiveLineEditorial ?? p.editorialLineStatus === "active",
+            ),
+            lineEditorialStatus:
+              p.lineEditorialStatus ||
+              (p.editorialLineStatus === "active" ? "Ativa" : "Pendente"),
+            hasActiveCalendar: Boolean(
+              p.hasActiveCalendar ?? p.calendarStatus === "active",
+            ),
+            calendarStatus: p.calendarStatus || "pending",
+            themesCount: Number(p.themesCount || 0),
+            allocatedThemesCount: Number(p.allocatedThemesCount || 0),
+            approvedScriptsCount: Number(p.approvedScriptsCount || 0),
+            draftScriptsCount: Number(p.draftScriptsCount || 0),
+            nextActionLabel:
+              p.nextActionLabel || "Continuar estruturação do projeto",
+            nextActionReason:
+              p.nextActionReason ||
+              "Mantenha Linha Editorial, Calendário e Roteiros conectados.",
+            updatedAtLabel: p.updatedAtLabel || "Atualizado recentemente",
+          });
+        }
+
+        if (verRes.status === "fulfilled" && Array.isArray(verRes.value)) {
+          setProjectVersions(verRes.value);
+        }
+
+        if (calRes.status === "fulfilled" && Array.isArray(calRes.value)) {
+          setProjectCalendars(calRes.value);
+        }
+
+        if (thmRes.status === "fulfilled" && Array.isArray(thmRes.value)) {
+          setThemesList(
+            thmRes.value.map((t: any) => ({
+              id: String(t.id || t._id),
+              title: t.title,
+              origin:
+                t.origin === "market"
+                  ? "Dados de Mercado"
+                  : t.origin === "objective"
+                    ? "Objetivo e Momento"
+                    : "ROMA & Avatar",
+              pillar: t.romaPillar || t.pillar || "Posicionamento",
+              retinaType: (() => {
+                const r = String(t.retinaType || "").toLowerCase();
+                if (r.includes("relac")) return "Relacionamento" as const;
+                if (r.includes("engaj")) return "Engajamento" as const;
+                if (r.includes("transf")) return "Transformação" as const;
+                if (r.includes("inter")) return "Interação" as const;
+                if (r.includes("consci")) return "Níveis de Consciência" as const;
+                return "Autoridade" as const;
+              })(),
+              painOrObjection: t.painDesireOrObjection || t.angle || "",
+              awarenessLevel:
+                t.consciousnessAxis ||
+                t.consciousnessLevel ||
+                "Consciente do Problema",
+              suggestedFormat:
+                t.recommendedFormat || String(t.format || "Vídeos Curtos"),
+              priority: Boolean(t.isFavorite || t.isPriorityNextCycle),
+              allocatedSlotLabel:
+                Array.isArray(t.allocatedSlotIds) &&
+                t.allocatedSlotIds.length > 0
+                  ? `${t.allocatedSlotIds.length} slot(s)`
+                  : null,
+            })),
+          );
+        }
+
+        if (scrRes.status === "fulfilled" && Array.isArray(scrRes.value)) {
+          setScriptsList(
+            scrRes.value.map((s: any) => {
+              const fk = (
+                s.formatSlug ||
+                (s.format === "reel"
+                  ? "short_video"
+                  : s.format === "static_post"
+                    ? "static_post"
+                    : s.format) ||
+                "short_video"
+              ) as ScriptFormatKey;
+              const def = SCRIPT_FORMAT_DEFINITIONS.find((f) => f.key === fk);
+              return {
+                id: String(s.id || s._id),
+                title: s.title || s.provisionalName || "Roteiro sem título",
+                formatKey: fk,
+                formatLabel: def?.name || s.format || "Vídeos Curtos",
+                status:
+                  s.status === "pronto" || s.status === "publicado"
+                    ? "approved"
+                    : s.status === "in_production"
+                      ? "in_production"
+                      : "draft",
+                retinaType: s.retinaType || "Autoridade",
+                pillar: s.editorialPillar || "Posicionamento",
+                linkedSlotLabel: s.linkedSlotLabel || null,
+                mode:
+                  s.mode === "seguranca"
+                    ? "Modo Técnico/Segurança"
+                    : "Modo Conexão",
+                updatedAt: s.updatedAt
+                  ? new Date(s.updatedAt).toLocaleDateString("pt-BR")
+                  : "Recente",
+              };
+            }),
+          );
+        }
+      } finally {
+        if (!cancelled) setIsLoadingProjectData(false);
+      }
+    };
+
+    void loadAll();
+    return () => {
+      cancelled = true;
+    };
+  }, [projectId]);
 
   const project = useMemo(() => {
     return (
-      projects.find((p) => p.id === projectId) ??
-      projects[0] ?? {
-        id: projectId,
-        name: "Produto X — Lançamento Semente",
-        brandOrClientName: "Roberto Zane",
-        niche: "Finanças",
-        subniche: "Algorithmic Trading",
-        operationTypeLabel: "Lançamento",
-        currentObjectiveLabel: "Conversão",
-        currentPhaseLabel: "Aquecimento — Semana 2 de 4",
-        status: "active" as ProjectStatus,
-        hasActiveLineEditorial: true,
-        lineEditorialStatus: "Ativa — Linha v1 aprovada",
-        hasActiveCalendar: true,
-        calendarStatus: "Ativo — 09/08 a 05/09 (28 slots)",
-        themesCount: 124,
-        allocatedThemesCount: 18,
-        approvedScriptsCount: 18,
-        draftScriptsCount: 7,
-        nextActionLabel: "Criar 3 roteiros prioritários da Semana 2",
-        nextActionReason:
-          "Três slots prioritários possuem tema definido, mas ainda não possuem roteiro aprovado.",
-        updatedAtLabel: "Atualizado há 2 horas",
-      }
+      projects.find((p) => p.id === projectId) ?? fetchedProject ?? null
     );
-  }, [projects, projectId]);
+  }, [projects, projectId, fetchedProject]);
 
   /* Controle da Aba Ativa (Seção 5.8: Dashboard é a porta de entrada padrão) */
   const [activeTab, setActiveTab] = useState<WorkspaceTabKey>("dashboard");
@@ -316,102 +461,31 @@ export default function ProjectWorkspacePage() {
 
   /* Dados Operacionais da Aba 4: Temas e Ideias Estratégicas (Seção 6.4) */
   const [themesSubTab, setThemesSubTab] = useState<ThemesSubTabKey>("gerar");
-  const [themesList] = useState<readonly ThemeLibraryItem[]>([
-    {
-      id: "thm-01",
-      title: "O erro invisível que bloqueia sua previsibilidade comercial",
-      origin: "ROMA & Avatar",
-      pillar: "Diagnóstico de Erros Invisíveis do ICP",
-      retinaType: "Transformação",
-      painOrObjection: "Dor: imprevisibilidade de receita mensal",
-      awarenessLevel: "Consciente do Problema",
-      suggestedFormat: "Vídeos Curtos",
-      priority: true,
-      allocatedSlotLabel: "Hoje, 16h00 • Reel",
-    },
-    {
-      id: "thm-02",
-      title: "5 sinais de uma oferta fraca que afasta compradores qualificados",
-      origin: "Objetivo e Momento",
-      pillar: "Mecanismo Único da Oferta (MUV)",
-      retinaType: "Níveis de Consciência",
-      painOrObjection: "Objeção: será que funciona para o meu modelo?",
-      awarenessLevel: "Consciente da Solução",
-      suggestedFormat: "Carrosséis",
-      priority: true,
-      allocatedSlotLabel: "Amanhã, 11h00 • Carrossel",
-    },
-    {
-      id: "thm-03",
-      title: "Como validar sua oferta no orgânico sem depender de sorte",
-      origin: "Dados de Mercado",
-      pillar: "Aplicação Prática & Bastidores Reais",
-      retinaType: "Autoridade",
-      painOrObjection: "Mito: preciso de milhares de seguidores para vender",
-      awarenessLevel: "Consciente do Produto",
-      suggestedFormat: "Lives",
-      priority: true,
-      allocatedSlotLabel: "Sexta, 20h00 • Live Semanal",
-    },
-    {
-      id: "thm-04",
-      title: "Por que repetir comandos soltos na IA destrói a voz da sua marca",
-      origin: "ROMA & Avatar",
-      pillar: "Visão de Mundo & Quebra de Mitos",
-      retinaType: "Transformação",
-      painOrObjection: "Objeção: IA deixa meu conteúdo artificial",
-      awarenessLevel: "Consciente do Problema",
-      suggestedFormat: "Vídeos Curtos",
-      priority: true,
-      allocatedSlotLabel: null,
-    },
-    {
-      id: "thm-05",
-      title: "Bastidor Real: Como organizo 4 semanas editoriais em 45 minutos",
-      origin: "Dados de Mercado",
-      pillar: "Superação de Objeções Prioritárias",
-      retinaType: "Relacionamento",
-      painOrObjection: "Objeção: não tenho tempo para produzir conteúdo",
-      awarenessLevel: "Consciente da Solução",
-      suggestedFormat: "Sequências de Stories",
-      priority: false,
-      allocatedSlotLabel: null,
-    },
-  ]);
 
-  /* Slots abertos para integração no Dashboard (Seção 6.4.5) */
-  const [openCalendarSlots] = useState<
+  const openCalendarSlots = useMemo<
     readonly OpenCalendarSlotIntegrationItem[]
-  >([
-    {
-      id: "open-slot-1",
-      slotLabel: "Quinta-feira, 16h00",
-      format: "Vídeos Curtos (Reel)",
-      retinaRequired: "Transformação",
-      assignedThemeTitle: null,
-    },
-    {
-      id: "open-slot-2",
-      slotLabel: "Sábado, 11h00",
-      format: "Carrossel",
-      retinaRequired: "Níveis de Consciência",
-      assignedThemeTitle: null,
-    },
-    {
-      id: "open-slot-3",
-      slotLabel: "Domingo, 09h00",
-      format: "Sequência de Stories",
-      retinaRequired: "Relacionamento",
-      assignedThemeTitle: null,
-    },
-    {
-      id: "open-slot-4",
-      slotLabel: "Segunda-feira, 18h00",
-      format: "Post Estático",
-      retinaRequired: "Autoridade",
-      assignedThemeTitle: null,
-    },
-  ]);
+  >(() => {
+    const activeCal =
+      projectCalendars.find((c: any) => c.status === "active") ||
+      projectCalendars[0];
+    if (!activeCal) return [];
+
+    const slotsSource: any[] =
+      Array.isArray(activeCal.slots) && activeCal.slots.length > 0
+        ? activeCal.slots
+        : (activeCal.days || []).flatMap((d: any) => d.items || []);
+
+    return slotsSource
+      .filter((s: any) => !s.themeId && !s.mainTheme && !s.theme)
+      .slice(0, 8)
+      .map((s: any, idx: number) => ({
+        id: String(s.id || s._id || `open-slot-${idx}`),
+        slotLabel: `${s.dayOfWeek || "Dia"}, ${s.scheduledTime || s.suggestedTime || "12:00"}`,
+        format: String(s.formatLabel || s.format || "Conteúdo"),
+        retinaRequired: String(s.retinaBadge || s.retinaType || "Autoridade"),
+        assignedThemeTitle: null,
+      }));
+  }, [projectCalendars]);
 
   /* Dados Operacionais da Aba 5: Roteiros & Ativos por Formato (Seção 6.5) */
   const [isNewScriptModalOpen, setIsNewScriptModalOpen] =
@@ -426,141 +500,6 @@ export default function ProjectWorkspacePage() {
   >("Modo Conexão");
   const [newScriptTitle, setNewScriptTitle] = useState<string>("");
 
-  const [scriptsList, setScriptsList] = useState<readonly ScriptItemModel[]>([
-    {
-      id: "scr-01",
-      title: "O erro invisível que bloqueia sua previsibilidade comercial",
-      formatKey: "short_video",
-      formatLabel: "Vídeos Curtos",
-      status: "approved",
-      retinaType: "Transformação",
-      pillar: "Diagnóstico de Erros Invisíveis",
-      linkedSlotLabel: "Hoje, 16h00 • Slot #04",
-      mode: "Modo Conexão",
-      updatedAt: "Hoje, 09:42",
-    },
-    {
-      id: "scr-02",
-      title: "Por que repetir prompts soltos faz sua marca soar genérica",
-      formatKey: "short_video",
-      formatLabel: "Vídeos Curtos",
-      status: "draft",
-      retinaType: "Transformação",
-      pillar: "Visão de Mundo",
-      linkedSlotLabel: "Quinta, 16h00 • Slot #08",
-      mode: "Modo Técnico/Segurança",
-      updatedAt: "Ontem, 18:20",
-    },
-    {
-      id: "scr-03",
-      title: "O mito do conteúdo diário sem arquitetura de conversão",
-      formatKey: "short_video",
-      formatLabel: "Vídeos Curtos",
-      status: "draft",
-      retinaType: "Níveis de Consciência",
-      pillar: "Quebra de Mitos",
-      linkedSlotLabel: "Sábado, 14h00 • Slot #11",
-      mode: "Modo Conexão",
-      updatedAt: "Há 2 dias",
-    },
-    {
-      id: "scr-04",
-      title: "Arquitetura Completa de Operação Editorial Orientada por Contexto",
-      formatKey: "long_video",
-      formatLabel: "Vídeos Longos",
-      status: "approved",
-      retinaType: "Autoridade",
-      pillar: "Mecanismo Único da Oferta (MUV)",
-      linkedSlotLabel: "Quarta, 19h00 • YouTube",
-      mode: "Modo Técnico/Segurança",
-      updatedAt: "Há 2 dias",
-    },
-    {
-      id: "scr-05",
-      title: "Bastidores da Estruturação Estratégica para Ofertas High-Ticket",
-      formatKey: "long_video",
-      formatLabel: "Vídeos Longos",
-      status: "draft",
-      retinaType: "Autoridade",
-      pillar: "Aplicação Prática",
-      linkedSlotLabel: "Próxima Semana • YouTube",
-      mode: "Modo Técnico/Segurança",
-      updatedAt: "Há 3 dias",
-    },
-    {
-      id: "scr-06",
-      title: "Live Semanal: Como validar sua oferta no orgânico sem improviso",
-      formatKey: "live",
-      formatLabel: "Lives",
-      status: "approved",
-      retinaType: "Autoridade",
-      pillar: "Superação de Objeções",
-      linkedSlotLabel: "Sexta, 20h00 • Live #04",
-      mode: "Modo Conexão",
-      updatedAt: "Ontem",
-    },
-    {
-      id: "scr-07",
-      title: "Live de Aquecimento: Diagnóstico de Posicionamento ao Vivo",
-      formatKey: "live",
-      formatLabel: "Lives",
-      status: "draft",
-      retinaType: "Interação",
-      pillar: "Provas & Estudos de Caso",
-      linkedSlotLabel: "Próxima Sexta, 20h00",
-      mode: "Modo Conexão",
-      updatedAt: "Há 4 dias",
-    },
-    {
-      id: "scr-08",
-      title: "5 sinais de uma oferta fraca que afasta compradores qualificados",
-      formatKey: "carousel",
-      formatLabel: "Carrosséis",
-      status: "approved",
-      retinaType: "Níveis de Consciência",
-      pillar: "Mecanismo Único da Oferta",
-      linkedSlotLabel: "Amanhã, 11h00 • Carrossel",
-      mode: "Modo Técnico/Segurança",
-      updatedAt: "Hoje, 08:15",
-    },
-    {
-      id: "scr-09",
-      title: "Por que produzir mais sem Linha Editorial destrói sua conversão",
-      formatKey: "carousel",
-      formatLabel: "Carrosséis",
-      status: "in_production",
-      retinaType: "Níveis de Consciência",
-      pillar: "Visão de Mundo",
-      linkedSlotLabel: "Hoje, 11h00 • Carrossel",
-      mode: "Modo Técnico/Segurança",
-      updatedAt: "Hoje, 07:50",
-    },
-    {
-      id: "scr-10",
-      title: "Mapa de Decisão: Como separar ofertas em Projetos Editoriais",
-      formatKey: "static_post",
-      formatLabel: "Posts Estáticos",
-      status: "approved",
-      retinaType: "Autoridade",
-      pillar: "Aplicação Prática",
-      linkedSlotLabel: "Hoje, 18h30 • Post Estático",
-      mode: "Modo Técnico/Segurança",
-      updatedAt: "Ontem",
-    },
-    {
-      id: "scr-11",
-      title: "Sequência da Manhã: O erro invisível que trava sua previsibilidade",
-      formatKey: "stories_sequence",
-      formatLabel: "Sequências de Stories",
-      status: "approved",
-      retinaType: "Relacionamento",
-      pillar: "Bastidores Reais",
-      linkedSlotLabel: "Hoje, 08h00 • Bloco Manhã",
-      mode: "Modo Conexão",
-      updatedAt: "Hoje, 07:30",
-    },
-  ]);
-
   /* Detalhamento expansível de Stories na Tabela da Semana (Seção 5.9.2 - Bloco 4) */
   const [showStoriesBreakdown, setShowStoriesBreakdown] =
     useState<boolean>(false);
@@ -572,25 +511,146 @@ export default function ProjectWorkspacePage() {
   const [newProjectTaskTitle, setNewProjectTaskTitle] = useState<string>("");
 
   const projectTasks = useMemo(() => {
-    const list = tasks.filter((t) => t.projectId === project.id);
+    const pid = project?.id || projectId;
+    const list = tasks.filter((t) => t.projectId === pid);
     if (projectTaskFilter === "pending") return list.filter((t) => !t.completed);
     if (projectTaskFilter === "completed")
       return list.filter((t) => t.completed);
     return list;
-  }, [tasks, project.id, projectTaskFilter]);
+  }, [tasks, project?.id, projectId, projectTaskFilter]);
 
   const projectActivities = useMemo(() => {
+    if (!project) return [];
     const matching = activityEvents.filter(
-      (ev) => ev.projectName === project.name
+      (ev) => ev.projectName === project.name || ev.projectName === project.brandOrClientName
     );
-    return matching.length > 0 ? matching : activityEvents.slice(0, 4);
-  }, [activityEvents, project.name]);
+    return matching;
+  }, [activityEvents, project]);
 
-  const hasActiveLine = project.hasActiveLineEditorial;
-  const hasActiveCalendar = project.hasActiveCalendar;
-  const activeLineVersionLabel = `Linha v1 — ${
-    project.name.split("—")[1]?.trim() || "Principal"
-  }`;
+  const hasActiveLine = Boolean(
+    project?.hasActiveLineEditorial ||
+      projectVersions.some((v: any) => v.status === "active")
+  );
+  const hasActiveCalendar = Boolean(
+    project?.hasActiveCalendar ||
+      projectCalendars.some((c: any) => c.status === "active")
+  );
+  const activeLineVersion = useMemo(() => {
+    return (
+      projectVersions.find((v: any) => v.status === "active") ||
+      projectVersions[0]
+    );
+  }, [projectVersions]);
+  const activeLineVersionLabel =
+    activeLineVersion?.name ||
+    (hasActiveLine ? "Linha Editorial Ativa" : "Sem Linha Editorial");
+
+  const activeCalendarSlots = useMemo(() => {
+    const activeCal =
+      projectCalendars.find((c: any) => c.status === "active") ||
+      projectCalendars[0];
+    if (!activeCal) return [];
+    if (Array.isArray(activeCal.slots) && activeCal.slots.length > 0) {
+      return activeCal.slots as any[];
+    }
+    return (activeCal.days || []).flatMap((d: any) => d.items || []);
+  }, [projectCalendars]);
+
+  const weeklyFormatStats = useMemo(() => {
+    const activeCal =
+      projectCalendars.find((c: any) => c.status === "active") ||
+      projectCalendars[0];
+    const cap = activeCal?.capacity || {};
+    const formatGroups = [
+      { key: "short_video", calKey: "reel", label: "Vídeos curtos", capVal: cap.reelsPerWeek || 0 },
+      { key: "carousel", calKey: "carousel", label: "Carrosséis", capVal: cap.carouselsPerWeek || 0 },
+      { key: "static_post", calKey: "static_post", label: "Posts estáticos", capVal: cap.staticPostsPerWeek || 0 },
+      { key: "long_video", calKey: "long_video", label: "Vídeos longos", capVal: cap.longVideosPerWeek || 0 },
+      { key: "live", calKey: "live", label: "Lives", capVal: cap.livesPerWeek || 0 },
+    ];
+    return formatGroups.map((g) => {
+      const matchingSlots = activeCalendarSlots.filter(
+        (s: any) =>
+          String(s.format || "").toLowerCase() === g.calKey ||
+          String(s.formatSlug || "").toLowerCase() === g.key
+      );
+      const matchingScripts = scriptsList.filter((s) => s.formatKey === g.key);
+      return {
+        format: g.label,
+        planned: matchingSlots.length || g.capVal,
+        ready: matchingScripts.filter((s) => s.status === "approved").length,
+        prod: matchingScripts.filter((s) => s.status === "in_production").length,
+        pub: matchingSlots.filter((s: any) => s.status === "published").length,
+      };
+    });
+  }, [projectCalendars, activeCalendarSlots, scriptsList]);
+
+  const storiesStats = useMemo(() => {
+    const storyScripts = scriptsList.filter(
+      (s) => s.formatKey === "stories_sequence"
+    );
+    const activeCal =
+      projectCalendars.find((c: any) => c.status === "active") ||
+      projectCalendars[0];
+    const perWeek = (activeCal?.capacity?.storySequencesPerDay || 0) * 7;
+    const storySlots = activeCalendarSlots.filter(
+      (s: any) => String(s.format || "").toLowerCase() === "stories_sequence"
+    );
+    return {
+      planned: storySlots.length || perWeek,
+      ready: storyScripts.filter((s) => s.status === "approved").length,
+      prod: storyScripts.filter((s) => s.status === "in_production").length,
+      pub: storySlots.filter((s: any) => s.status === "published").length,
+      perPeriod: Math.max(0, Math.round((storySlots.length || perWeek) / 4)),
+    };
+  }, [scriptsList, projectCalendars, activeCalendarSlots]);
+
+  const priorityContentItems = useMemo<
+    {
+      deadline: string;
+      format: string;
+      title: string;
+      retina: string;
+      status: string;
+      actionLabel: string;
+    }[]
+  >(() => {
+    const fromSlots = activeCalendarSlots.slice(0, 4).map((s: any) => ({
+      deadline: `${s.dayOfWeek || "Agendado"}, ${s.scheduledTime || s.suggestedTime || "12:00"}`,
+      format: String(s.formatLabel || s.format || "Conteúdo"),
+      title: String(
+        s.provisionalTitle ||
+          s.provisionalName ||
+          s.mainTheme ||
+          s.theme ||
+          "Slot aguardando definição de tema"
+      ),
+      retina: String(s.retinaBadge || s.retinaType || "Autoridade"),
+      status:
+        s.status === "script_ready"
+          ? "Roteiro pronto"
+          : s.status === "in_production"
+            ? "Em produção"
+            : s.mainTheme || s.theme
+              ? "Tema vinculado"
+              : "Tema pendente",
+      actionLabel: s.scriptId ? "Abrir roteiro" : "Criar roteiro",
+    }));
+    if (fromSlots.length > 0) return fromSlots;
+    return scriptsList.slice(0, 4).map((scr) => ({
+      deadline: scr.linkedSlotLabel || scr.updatedAt,
+      format: scr.formatLabel,
+      title: scr.title,
+      retina: scr.retinaType,
+      status:
+        scr.status === "approved"
+          ? "Roteiro pronto"
+          : scr.status === "in_production"
+            ? "Em produção"
+            : "Em rascunho",
+      actionLabel: scr.status === "approved" ? "Abrir roteiro" : "Continuar roteiro",
+    }));
+  }, [activeCalendarSlots, scriptsList]);
 
   /* Handler do menu "+ Criar" do Cabeçalho com orientação de dependências (Seções 5.7 e 5.10) */
   const handleQuickActionFromHeader = (
@@ -659,22 +719,39 @@ export default function ProjectWorkspacePage() {
   };
 
   /* Criar Novo Roteiro contextualizado (Seção 6.5.1) */
-  const handleCreateScript = (e: FormEvent<HTMLFormElement>) => {
+  const handleCreateScript = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
+    if (!project) return;
+
     const formatMeta =
       SCRIPT_FORMAT_DEFINITIONS.find((f) => f.key === newScriptFormat) ??
       SCRIPT_FORMAT_DEFINITIONS[0];
 
+    const backendFormat =
+      newScriptFormat === "short_video" ? "reel" : newScriptFormat;
+
+    const title =
+      newScriptTitle.trim() ||
+      `Novo roteiro de ${formatMeta.name} — ${project.currentPhaseLabel}`;
+
+    const saved = await scriptsService.createScript(project.id, {
+      format: backendFormat as any,
+      mode: newScriptMode === "Modo Conexão" ? "conexao" : "seguranca",
+      title,
+      autoGenerate: true,
+      formatSlug: formatMeta.key,
+      originType:
+        newScriptOrigin === "calendar_slot" ? "CALENDAR_SLOT" : "THEME",
+    } as any);
+
     const created: ScriptItemModel = {
-      id: `scr-${Date.now()}`,
-      title:
-        newScriptTitle.trim() ||
-        `Novo roteiro de ${formatMeta.name} — ${project.currentPhaseLabel}`,
+      id: String((saved as any).id || (saved as any)._id),
+      title: saved.title || title,
       formatKey: formatMeta.key,
       formatLabel: formatMeta.name,
-      status: "draft",
-      retinaType: "Transformação",
-      pillar: "Mecanismo Único da Oferta (MUV)",
+      status: saved.status === "pronto" ? "approved" : "draft",
+      retinaType: (saved as any).retinaType || "Transformação",
+      pillar: (saved as any).editorialPillar || "Mecanismo Único da Oferta",
       linkedSlotLabel:
         newScriptOrigin === "calendar_slot"
           ? "Slot do Calendário Ativo"
@@ -686,21 +763,50 @@ export default function ProjectWorkspacePage() {
     setScriptsList((prev) => [created, ...prev]);
     setNewScriptTitle("");
     setIsNewScriptModalOpen(false);
+    void refreshWorkspace();
   };
 
   const handleAddProjectTask = (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    if (!newProjectTaskTitle.trim()) return;
+    if (!project || !newProjectTaskTitle.trim()) return;
     addManualTask(newProjectTaskTitle, project.id);
     setNewProjectTaskTitle("");
   };
 
+  if (!project) {
+    if (isWorkspaceLoading || isLoadingProjectData) {
+      return (
+        <div className="flex min-h-[24rem] items-center justify-center rounded-la-xl border border-white/10 bg-[#080B12]/95 p-8">
+          <p className="font-la-mono text-[0.8125rem] text-la-text-secondary">
+            Carregando projeto editorial...
+          </p>
+        </div>
+      );
+    }
+    return (
+      <div className="flex flex-col items-center justify-center gap-4 rounded-la-xl border border-white/10 bg-[#080B12]/95 p-10 text-center">
+        <h2 className="font-la-sans text-[1.25rem] font-semibold text-la-text-primary">
+          Projeto Editorial não encontrado
+        </h2>
+        <p className="font-la-sans text-[0.875rem] text-la-text-secondary">
+          O projeto solicitado não existe ou foi removido.
+        </p>
+        <Link
+          href="/dashboard/editorial"
+          className="inline-flex items-center gap-2 rounded-la-md bg-la-gold px-4 py-2 font-la-sans text-[0.8125rem] font-semibold text-la-text-inverse"
+        >
+          <ArrowLeft className="h-4 w-4" />
+          <span>Voltar aos Projetos Editoriais</span>
+        </Link>
+      </div>
+    );
+  }
+
   const statusBadge = STATUS_BADGE_STYLES[project.status];
 
-  const unassignedOpenSlotsCount = useMemo(
-    () => openCalendarSlots.filter((s) => !s.assignedThemeTitle).length,
-    [openCalendarSlots]
-  );
+  const unassignedOpenSlotsCount = openCalendarSlots.filter(
+    (s) => !s.assignedThemeTitle
+  ).length;
 
   /* Props tipadas corretamente para LinhaEditorialModule e CalendarioEditorialModule */
   const linhaModuleProps: ComponentProps<typeof LinhaEditorialModule> = {
@@ -905,9 +1011,9 @@ export default function ProjectWorkspacePage() {
 
                     <button
                       type="button"
-                      onClick={() => {
+                      onClick={async () => {
                         setIsHeaderMoreOpen(false);
-                        duplicateProject({
+                        await duplicateProject({
                           sourceProjectId: project.id,
                           newName: `${project.name} (Cópia)`,
                           copyStrategicBase: true,
@@ -1276,43 +1382,7 @@ export default function ProjectWorkspacePage() {
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-white/8">
-                        {[
-                          {
-                            format: "Vídeos curtos",
-                            planned: 4,
-                            ready: 3,
-                            prod: 1,
-                            pub: 0,
-                          },
-                          {
-                            format: "Carrosséis",
-                            planned: 2,
-                            ready: 2,
-                            prod: 0,
-                            pub: 0,
-                          },
-                          {
-                            format: "Posts estáticos",
-                            planned: 2,
-                            ready: 1,
-                            prod: 1,
-                            pub: 0,
-                          },
-                          {
-                            format: "Vídeos longos",
-                            planned: 1,
-                            ready: 1,
-                            prod: 0,
-                            pub: 0,
-                          },
-                          {
-                            format: "Lives",
-                            planned: 1,
-                            ready: 1,
-                            prod: 0,
-                            pub: 0,
-                          },
-                        ].map((row) => (
+                        {weeklyFormatStats.map((row) => (
                           <tr key={row.format}>
                             <td className="py-2.5 font-medium text-la-text-primary">
                               {row.format}
@@ -1351,16 +1421,16 @@ export default function ProjectWorkspacePage() {
                             </button>
                           </td>
                           <td className="py-2.5 text-center font-la-mono text-la-text-secondary">
-                            21
+                            {storiesStats.planned}
                           </td>
                           <td className="py-2.5 text-center font-la-mono text-la-gold-light">
-                            14
+                            {storiesStats.ready}
                           </td>
                           <td className="py-2.5 text-center font-la-mono text-sky-300">
-                            0
+                            {storiesStats.prod}
                           </td>
                           <td className="py-2.5 text-center font-la-mono text-emerald-300">
-                            7
+                            {storiesStats.pub}
                           </td>
                         </tr>
                       </tbody>
@@ -1373,7 +1443,7 @@ export default function ProjectWorkspacePage() {
                             MANHÃ
                           </span>
                           <span className="text-la-gold-light">
-                            6 sequências
+                            {storiesStats.perPeriod} sequências
                           </span>
                         </div>
                         <div className="rounded-la-xs border border-white/8 bg-white/[0.02] p-2 text-center">
@@ -1381,7 +1451,7 @@ export default function ProjectWorkspacePage() {
                             ALMOÇO
                           </span>
                           <span className="text-la-gold-light">
-                            5 sequências
+                            {storiesStats.perPeriod} sequências
                           </span>
                         </div>
                         <div className="rounded-la-xs border border-white/8 bg-white/[0.02] p-2 text-center">
@@ -1389,7 +1459,7 @@ export default function ProjectWorkspacePage() {
                             TARDE
                           </span>
                           <span className="text-la-gold-light">
-                            5 sequências
+                            {storiesStats.perPeriod} sequências
                           </span>
                         </div>
                         <div className="rounded-la-xs border border-white/8 bg-white/[0.02] p-2 text-center">
@@ -1397,7 +1467,7 @@ export default function ProjectWorkspacePage() {
                             NOITE / Q&A
                           </span>
                           <span className="text-la-gold-light">
-                            5 sequências
+                            {storiesStats.perPeriod} sequências
                           </span>
                         </div>
                       </div>
@@ -1419,42 +1489,16 @@ export default function ProjectWorkspacePage() {
                 </div>
 
                 <div className="mt-4 flex flex-col gap-3">
-                  {[
-                    {
-                      deadline: "Hoje, 11h",
-                      format: "Stories",
-                      title: "Sequência da Manhã: “O erro invisível…”",
-                      retina: "Relacionamento",
-                      status: "Pendente",
-                      actionLabel: "Gerar sequência",
-                    },
-                    {
-                      deadline: "Hoje, 16h",
-                      format: "Reel",
-                      title: "“Por que sua estratégia não gera leads”",
-                      retina: "Transformação",
-                      status: "Roteiro pronto",
-                      actionLabel: "Abrir roteiro",
-                    },
-                    {
-                      deadline: "Amanhã",
-                      format: "Carrossel",
-                      title: "“5 sinais de uma oferta fraca”",
-                      retina: "Níveis de Consciência",
-                      status: "Em rascunho",
-                      actionLabel: "Continuar roteiro",
-                    },
-                    {
-                      deadline: "Sexta, 20h",
-                      format: "Live",
-                      title: "“Como validar sua oferta no orgânico”",
-                      retina: "Autoridade",
-                      status: "Falta thumbnail",
-                      actionLabel: "Criar títulos e capa",
-                    },
-                  ].map((item) => (
+                  {priorityContentItems.length === 0 ? (
+                    <div className="rounded-la-lg border border-white/10 bg-black/40 p-5 text-center">
+                      <p className="font-la-sans text-[0.8125rem] text-la-text-secondary">
+                        Nenhum conteúdo prioritário pendente ainda. Crie o calendário ou gere novos roteiros.
+                      </p>
+                    </div>
+                  ) : (
+                    priorityContentItems.map((item, idx) => (
                     <div
-                      key={item.title}
+                      key={`${item.title}-${idx}`}
                       className="flex flex-col justify-between gap-3 rounded-la-lg border border-white/10 bg-white/[0.02] p-3.5 sm:flex-row sm:items-center"
                     >
                       <div className="flex flex-col gap-1">
@@ -1487,7 +1531,8 @@ export default function ProjectWorkspacePage() {
                         <ArrowRight className="h-3.5 w-3.5" />
                       </button>
                     </div>
-                  ))}
+                  ))
+                  )}
                 </div>
               </section>
             </div>
@@ -1504,63 +1549,53 @@ export default function ProjectWorkspacePage() {
                 </div>
 
                 <div className="mt-3.5 flex flex-col gap-2.5">
-                  <div className="rounded-la-lg border border-amber-500/35 bg-amber-950/20 p-3.5">
-                    <span className="font-la-mono text-[0.5625rem] font-semibold uppercase text-amber-300">
-                      RISCO DE EXECUÇÃO
-                    </span>
-                    <p className="mt-1 font-la-sans text-[0.8125rem] font-semibold text-la-text-primary">
-                      3 conteúdos previstos para amanhã ainda não possuem
-                      roteiro.
-                    </p>
-                    <p className="mt-1 font-la-sans text-[0.75rem] text-la-text-secondary">
-                      Crie os roteiros antes de iniciar a produção para não
-                      comprometer a execução da semana.
-                    </p>
-                    <button
-                      type="button"
-                      onClick={() => handleSelectTab("roteiros")}
-                      className="mt-2 font-la-mono text-[0.6875rem] font-semibold text-la-gold-light hover:underline"
-                    >
-                      [ Criar Roteiros ] →
-                    </button>
-                  </div>
+                  {scriptsList.filter((s) => s.status === "draft").length > 0 ? (
+                    <div className="rounded-la-lg border border-amber-500/35 bg-amber-950/20 p-3.5">
+                      <span className="font-la-mono text-[0.5625rem] font-semibold uppercase text-amber-300">
+                        RISCO DE EXECUÇÃO
+                      </span>
+                      <p className="mt-1 font-la-sans text-[0.8125rem] font-semibold text-la-text-primary">
+                        {scriptsList.filter((s) => s.status === "draft").length} roteiro(s) em rascunho precisam ser revisados.
+                      </p>
+                      <button
+                        type="button"
+                        onClick={() => handleSelectTab("roteiros")}
+                        className="mt-2 font-la-mono text-[0.6875rem] font-semibold text-la-gold-light hover:underline"
+                      >
+                        [ Abrir Roteiros ] →
+                      </button>
+                    </div>
+                  ) : null}
 
-                  <div className="rounded-la-lg border border-white/10 bg-black/45 p-3.5">
-                    <span className="font-la-mono text-[0.5625rem] font-semibold uppercase text-la-gold-light">
-                      FALHA DE PLANEJAMENTO
-                    </span>
-                    <p className="mt-1 font-la-sans text-[0.8125rem] font-semibold text-la-text-primary">
-                      {unassignedOpenSlotsCount} slots do calendário não possuem
-                      tema conectado.
-                    </p>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        handleSelectTab("temas");
-                        setThemesSubTab("integracao");
-                      }}
-                      className="mt-2 font-la-mono text-[0.6875rem] font-semibold text-la-gold-light hover:underline"
-                    >
-                      [ Gerar ou Conectar Temas ] →
-                    </button>
-                  </div>
+                  {unassignedOpenSlotsCount > 0 ? (
+                    <div className="rounded-la-lg border border-white/10 bg-black/45 p-3.5">
+                      <span className="font-la-mono text-[0.5625rem] font-semibold uppercase text-la-gold-light">
+                        SLOTS ABERTOS
+                      </span>
+                      <p className="mt-1 font-la-sans text-[0.8125rem] font-semibold text-la-text-primary">
+                        {unassignedOpenSlotsCount} slots do calendário ainda não possuem tema conectado.
+                      </p>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          handleSelectTab("temas");
+                          setThemesSubTab("integracao");
+                        }}
+                        className="mt-2 font-la-mono text-[0.6875rem] font-semibold text-la-gold-light hover:underline"
+                      >
+                        [ Gerar ou Conectar Temas ] →
+                      </button>
+                    </div>
+                  ) : null}
 
-                  <div className="rounded-la-lg border border-white/10 bg-black/45 p-3.5">
-                    <span className="font-la-mono text-[0.5625rem] font-semibold uppercase text-la-gold-light">
-                      MATERIAL COMPLEMENTAR QUALIFICADO
-                    </span>
-                    <p className="mt-1 font-la-sans text-[0.8125rem] font-semibold text-la-text-primary">
-                      Um conteúdo qualificado ainda não possui material
-                      complementar.
-                    </p>
-                    <button
-                      type="button"
-                      onClick={() => handleSelectTab("roteiros")}
-                      className="mt-2 font-la-mono text-[0.6875rem] font-semibold text-la-gold-light hover:underline"
-                    >
-                      [ Abrir recomendação ] →
-                    </button>
-                  </div>
+                  {scriptsList.filter((s) => s.status === "draft").length === 0 &&
+                  unassignedOpenSlotsCount === 0 ? (
+                    <div className="rounded-la-lg border border-white/10 bg-black/45 p-4 text-center">
+                      <p className="font-la-sans text-[0.8125rem] text-la-text-secondary">
+                        Nenhuma pendência crítica detectada neste momento.
+                      </p>
+                    </div>
+                  ) : null}
                 </div>
               </section>
 

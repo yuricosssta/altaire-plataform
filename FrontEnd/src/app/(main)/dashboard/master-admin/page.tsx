@@ -4,7 +4,10 @@
 import React, { useCallback, useEffect, useState } from "react";
 import { useSelector } from "react-redux";
 import { RootState } from "@/lib/redux/store";
-import axios from "axios";
+import {
+  apiGetAllOrganizationsAdmin,
+  apiUpdateOrganizationPlanAdmin,
+} from "@/lib/services/organizationService";
 import { ShieldAlert, Zap, Loader2, Search, Building2, ChevronDown, ChevronUp, Link as LinkIcon } from "lucide-react";
 
 interface OwnerMembership {
@@ -42,18 +45,15 @@ export default function MasterAdminPage() {
   const fetchAllOrgs = useCallback(async () => {
     try {
       setIsLoading(true);
-      const response = await axios.get(
-        `${process.env.NEXT_PUBLIC_API_BASE_URL}/organizations/admin/all`,
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
-      setOrgs(response.data);
+      const data = await apiGetAllOrganizationsAdmin();
+      setOrgs(Array.isArray(data) ? data : []);
     } catch (error: any) {
       console.error(error);
       alert(error.response?.data?.message || "Acesso negado ou erro ao buscar dados.");
     } finally {
       setIsLoading(false);
     }
-  }, [token]);
+  }, []);
 
   useEffect(() => {
     if (token) fetchAllOrgs();
@@ -63,11 +63,7 @@ export default function MasterAdminPage() {
     if (!confirm(`Tem certeza que deseja alterar o plano desta empresa para ${newPlan}?`)) return;
 
     try {
-      await axios.patch(
-        `${process.env.NEXT_PUBLIC_API_BASE_URL}/organizations/admin/${orgId}/plan`,
-        { plan: newPlan },
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
+      await apiUpdateOrganizationPlanAdmin(orgId, newPlan);
       fetchAllOrgs(); // Recarrega a lista para atualizar a tela
     } catch (error: any) {
       alert(error.response?.data?.message || "Erro ao atualizar plano.");

@@ -7,6 +7,7 @@ import {
 import {
   ConsciousnessLevel,
   ICreateEditorialTheme,
+  IEditorialTheme,
   JourneyStage,
   ThemeApproach,
 } from '../schemas/models/editorial-theme.interface';
@@ -55,6 +56,12 @@ const CONSCIOUSNESS_LABELS: Record<ConsciousnessLevel, string> = {
   objecao: 'Quebra de objeção',
 };
 
+const CONSCIOUSNESS_UI_AXIS: Record<ConsciousnessLevel, string> = {
+  sintoma: 'Sintoma',
+  solucao: 'Solução',
+  objecao: 'Objeção',
+};
+
 const JOURNEY_LABELS: Record<JourneyStage, string> = {
   descoberta: 'descoberta',
   consideracao: 'consideração',
@@ -63,11 +70,49 @@ const JOURNEY_LABELS: Record<JourneyStage, string> = {
   compartilhamento: 'compartilhamento',
 };
 
-/** Jornada "natural" por nível de consciência — mantém coerência no stub. */
 const JOURNEY_BY_LEVEL: Record<ConsciousnessLevel, JourneyStage[]> = {
   sintoma: ['descoberta', 'consideracao'],
   solucao: ['consideracao', 'experiencia', 'compartilhamento'],
   objecao: ['conversao', 'consideracao'],
+};
+
+const FORMAT_TO_UI: Record<ContentFormat, string> = {
+  reel: 'reel_curto',
+  long_video: 'video_longo',
+  carousel: 'carrossel',
+  static_post: 'post_estatico',
+  live: 'live_semanal',
+  stories_sequence: 'sequencia_stories',
+};
+
+const PLATFORM_TO_UI: Record<string, string> = {
+  instagram: 'Instagram',
+  youtube: 'YouTube',
+  tiktok: 'TikTok',
+  linkedin: 'LinkedIn',
+};
+
+const TECHNIQUES_BY_ORIGIN: Record<string, string[]> = {
+  roma_avatar: [
+    'Técnica 1 · Subárea Estrutural da ROMA',
+    'Técnica 2 · Avatar (Vencer Dores & Chegar aos Desejos)',
+    'Técnica 3 · Quebra de Mito para chegar à ROMA',
+    'Técnica 4 · Atalhos e Oportunidades para a ROMA',
+    'Técnica 5 · Estudo de Caso que Remove Objeção',
+  ],
+  market: [
+    "Técnica 7 · Engenharia Reversa de Comentários ('Mas e se...?')",
+    'Técnica 9 · Termos Periféricos Invisíveis da Rotina do ICP',
+    'Técnica 10 · Desconstrução de Estereótipos (Anti-Clichê)',
+    'Técnica 11 · Engenharia Reversa de Reviews',
+    'Técnica 12 · Mapeamento de Ilhas de Competência',
+  ],
+  objective: [
+    'Alinhamento Direto · Objetivo do Período',
+    'Prioridade de Ciclo · Quebra de Objeção Imediata',
+    'Prioridade de Ciclo · Demonstração de Oferta & MUV',
+    'Prioridade de Ciclo · Qualificação de Compradores',
+  ],
 };
 
 type TitleTemplate = (pillar: string, niche: string) => string;
@@ -122,6 +167,13 @@ export class StubThemeGenerator extends ThemeGenerator {
     context: IThemeGenerationContext,
     input: IThemeGenerationInput,
   ): Promise<ICreateEditorialTheme[]> {
+    // TODO(LLM): Substituir round-robin determinístico por chamada à LLM especializada nos 3 modos:
+    // - roma_avatar: aplica as Técnicas 1 a 6 sobre ROMA, Dores, Desejos, Objeções e Mitos do Mapa Estratégico.
+    // - market: analisa videoLinks, comments e reviews para extrair ângulos anti-clichê (Técnicas 7 a 13).
+    // - objective: alinha pautas diretamente ao objetivo comercial e momento de negócio (aquecimento, carrinho aberto, manutenção).
+    // Input: { context, input }
+    // Output esperado: ICreateEditorialTheme[]
+
     const pillars = input.pillars?.length
       ? input.pillars
       : context.pillars.length
@@ -134,13 +186,14 @@ export class StubThemeGenerator extends ThemeGenerator {
     const formats = input.formats?.length ? input.formats : DEFAULT_FORMATS;
     const retinaCycle = this.buildRetinaCycle(input);
     const offset = input.offset ?? 0;
+    const techniquePool =
+      TECHNIQUES_BY_ORIGIN[input.mode] || TECHNIQUES_BY_ORIGIN.roma_avatar;
 
     const themes: ICreateEditorialTheme[] = [];
     for (let n = 0; n < input.count; n++) {
       const i = n + offset;
       const pillar = pillars[i % pillars.length];
       const level = CONSCIOUSNESS_LEVELS[i % CONSCIOUSNESS_LEVELS.length];
-      // Avança a abordagem a cada volta completa de pilares → títulos distintos.
       const approach =
         APPROACHES[(Math.floor(i / pillars.length) + i) % APPROACHES.length];
       const journeyOptions = JOURNEY_BY_LEVEL[level];
@@ -149,6 +202,8 @@ export class StubThemeGenerator extends ThemeGenerator {
           Math.floor(i / CONSCIOUSNESS_LEVELS.length) % journeyOptions.length
         ];
       const format = formats[i % formats.length];
+      const targetPlatforms = this.platformsForFormat(format, platforms);
+      const isMarketTest = input.mode === 'market' && n % 3 === 0;
 
       themes.push({
         projectId: context.projectId,
@@ -159,16 +214,140 @@ export class StubThemeGenerator extends ThemeGenerator {
         consciousnessLevel: level,
         journeyStage,
         format,
-        platforms: this.platformsForFormat(format, platforms),
-        status: 'active',
+        platforms: targetPlatforms,
+        status: isMarketTest ? 'market_test' : 'active',
         flags: [],
         sourceContext: input.sourceContext,
         batchId: input.batchId,
         angle: `${CONSCIOUSNESS_LABELS[level]} · ${JOURNEY_LABELS[journeyStage]}`,
         approach,
+        techniqueUsed: techniquePool[i % techniquePool.length],
+        romaPillar: pillar,
+        consciousnessAxis: CONSCIOUSNESS_UI_AXIS[level],
+        recommendedFormat: FORMAT_TO_UI[format] || 'reel_curto',
+        recommendedPlatform: PLATFORM_TO_UI[targetPlatforms[0]] || 'Instagram',
+        painDesireOrObjection:
+          level === 'objecao'
+            ? `Objeção mapeada sobre ${pillar} em ${niche}.`
+            : level === 'sintoma'
+              ? `Dor recorrente do ICP ligada a ${pillar}.`
+              : `Desejo de domínio prático em ${pillar}.`,
+        isFavorite: false,
+        isPriorityNextCycle: input.mode === 'objective' || n < 3,
+        isSavedForSales: level === 'objecao',
+        isMarketTest,
+        allocatedSlotIds: [],
       });
     }
     return themes;
+  }
+
+  async generateMoreThemes(
+    context: IThemeGenerationContext,
+    seedTheme: IEditorialTheme,
+    count: number,
+    batchId: string,
+  ): Promise<ICreateEditorialTheme[]> {
+    // TODO(LLM): Gerar cluster de variações aprofundando exatamente o mesmo ângulo/tema semente
+    // mantendo coerência com a Base Estratégica do projeto.
+    // Input: { context, seedTheme, count }
+    // Output esperado: ICreateEditorialTheme[]
+
+    const base = await this.generate(context, {
+      mode: seedTheme.origin,
+      count,
+      batchId,
+      pillars: [seedTheme.pillar],
+      platforms: seedTheme.platforms,
+      formats: [seedTheme.format, 'carousel', 'long_video', 'reel'],
+      retinaTypes: [seedTheme.retinaType],
+      offset: 10,
+    });
+
+    const prefixVariations = [
+      `${seedTheme.title} — Parte 2: O protocolo prático de execução`,
+      `Estudo de Caso: Como resolvemos "${seedTheme.title.slice(0, 48)}..." na prática`,
+      `A pergunta que todo comprador faz sobre: ${seedTheme.title.slice(0, 48)}...`,
+    ];
+
+    return base.map((item, idx) => ({
+      ...item,
+      title:
+        prefixVariations[idx] || `${seedTheme.title} (Variação #${idx + 1})`,
+    }));
+  }
+
+  async rebalanceSlots(context: {
+    slots: Record<string, unknown>[];
+    themes: IEditorialTheme[];
+    scenario: string;
+  }): Promise<{
+    updatedSlots: Record<string, unknown>[];
+    allocatedPairs: { calendarItemId: string; theme: IEditorialTheme }[];
+  }> {
+    // TODO(LLM): Substituir alocação heurística por otimizador baseado em LLM que distribui
+    // temas nos slots do calendário respeitando o equilíbrio RETINA, a Jornada de 5 Passos
+    // e o cenário simulado (none, more_transformation, sales_push, top_of_funnel).
+    // Input: { slots: context.slots, themes: context.themes, scenario: context.scenario }
+    // Output esperado: { updatedSlots, allocatedPairs }
+
+    const usedThemeIds = new Set<string>();
+    const allocatedPairs: { calendarItemId: string; theme: IEditorialTheme }[] =
+      [];
+
+    const updatedSlots = (context.slots || []).map((slot) => {
+      const format = String(slot.format || '');
+      if (format === 'sequencia_stories' || format === 'stories_sequence') {
+        return slot;
+      }
+
+      let targetRetina = String(slot.retinaType || 'Transformacao');
+      if (
+        context.scenario === 'more_transformation' &&
+        targetRetina === 'Engajamento'
+      ) {
+        targetRetina = 'Transformacao';
+      } else if (
+        context.scenario === 'sales_push' &&
+        (targetRetina === 'Engajamento' || targetRetina === 'Relacionamento')
+      ) {
+        targetRetina = 'NiveisDeConsciencia';
+      } else if (
+        context.scenario === 'top_of_funnel' &&
+        targetRetina === 'NiveisDeConsciencia'
+      ) {
+        targetRetina = 'Engajamento';
+      }
+
+      const bestMatch =
+        context.themes.find(
+          (t) =>
+            !usedThemeIds.has(String(t.id || t._id)) &&
+            (t.recommendedFormat === format || t.format === format),
+        ) ??
+        context.themes.find((t) => !usedThemeIds.has(String(t.id || t._id))) ??
+        context.themes[0];
+
+      if (bestMatch) {
+        const themeId = String(bestMatch.id || bestMatch._id || '');
+        if (themeId) usedThemeIds.add(themeId);
+        allocatedPairs.push({
+          calendarItemId: String(slot.id || slot._id || ''),
+          theme: bestMatch,
+        });
+        return {
+          ...slot,
+          retinaType: targetRetina,
+          mainTheme: bestMatch.title,
+          editorialPillar: bestMatch.romaPillar || bestMatch.pillar,
+          icpPainDesireOrObjection:
+            bestMatch.painDesireOrObjection || slot.icpPainDesireOrObjection,
+        };
+      }
+      return slot;
+    });
+
+    return { updatedSlots, allocatedPairs };
   }
 
   /** Com prioridade RETINA, metade dos temas recai no tipo priorizado. */

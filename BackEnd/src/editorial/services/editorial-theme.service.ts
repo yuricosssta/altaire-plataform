@@ -18,6 +18,7 @@ import {
 } from '../../shared/events/editorial.events';
 import {
   IEditorialTheme,
+  ICreateEditorialTheme,
   IUpdateEditorialTheme,
   IThemeFilters,
   IThemeGenerationRequest,
@@ -31,6 +32,7 @@ import {
 import { IEditorialCalendarThemeVersion } from '../schemas/models/editorial-calendar-theme-version.interface';
 import {
   AssignThemeInput,
+  CreateThemesBatchInput,
   GenerateMoreInput,
   RebalanceRequestInput,
   SaveVersionInput,
@@ -109,14 +111,18 @@ export class EditorialThemeService {
     const batchId = randomUUID();
     const count =
       request.mode === 'roma_avatar'
-        ? Number(request.params.volume)
+        ? Number(request.params.volume || 20)
         : Number(request.params.volume || 20);
 
     const inputPillars =
-      request.mode === 'roma_avatar' ? request.params.pillars : pillars;
+      request.mode === 'roma_avatar' && request.params.pillars?.length
+        ? request.params.pillars
+        : pillars.length
+          ? pillars
+          : ['Educação Estratégica', 'Autoridade & Método'];
 
     const platforms =
-      request.mode === 'objective'
+      request.mode === 'objective' && request.params.platforms?.length
         ? request.params.platforms
         : (['instagram'] as any);
 
@@ -125,20 +131,26 @@ export class EditorialThemeService {
         ? request.params.retinaPriority
         : undefined;
 
+    const marketNotes =
+      request.mode === 'market'
+        ? (request.params as { marketNotes?: string }).marketNotes
+        : undefined;
+
     const sourceContext =
       request.mode === 'market'
         ? [
             ...(request.params.videoLinks || []),
             ...(request.params.comments || []),
             ...(request.params.reviews || []),
+            ...(marketNotes ? [marketNotes] : []),
           ].join('; ')
         : undefined;
 
     const toCreate = await this.themeGenerator.generate(
       {
         projectId,
-        niche: project.niche,
-        subniche: project.subniche,
+        niche: (request.params as any)?.niche || project.niche,
+        subniche: (request.params as any)?.subniche || project.subniche,
         pillars: inputPillars,
         mensagemCentral,
       },
@@ -150,8 +162,32 @@ export class EditorialThemeService {
         platforms,
         retinaPriority,
         sourceContext,
+        videoLinks:
+          request.mode === 'market' ? request.params.videoLinks : undefined,
+        comments:
+          request.mode === 'market' ? request.params.comments : undefined,
+        reviews: request.mode === 'market' ? request.params.reviews : undefined,
+        objective:
+          request.mode === 'objective' ? request.params.objective : undefined,
+        businessMoment:
+          request.mode === 'objective'
+            ? request.params.businessMoment
+            : undefined,
       },
     );
+
+    if (request.persist === false) {
+      const previewThemes = toCreate.map((item, idx) => ({
+        ...item,
+        id: `preview-${batchId.slice(0, 8)}-${idx + 1}`,
+        isActive: true,
+      })) as unknown as IEditorialTheme[];
+      return {
+        batchId,
+        mode: request.mode,
+        themes: previewThemes,
+      };
+    }
 
     const created = await this.themeRepository.createMany(toCreate);
 
@@ -173,6 +209,75 @@ export class EditorialThemeService {
     };
   }
 
+  async createBatch(
+    projectId: string,
+    input: CreateThemesBatchInput,
+    triggeredBy = 'system',
+  ): Promise<IThemeGenerationResult> {
+    const project = await this.projectRepository.findById(projectId);
+    if (!project) throw new NotFoundException('Projeto não encontrado.');
+
+    const batchId = randomUUID();
+    const mapped: ICreateEditorialTheme[] = input.themes.map((t) => ({
+      projectId,
+      origin: (t.origin as any) || 'roma_avatar',
+      title: String(t.title),
+      pillar: String(t.pillar || t.romaPillar || 'Posicionamento'),
+      retinaType: (t.retinaType as any) || 'autoridade',
+      consciousnessLevel: (t.consciousnessLevel as any) || 'solucao',
+      journeyStage: (t.journeyStage as any) || 'descoberta',
+      format: (t.format as any) || 'reel',
+      platforms: Array.isArray(t.platforms)
+        ? (t.platforms as any)
+        : (['instagram'] as any),
+      status: (t.status as any) || 'active',
+      flags: Array.isArray(t.flags) ? (t.flags as any) : [],
+      angle: t.angle ? String(t.angle) : undefined,
+      approach: t.approach as any,
+      batchId,
+      techniqueUsed: t.techniqueUsed ? String(t.techniqueUsed) : undefined,
+      romaPillar: t.romaPillar ? String(t.romaPillar) : undefined,
+      consciousnessAxis: t.consciousnessAxis
+        ? String(t.consciousnessAxis)
+        : undefined,
+      recommendedFormat: t.recommendedFormat
+        ? String(t.recommendedFormat)
+        : undefined,
+      recommendedPlatform: t.recommendedPlatform
+        ? String(t.recommendedPlatform)
+        : undefined,
+      painDesireOrObjection: t.painDesireOrObjection
+        ? String(t.painDesireOrObjection)
+        : undefined,
+      isFavorite: Boolean(t.isFavorite),
+      isPriorityNextCycle: Boolean(t.isPriorityNextCycle),
+      isSavedForSales: Boolean(t.isSavedForSales),
+      isMarketTest: Boolean(t.isMarketTest),
+      allocatedSlotIds: Array.isArray(t.allocatedSlotIds)
+        ? t.allocatedSlotIds.map(String)
+        : [],
+    }));
+
+    const created = await this.themeRepository.createMany(mapped);
+
+    const payload: EditorialEventPayload = {
+      event: EDITORIAL_EVENTS.THEME_GENERATED,
+      projectId,
+      entityId: batchId,
+      entityType: 'theme_batch',
+      triggeredBy,
+      timestamp: new Date(),
+      metadata: { count: created.length, mode: 'batch_save' },
+    };
+    this.eventEmitter.emit(EDITORIAL_EVENTS.THEME_GENERATED, payload);
+
+    return {
+      batchId,
+      mode: 'roma_avatar',
+      themes: created,
+    };
+  }
+
   async generateMore(
     projectId: string,
     themeId: string,
@@ -185,24 +290,39 @@ export class EditorialThemeService {
     const count = input.count ?? 5;
     const batchId = baseTheme.batchId || randomUUID();
 
-    const toCreate = await this.themeGenerator.generate(
-      {
-        projectId,
-        niche: project.niche,
-        subniche: project.subniche,
-        pillars: [baseTheme.pillar],
-      },
-      {
-        mode: baseTheme.origin,
+    let toCreate: ICreateEditorialTheme[];
+    if (typeof (this.themeGenerator as any).generateMoreThemes === 'function') {
+      toCreate = await this.themeGenerator.generateMoreThemes(
+        {
+          projectId,
+          niche: project.niche,
+          subniche: project.subniche,
+          pillars: [baseTheme.pillar],
+        },
+        baseTheme,
         count,
         batchId,
-        pillars: [baseTheme.pillar],
-        platforms: baseTheme.platforms,
-        formats: [baseTheme.format],
-        retinaTypes: [baseTheme.retinaType],
-        offset: 10,
-      },
-    );
+      );
+    } else {
+      toCreate = await this.themeGenerator.generate(
+        {
+          projectId,
+          niche: project.niche,
+          subniche: project.subniche,
+          pillars: [baseTheme.pillar],
+        },
+        {
+          mode: baseTheme.origin,
+          count,
+          batchId,
+          pillars: [baseTheme.pillar],
+          platforms: baseTheme.platforms,
+          formats: [baseTheme.format],
+          retinaTypes: [baseTheme.retinaType],
+          offset: 10,
+        },
+      );
+    }
 
     return this.themeRepository.createMany(toCreate);
   }
@@ -254,6 +374,43 @@ export class EditorialThemeService {
     return (mapa?.pilares || []).map((p) => p.title);
   }
 
+  private collectCalendarItems(calendar: any): {
+    id: string;
+    format?: string;
+    retinaType?: string;
+    pillar?: string;
+    theme?: string;
+    themeId?: string;
+  }[] {
+    const collected: any[] = [];
+    if (Array.isArray(calendar.slots) && calendar.slots.length > 0) {
+      for (const s of calendar.slots) {
+        collected.push({
+          id: String(s.id || s._id || ''),
+          format: s.format,
+          retinaType: (s.retinaBadge || s.retinaType || '').toLowerCase(),
+          pillar: s.editorialPillar || s.pillar,
+          theme: s.mainTheme || s.theme,
+          themeId: s.themeId,
+        });
+      }
+      return collected;
+    }
+    for (const day of calendar.days || []) {
+      for (const item of day.items || []) {
+        collected.push({
+          id: String(item.id || item._id),
+          format: item.format,
+          retinaType: item.retinaType,
+          pillar: item.pillar,
+          theme: item.theme,
+          themeId: item.themeId,
+        });
+      }
+    }
+    return collected;
+  }
+
   async calendarSuggestions(
     projectId: string,
     calendarId: string,
@@ -266,23 +423,21 @@ export class EditorialThemeService {
     });
 
     const suggestions: ISlotSuggestion[] = [];
+    const items = this.collectCalendarItems(calendar);
 
-    for (const day of calendar.days || []) {
-      for (const item of day.items || []) {
-        const itemId = String(item.id || item._id);
-        const matched = allThemes.filter(
-          (t) =>
-            t.format === item.format ||
-            t.retinaType === item.retinaType ||
-            (item.pillar && t.pillar === item.pillar),
-        );
-        const candidates = (matched.length ? matched : allThemes).slice(0, 3);
-        if (candidates.length) {
-          suggestions.push({
-            calendarItemId: itemId,
-            suggestions: candidates,
-          });
-        }
+    for (const item of items) {
+      const matched = allThemes.filter(
+        (t) =>
+          t.format === item.format ||
+          t.retinaType === item.retinaType ||
+          (item.pillar && t.pillar === item.pillar),
+      );
+      const candidates = (matched.length ? matched : allThemes).slice(0, 3);
+      if (candidates.length) {
+        suggestions.push({
+          calendarItemId: item.id,
+          suggestions: candidates,
+        });
       }
     }
 
@@ -296,16 +451,34 @@ export class EditorialThemeService {
   ): Promise<{ message: string }> {
     let titleToSet = data.title || '';
 
-    if (data.themeId) {
+    if (data.themeId && !data.unassign) {
       const theme = await this.findById(data.themeId);
       if (!titleToSet) titleToSet = theme.title;
+
+      const currentSlots = Array.isArray(theme.allocatedSlotIds)
+        ? theme.allocatedSlotIds.map(String)
+        : [];
+      if (!currentSlots.includes(data.calendarItemId)) {
+        await this.themeRepository.update(data.themeId, {
+          allocatedSlotIds: [...currentSlots, data.calendarItemId],
+        });
+      }
+    } else if (data.unassign && data.themeId) {
+      const theme = await this.themeRepository.findById(data.themeId);
+      if (theme && Array.isArray(theme.allocatedSlotIds)) {
+        await this.themeRepository.update(data.themeId, {
+          allocatedSlotIds: theme.allocatedSlotIds.filter(
+            (sid) => String(sid) !== String(data.calendarItemId),
+          ),
+        });
+      }
     }
 
     const updated = await this.calendarRepository.assignItemTheme(
       calendarId,
       data.calendarItemId,
-      data.themeId ?? null,
-      titleToSet,
+      data.unassign ? null : (data.themeId ?? null),
+      data.unassign ? '' : titleToSet,
     );
 
     if (!updated) {
@@ -324,27 +497,18 @@ export class EditorialThemeService {
     const calendar = await this.calendarRepository.findById(calendarId);
     if (!calendar) throw new NotFoundException('Calendário não encontrado.');
 
-    const allItems: any[] = [];
-    for (const day of calendar.days || []) {
-      for (const item of day.items || []) {
-        allItems.push(item);
-      }
-    }
-
+    const allItems = this.collectCalendarItems(calendar);
     const totalSlots = allItems.length;
     const filledItems = allItems.filter((i) => i.themeId || i.theme);
     const filledSlots = filledItems.length;
 
-    // Retina count
     const retinaMap = new Map<RetinaType, number>();
     for (const type of ALL_RETINA) retinaMap.set(type, 0);
 
     for (const item of allItems) {
-      if (item.retinaType && retinaMap.has(item.retinaType)) {
-        retinaMap.set(
-          item.retinaType,
-          (retinaMap.get(item.retinaType) || 0) + 1,
-        );
+      const rt = item.retinaType as RetinaType;
+      if (rt && retinaMap.has(rt)) {
+        retinaMap.set(rt, (retinaMap.get(rt) || 0) + 1);
       }
     }
 
@@ -354,7 +518,6 @@ export class EditorialThemeService {
       return { retinaType: type, count, share: Math.round(share) };
     });
 
-    // Journey stages (a partir dos temas referenciados)
     const themeIds = allItems
       .map((i) => i.themeId)
       .filter((id): id is string => Boolean(id));
@@ -413,33 +576,68 @@ export class EditorialThemeService {
     calendarId: string,
     request?: RebalanceRequestInput,
   ): Promise<IRebalanceResult> {
-    void request;
     const calendar = await this.calendarRepository.findById(calendarId);
     if (!calendar) throw new NotFoundException('Calendário não encontrado.');
 
     const availableThemes = await this.themeRepository.findAllByProject(
       projectId,
-      { status: ['active', 'favorite'] },
+      {
+        status: [
+          'active',
+          'favorite',
+          'priority_next_cycle',
+          'saved_for_sales',
+        ],
+      },
     );
 
-    const report = await this.getBalance(projectId, calendarId);
-    const slots: { calendarItemId: string; theme: IEditorialTheme }[] = [];
+    const sourceSlots =
+      Array.isArray(request?.slots) && request.slots.length > 0
+        ? request.slots
+        : Array.isArray(calendar.slots) && calendar.slots.length > 0
+          ? calendar.slots
+          : [];
 
-    let themeIdx = 0;
-    for (const day of calendar.days || []) {
-      for (const item of day.items || []) {
-        if (!availableThemes.length) break;
-        const assignedTheme =
-          availableThemes[themeIdx % availableThemes.length];
-        themeIdx++;
-        slots.push({
-          calendarItemId: String(item.id || item._id),
-          theme: assignedTheme,
+    let updatedSlots: Record<string, unknown>[] | undefined;
+    let slots: { calendarItemId: string; theme: IEditorialTheme }[] = [];
+
+    if (
+      sourceSlots.length > 0 &&
+      typeof (this.themeGenerator as any).rebalanceSlots === 'function'
+    ) {
+      const rebalanced = await this.themeGenerator.rebalanceSlots({
+        slots: sourceSlots,
+        themes: availableThemes,
+        scenario:
+          request?.scenario || request?.objective || 'CORRIGIR_RECORRENTES',
+      });
+      updatedSlots = rebalanced.updatedSlots;
+      slots = rebalanced.allocatedPairs;
+
+      if (request?.persist !== false && updatedSlots.length > 0) {
+        await this.calendarRepository.update(calendarId, {
+          slots: updatedSlots,
         });
+      }
+    } else {
+      let themeIdx = 0;
+      for (const day of calendar.days || []) {
+        for (const item of day.items || []) {
+          if (!availableThemes.length) break;
+          const assignedTheme =
+            availableThemes[themeIdx % availableThemes.length];
+          themeIdx++;
+          slots.push({
+            calendarItemId: String(item.id || item._id),
+            theme: assignedTheme,
+          });
+        }
       }
     }
 
-    return { report, slots };
+    const report = await this.getBalance(projectId, calendarId);
+
+    return { report, slots, updatedSlots };
   }
 
   async simulate(
@@ -485,11 +683,9 @@ export class EditorialThemeService {
     if (!calendar) throw new NotFoundException('Calendário não encontrado.');
 
     const itemThemesMap = new Map<string, string>();
-    for (const day of calendar.days || []) {
-      for (const item of day.items || []) {
-        if (item.themeId) {
-          itemThemesMap.set(String(item.id || item._id), String(item.themeId));
-        }
+    for (const item of this.collectCalendarItems(calendar)) {
+      if (item.themeId) {
+        itemThemesMap.set(item.id, String(item.themeId));
       }
     }
 

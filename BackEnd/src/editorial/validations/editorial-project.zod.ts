@@ -5,6 +5,14 @@ export const createProjectSchema = z.object({
   niche: z.string().min(2, 'O nicho é obrigatório.'),
   subniche: z.string().min(2, 'O subnicho é obrigatório.'),
   currentObjective: z.string().min(2, 'Defina o objetivo atual do projeto.'),
+  brandOrClientName: z.string().optional(),
+  operationTypeLabel: z.string().optional(),
+  currentPhaseLabel: z.string().optional(),
+  status: z
+    .enum(['draft', 'active', 'paused', 'archived', 'in_setup', 'in_review'])
+    .optional(),
+  nextActionLabel: z.string().optional(),
+  nextActionReason: z.string().optional(),
 });
 
 export const updateProjectSchema = z.object({
@@ -12,8 +20,28 @@ export const updateProjectSchema = z.object({
   niche: z.string().min(2).optional(),
   subniche: z.string().min(2).optional(),
   currentObjective: z.string().min(2).optional(),
+  brandOrClientName: z.string().optional(),
+  operationTypeLabel: z.string().optional(),
+  currentPhaseLabel: z.string().optional(),
+  status: z
+    .enum(['draft', 'active', 'paused', 'archived', 'in_setup', 'in_review'])
+    .optional(),
   editorialLineStatus: z.enum(['pending', 'active', 'archived']).optional(),
   calendarStatus: z.enum(['pending', 'active', 'archived']).optional(),
+  nextActionLabel: z.string().optional(),
+  nextActionReason: z.string().optional(),
+});
+
+export const duplicateProjectSchema = z.object({
+  newName: z.string().min(2, 'Informe o nome do projeto duplicado.').optional(),
+  name: z.string().min(2).optional(),
+  brandOrClientName: z.string().optional(),
+  copyStrategicBase: z.boolean().optional(),
+  copyLineEditorial: z.boolean().optional(),
+  copyThemes: z.boolean().optional(),
+  copyCalendars: z.boolean().optional(),
+  copyScripts: z.boolean().optional(),
+  includeActiveLine: z.boolean().optional(),
 });
 
 export const projectIdSchema = z.object({
@@ -22,3 +50,4 @@ export const projectIdSchema = z.object({
 
 export type CreateProject = z.infer<typeof createProjectSchema>;
 export type UpdateProject = z.infer<typeof updateProjectSchema>;
+export type DuplicateProject = z.infer<typeof duplicateProjectSchema>;

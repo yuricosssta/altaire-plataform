@@ -138,3 +138,36 @@ export const apiDeleteOrgFunction = async (
   );
   return response.data;
 };
+
+export const apiUpdateOrganizationProfile = async (
+  orgId: string,
+  data: { name?: string; acronym?: string; billingDocument?: string },
+) => {
+  const response = await localClient.patch(`/organizations/${orgId}`, data);
+  return response.data;
+};
+
+export const apiUpdateOrganizationSettings = async (
+  orgId: string,
+  settings: Record<string, unknown>,
+) => {
+  const response = await localClient.patch(`/organizations/${orgId}/settings`, {
+    settings,
+  });
+  return response.data;
+};
+
+export const apiGetAllOrganizationsAdmin = async () => {
+  const response = await localClient.get('/organizations/admin/all');
+  return response.data;
+};
+
+export const apiUpdateOrganizationPlanAdmin = async (
+  orgId: string,
+  plan: string,
+) => {
+  const response = await localClient.patch(`/organizations/admin/${orgId}/plan`, {
+    plan,
+  });
+  return response.data;
+};

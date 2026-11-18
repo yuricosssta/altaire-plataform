@@ -1,7 +1,11 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, Optional } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
+import { randomUUID } from 'crypto';
 import { EditorialCalendarRepository } from '../repositories/editorial-calendar.repository';
 import { EditorialVersionRepository } from '../repositories/editorial-version.repository';
+import { EditorialProjectRepository } from '../repositories/editorial-project.repository';
+import { EditorialMapaRepository } from '../repositories/editorial-mapa.repository';
+import { CalendarGenerator } from '../generators/calendar-generator';
 import {
   IEditorialCalendar,
   ICreateEditorialCalendar,
@@ -18,12 +22,18 @@ import {
   ProductionCapacity,
 } from '../schemas/models/editorial-calendar.interface';
 import { EDITORIAL_EVENTS } from '../../shared/events/editorial.events';
+import { CreateCalendarSlotInput } from '../validations/editorial-calendar.zod';
 
 export interface CalendarSetup {
-  editorialVersionId: string;
+  editorialVersionId?: string;
   periodType: PeriodType;
-  startDate: Date;
+  startDate?: Date;
   endDate?: Date;
+  periodLabel?: string;
+  periodStart?: string;
+  periodEnd?: string;
+  mainObjective?: string;
+  linkedLineName?: string;
   platforms: Platform[];
   capacity: ProductionCapacity;
   objective: CalendarObjective;
@@ -54,6 +64,15 @@ const SUGGESTED_TIMES: Record<string, string> = {
   static_post: '12:00',
   live: '20:00',
   stories_sequence: '09:00',
+};
+
+const FORMAT_LABELS: Record<string, string> = {
+  reel: 'Reels / Short',
+  long_video: 'Vídeo Longo',
+  carousel: 'Carrossel',
+  static_post: 'Post Estático',
+  live: 'Live',
+  stories_sequence: 'Sequência de Stories',
 };
 
 function generateCalendarDays(
@@ -131,7 +150,7 @@ function generateCalendarDays(
         storySequences.push({
           date: new Date(currentDate),
           sequenceIndex: s + 1,
-          storiesCount: 3,
+          storiesCount: capacity.storiesPerSequence ?? 5,
           focus: '',
           retinaType,
           suggestedTime: '09:00',
@@ -156,6 +175,9 @@ export class EditorialCalendarService {
     private readonly calendarRepository: EditorialCalendarRepository,
     private readonly versionRepository: EditorialVersionRepository,
     private readonly eventEmitter: EventEmitter2,
+    @Optional() private readonly calendarGenerator?: CalendarGenerator,
+    @Optional() private readonly projectRepository?: EditorialProjectRepository,
+    @Optional() private readonly mapaRepository?: EditorialMapaRepository,
   ) {}
 
   private generateCalendarName(
@@ -222,49 +244,143 @@ export class EditorialCalendarService {
     projectId: string,
     setup: CalendarSetup,
   ): Promise<IEditorialCalendar> {
-    const version = await this.versionRepository.findById(
-      setup.editorialVersionId,
-    );
-    if (!version)
-      throw new NotFoundException('Versão editorial não encontrada.');
+    let resolvedVersionId = setup.editorialVersionId;
+    let linkedLineName = setup.linkedLineName || 'Linha Editorial Ativa';
 
+    if (resolvedVersionId && /^[0-9a-fA-F]{24}$/.test(resolvedVersionId)) {
+      const version = await this.versionRepository.findById(resolvedVersionId);
+      if (!version)
+        throw new NotFoundException('Versão editorial não encontrada.');
+      linkedLineName = setup.linkedLineName || version.name;
+    } else {
+      const versions = await this.versionRepository.findAllByProject(projectId);
+      const active = versions.find((v) => v.status === 'active') || versions[0];
+      if (active) {
+        resolvedVersionId = String(active._id || (active as any).id);
+        linkedLineName = setup.linkedLineName || active.name;
+      } else {
+        resolvedVersionId = projectId;
+      }
+    }
+
+    const startDate = setup.startDate
+      ? new Date(setup.startDate)
+      : setup.periodStart
+        ? new Date(setup.periodStart)
+        : new Date();
     const endDate = this.computeEndDate(
-      new Date(setup.startDate),
+      startDate,
       setup.periodType,
-      setup.endDate ? new Date(setup.endDate) : undefined,
+      setup.endDate
+        ? new Date(setup.endDate)
+        : setup.periodEnd
+          ? new Date(setup.periodEnd)
+          : undefined,
     );
-    const startDate = new Date(setup.startDate);
 
-    const { days } = generateCalendarDays(startDate, endDate, setup.capacity);
-
+    const periodLabel =
+      setup.periodLabel || PERIOD_LABELS[setup.periodType] || setup.periodType;
     const name = this.generateCalendarName(
       setup.objective,
       setup.periodType,
       setup.customName,
     );
 
+    let niche = 'Negócios Digitais';
+    let subniche = 'Conteúdo Estratégico';
+    let pillars: string[] = [];
+
+    if (this.projectRepository) {
+      const project = await this.projectRepository.findById(projectId);
+      if (project) {
+        niche = project.niche;
+        subniche = project.subniche;
+      }
+    }
+
+    if (
+      this.mapaRepository &&
+      resolvedVersionId &&
+      /^[0-9a-fA-F]{24}$/.test(resolvedVersionId)
+    ) {
+      const mapa = await this.mapaRepository.findByVersionId(resolvedVersionId);
+      if (mapa?.pilares?.length) {
+        pillars = mapa.pilares.map((p) => p.title);
+      }
+    }
+
+    let days: ICalendarDay[];
+    let slots: Record<string, unknown>[] = [];
+    let reviewSuggestions: IReviewSuggestion[] = [];
+
+    if (this.calendarGenerator) {
+      const generated = await this.calendarGenerator.generateCalendarPlan({
+        projectId,
+        niche,
+        subniche,
+        objective: setup.mainObjective || setup.objective,
+        periodLabel,
+        startDate,
+        endDate,
+        platforms: setup.platforms,
+        capacity: setup.capacity,
+        linkedLineName,
+        pillars,
+      });
+      days = generated.days;
+      slots = generated.slots;
+      reviewSuggestions = generated.reviewSuggestions;
+    } else {
+      days = generateCalendarDays(startDate, endDate, setup.capacity).days;
+    }
+
+    const weeklyCapacity: Record<string, number> = {
+      reels: setup.capacity.reelsPerWeek,
+      longVideos: setup.capacity.longVideosPerWeek,
+      carousels: setup.capacity.carouselsPerWeek,
+      staticPosts: setup.capacity.staticPostsPerWeek,
+      lives: setup.capacity.livesPerWeek,
+      storiesPerDay: setup.capacity.storySequencesPerDay,
+    };
+
     const payload: ICreateEditorialCalendar = {
       projectId,
-      editorialVersionId: setup.editorialVersionId,
+      editorialVersionId: resolvedVersionId,
       name,
       period: {
         type: setup.periodType,
-        label: PERIOD_LABELS[setup.periodType] || setup.periodType,
+        label: periodLabel,
         startDate,
         endDate,
       },
+      periodLabel,
+      periodStart: setup.periodStart || startDate.toISOString().slice(0, 10),
+      periodEnd: setup.periodEnd || endDate.toISOString().slice(0, 10),
+      mainObjective: setup.mainObjective || setup.objective,
+      linkedLineName,
       platforms: setup.platforms,
       capacity: setup.capacity,
+      weeklyCapacity,
       objective: setup.objective,
+      status: 'active',
       days,
+      slots,
+      reviewSuggestions,
     };
 
     const calendar = await this.calendarRepository.create(payload);
 
+    if (this.projectRepository) {
+      await this.projectRepository.update(projectId, {
+        calendarStatus: 'active',
+        currentPhaseLabel: 'Calendário Editorial ativo',
+      });
+    }
+
     this.eventEmitter.emit(EDITORIAL_EVENTS.CALENDAR_CREATED, {
       event: EDITORIAL_EVENTS.CALENDAR_CREATED,
       projectId,
-      versionId: setup.editorialVersionId,
+      versionId: resolvedVersionId,
       versionNumber: 1,
       triggeredBy: '',
       timestamp: new Date(),
@@ -302,6 +418,7 @@ export class EditorialCalendarService {
       periodType?: PeriodType;
       startDate?: Date;
       endDate?: Date;
+      name?: string;
     },
   ): Promise<IEditorialCalendar> {
     const original = await this.calendarRepository.findById(id);
@@ -330,20 +447,35 @@ export class EditorialCalendarService {
       original.capacity,
     );
 
+    const clonedSlots = (original.slots || []).map((slot) => ({
+      ...slot,
+      id: `slot-${randomUUID().slice(0, 8)}`,
+      status: 'planned',
+    }));
+
     const payload: ICreateEditorialCalendar = {
       projectId: original.projectId,
       editorialVersionId: original.editorialVersionId,
-      name: `Cópia de ${original.name}`,
+      name: periodOverride?.name || `Cópia de ${original.name}`,
       period: {
         type: periodType,
         label: PERIOD_LABELS[periodType] || periodType,
         startDate,
         endDate,
       },
+      periodLabel: original.periodLabel,
+      periodStart: startDate.toISOString().slice(0, 10),
+      periodEnd: endDate.toISOString().slice(0, 10),
+      mainObjective: original.mainObjective,
+      linkedLineName: original.linkedLineName,
       platforms: original.platforms,
       capacity: original.capacity,
+      weeklyCapacity: original.weeklyCapacity,
       objective: original.objective,
+      status: 'draft',
       days,
+      slots: clonedSlots,
+      reviewSuggestions: original.reviewSuggestions || [],
     };
 
     const calendar = await this.calendarRepository.create(payload);
@@ -364,6 +496,32 @@ export class EditorialCalendarService {
     return calendar;
   }
 
+  async addSlot(
+    calendarId: string,
+    slotInput: CreateCalendarSlotInput,
+  ): Promise<IEditorialCalendar> {
+    const slotId = slotInput.id || `slot-custom-${randomUUID().slice(0, 8)}`;
+    const slotPayload: Record<string, unknown> = {
+      ...slotInput,
+      id: slotId,
+      formatLabel:
+        slotInput.formatLabel ||
+        FORMAT_LABELS[slotInput.format] ||
+        slotInput.format,
+      retinaBadge: slotInput.retinaBadge || 'Relacionamento',
+      status: slotInput.status || 'planned',
+      theme: slotInput.mainTheme,
+      provisionalName: slotInput.provisionalTitle,
+    };
+
+    const updated = await this.calendarRepository.addSlot(
+      calendarId,
+      slotPayload,
+    );
+    if (!updated) throw new NotFoundException('Calendário não encontrado.');
+    return updated;
+  }
+
   async updateItem(
     calendarId: string,
     itemId: string,
@@ -379,9 +537,39 @@ export class EditorialCalendarService {
     return calendar;
   }
 
+  async deleteItem(
+    calendarId: string,
+    itemId: string,
+  ): Promise<IEditorialCalendar> {
+    const calendar = await this.calendarRepository.deleteItem(
+      calendarId,
+      itemId,
+    );
+    if (!calendar)
+      throw new NotFoundException('Calendário ou item não encontrado.');
+    return calendar;
+  }
+
   async getReview(calendarId: string): Promise<IReviewSuggestion[]> {
     const calendar = await this.calendarRepository.findById(calendarId);
     if (!calendar) throw new NotFoundException('Calendário não encontrado.');
+
+    if (this.calendarGenerator) {
+      const versionId = String(calendar.editorialVersionId || '');
+      const activeMapa =
+        this.mapaRepository && /^[0-9a-fA-F]{24}$/.test(versionId)
+          ? await this.mapaRepository.findByVersionId(versionId)
+          : null;
+      const suggestions = await this.calendarGenerator.generateCalendarReview({
+        calendar,
+        activeMapa,
+      });
+      await this.calendarRepository.addReviewSuggestions(
+        calendarId,
+        suggestions,
+      );
+      return suggestions;
+    }
 
     const suggestions = this.generateReviewSuggestions(
       calendar.days,
