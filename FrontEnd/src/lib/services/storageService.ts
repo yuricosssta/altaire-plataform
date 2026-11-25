@@ -9,6 +9,7 @@ localClient.interceptors.request.use(
     const state = store.getState();
     const token = state.auth?.token;
     const currentOrg = state.organizations?.currentOrganization;
+    const currentCompany = state.companies?.currentCompany;
 
     if (token) {
       config.headers['Authorization'] = `Bearer ${token}`;
@@ -23,12 +24,16 @@ localClient.interceptors.request.use(
       config.headers['x-org-id'] = orgId;
       config.headers['x-org-role'] = currentOrg.role;
     }
+
+    if (currentCompany?._id) {
+      config.headers['x-company-id'] = currentCompany._id;
+    }
     return config;
   },
   (error) => Promise.reject(error),
 );
 
-export async function uploadFileToR2(file: File): Promise<string> {
+export async function uploadFileToR2(file: File, brandId?: string): Promise<string> {
   try {
     let fileToUpload = file;
 
@@ -48,6 +53,7 @@ export async function uploadFileToR2(file: File): Promise<string> {
       fileName: fileToUpload.name,
       fileType: fileToUpload.type,
       sizeBytes: fileToUpload.size,
+      ...(brandId ? { brandId } : {}),
     });
 
     const { uploadUrl, fileUrl } = authResponse.data.data;
@@ -63,6 +69,7 @@ export async function uploadFileToR2(file: File): Promise<string> {
       fileName: fileToUpload.name,
       mimeType: fileToUpload.type,
       sizeBytes: fileToUpload.size,
+      ...(brandId ? { brandId } : {}),
     });
 
     return fileUrl;

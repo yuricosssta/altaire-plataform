@@ -7,9 +7,10 @@ export interface IUsableStory {
 export interface IEditorialBrandStory {
   _id?: string;
   id?: string;
-  /** Hoje fixo em 'altaire' (string) — ver nota da Sprint 11. */
   organizationId: string;
-  userId: string;
+  companyId: string;
+  brandId: string;
+  userId?: string;
   originStory: string;
   keyTurnarounds: string[];
   failures: string[];

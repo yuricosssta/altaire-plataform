@@ -1,7 +1,10 @@
 import { Injectable } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
-import { EditorialProjectRepository } from '../../repositories/editorial-project.repository';
+import {
+  EditorialProjectRepository,
+  IEditorialProjectFilter,
+} from '../../repositories/editorial-project.repository';
 import {
   IEditorialProject,
   ICreateEditorialProject,
@@ -12,6 +15,19 @@ import {
   EditorialProjectDocument,
 } from '../../schemas/editorial-project.schema';
 
+const toObjId = (id: string) => new (Types.ObjectId as any)(String(id));
+
+function normalizeProject(doc: any): IEditorialProject {
+  return {
+    ...doc,
+    _id: String(doc._id),
+    id: String(doc._id),
+    companyId: doc.companyId ? String(doc.companyId) : '',
+    brandId: doc.brandId ? String(doc.brandId) : '',
+    createdBy: doc.createdBy ? String(doc.createdBy) : '',
+  } as IEditorialProject;
+}
+
 @Injectable()
 export class EditorialProjectMongooseRepository implements EditorialProjectRepository {
   constructor(
@@ -19,75 +35,129 @@ export class EditorialProjectMongooseRepository implements EditorialProjectRepos
     private readonly projectModel: Model<EditorialProjectDocument>,
   ) {}
 
-  async findAll(
-    orgId: string,
-    createdBy?: string,
-    allowedProjectIds?: string[],
-  ): Promise<IEditorialProject[]> {
+  async findAll(filter: IEditorialProjectFilter): Promise<IEditorialProject[]> {
+    if (!(Types.ObjectId as any).isValid(filter.companyId)) {
+      return [];
+    }
+
     const query: Record<string, any> = {
-      orgId,
+      companyId: toObjId(filter.companyId),
       isActive: { $ne: false },
     };
-    if (Array.isArray(allowedProjectIds)) {
-      const validIds = allowedProjectIds
+
+    if (Array.isArray(filter.allowedProjectIds)) {
+      const validIds = filter.allowedProjectIds
         .filter((pid) => (Types.ObjectId as any).isValid(pid))
-        .map((pid) => new (Types.ObjectId as any)(pid));
+        .map(toObjId);
       if (validIds.length === 0) {
         return [];
       }
       query._id = { $in: validIds };
-    } else if (createdBy && (Types.ObjectId as any).isValid(createdBy)) {
-      query.createdBy = new (Types.ObjectId as any)(createdBy);
     }
+
+    if (Array.isArray(filter.brandIds)) {
+      const validBrandIds = filter.brandIds
+        .filter((bid) => (Types.ObjectId as any).isValid(bid))
+        .map(toObjId);
+      if (validBrandIds.length === 0) {
+        return [];
+      }
+      query.brandId = { $in: validBrandIds };
+    }
+
     const projects = await this.projectModel
       .find(query)
       .sort({ updatedAt: -1 })
       .lean()
       .exec();
-    return projects as unknown as IEditorialProject[];
+    return projects.map(normalizeProject);
   }
 
   async findById(id: string): Promise<IEditorialProject | null> {
+    if (!(Types.ObjectId as any).isValid(id)) return null;
     const project = await this.projectModel
       .findOne({
-        _id: new (Types.ObjectId as any)(id),
+        _id: toObjId(id),
         isActive: { $ne: false },
       })
       .lean()
       .exec();
-    return project as unknown as IEditorialProject | null;
+    return project ? normalizeProject(project) : null;
+  }
+
+  async countActiveByBrandId(brandId: string): Promise<number> {
+    if (!(Types.ObjectId as any).isValid(brandId)) return 0;
+    return this.projectModel
+      .countDocuments({
+        brandId: toObjId(brandId),
+        isActive: { $ne: false },
+      })
+      .exec();
+  }
+
+  async findBrandIdsByProjectIds(
+    companyId: string,
+    projectIds: string[],
+  ): Promise<string[]> {
+    if (!(Types.ObjectId as any).isValid(companyId)) return [];
+    const validIds = projectIds
+      .filter((pid) => (Types.ObjectId as any).isValid(pid))
+      .map(toObjId);
+    if (validIds.length === 0) return [];
+
+    const brandIds = await this.projectModel
+      .distinct('brandId', {
+        companyId: toObjId(companyId),
+        _id: { $in: validIds },
+        isActive: { $ne: false },
+      })
+      .exec();
+
+    return brandIds.map(String);
   }
 
   async create(data: ICreateEditorialProject): Promise<IEditorialProject> {
-    const doc = new this.projectModel(data);
+    const doc = new this.projectModel({
+      name: data.name,
+      niche: data.niche,
+      subniche: data.subniche,
+      currentObjective: data.currentObjective,
+      createdBy: toObjId(data.createdBy),
+      companyId: toObjId(data.companyId),
+      brandId: toObjId(data.brandId),
+      orgId: data.orgId || 'altaire',
+      isActive: true,
+    });
     const saved = await doc.save();
-    return saved.toObject() as unknown as IEditorialProject;
+    return normalizeProject(saved.toObject());
   }
 
   async update(
     id: string,
     data: IUpdateEditorialProject,
   ): Promise<IEditorialProject | null> {
+    if (!(Types.ObjectId as any).isValid(id)) return null;
     const updated = await this.projectModel
       .findOneAndUpdate(
-        { _id: new (Types.ObjectId as any)(id), isActive: { $ne: false } },
+        { _id: toObjId(id), isActive: { $ne: false } },
         { $set: data },
         { new: true },
       )
       .lean()
       .exec();
-    return updated as unknown as IEditorialProject | null;
+    return updated ? normalizeProject(updated) : null;
   }
 
   async softDelete(id: string): Promise<IEditorialProject | null> {
+    if (!(Types.ObjectId as any).isValid(id)) return null;
     const deleted = await this.projectModel
       .findOneAndUpdate(
-        { _id: new (Types.ObjectId as any)(id) },
+        { _id: toObjId(id) },
         { $set: { isActive: false } },
         { new: true },
       )
       .lean()
       .exec();
-    return deleted as unknown as IEditorialProject | null;
+    return deleted ? normalizeProject(deleted) : null;
   }
 }

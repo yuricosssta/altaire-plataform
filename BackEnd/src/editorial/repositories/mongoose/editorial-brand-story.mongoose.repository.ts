@@ -13,6 +13,17 @@ import {
 
 const toObjectId = (id: string) => new (Types.ObjectId as any)(String(id));
 
+function normalizeBrandStory(doc: any): IEditorialBrandStory {
+  return {
+    ...doc,
+    _id: doc._id ? String(doc._id) : undefined,
+    id: doc._id ? String(doc._id) : undefined,
+    companyId: doc.companyId ? String(doc.companyId) : '',
+    brandId: doc.brandId ? String(doc.brandId) : '',
+    userId: doc.userId ? String(doc.userId) : undefined,
+  } as IEditorialBrandStory;
+}
+
 @Injectable()
 export class EditorialBrandStoryMongooseRepository implements EditorialBrandStoryRepository {
   constructor(
@@ -20,24 +31,20 @@ export class EditorialBrandStoryMongooseRepository implements EditorialBrandStor
     private readonly brandStoryModel: Model<EditorialBrandStoryDocument>,
   ) {}
 
-  async findByUserId(
-    userId: string,
-    organizationId = 'altaire',
-  ): Promise<IEditorialBrandStory | null> {
+  async findByBrandId(brandId: string): Promise<IEditorialBrandStory | null> {
+    if (!(Types.ObjectId as any).isValid(brandId)) return null;
     const doc = await this.brandStoryModel
-      .findOne({
-        userId: toObjectId(userId),
-        organizationId,
-      })
+      .findOne({ brandId: toObjectId(brandId) })
       .lean()
       .exec();
-    return doc as unknown as IEditorialBrandStory | null;
+    return doc ? normalizeBrandStory(doc) : null;
   }
 
-  async upsert(
-    userId: string,
-    organizationId = 'altaire',
+  async upsertByBrand(
+    brandId: string,
+    companyId: string,
     data: IUpsertEditorialBrandStory,
+    updatedBy?: string,
   ): Promise<IEditorialBrandStory> {
     const set: Record<string, unknown> = {};
     if (data.originStory !== undefined) set.originStory = data.originStory;
@@ -49,21 +56,25 @@ export class EditorialBrandStoryMongooseRepository implements EditorialBrandStor
     if (data.lifestyle !== undefined) set.lifestyle = data.lifestyle;
     if (data.usableStories !== undefined)
       set.usableStories = data.usableStories;
+    if (updatedBy && (Types.ObjectId as any).isValid(updatedBy)) {
+      set.userId = toObjectId(updatedBy);
+    }
 
     const doc = await this.brandStoryModel
       .findOneAndUpdate(
-        { userId: toObjectId(userId), organizationId },
+        { brandId: toObjectId(brandId) },
         {
           $set: set,
           $setOnInsert: {
-            userId: toObjectId(userId),
-            organizationId,
+            brandId: toObjectId(brandId),
+            companyId: toObjectId(companyId),
+            organizationId: 'altaire',
           },
         },
         { new: true, upsert: true },
       )
       .lean()
       .exec();
-    return doc as unknown as IEditorialBrandStory;
+    return normalizeBrandStory(doc);
   }
 }

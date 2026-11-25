@@ -1,5 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getBackendApiUrl, getBffAuthHeader, getBffOrgHeaders } from '@/lib/api/serverUtils';
+import {
+  getBackendApiUrl,
+  getBffAuthHeader,
+  getBffCompanyHeaders,
+  getBffOrgHeaders,
+} from '@/lib/api/serverUtils';
 import { success, error, ERROR_CODES } from '@/lib/api/response';
 
 export async function DELETE(
@@ -11,8 +16,9 @@ export async function DELETE(
     const backendUrl = getBackendApiUrl();
     const authHeader = await getBffAuthHeader(request);
     const orgHeaders = getBffOrgHeaders(request);
+    const companyHeaders = await getBffCompanyHeaders(request);
 
-    const headers: Record<string, string> = { ...orgHeaders };
+    const headers: Record<string, string> = { ...orgHeaders, ...companyHeaders };
     if (authHeader) headers['Authorization'] = authHeader;
 
     const response = await fetch(`${backendUrl}/storage/assets/${id}`, {
@@ -23,7 +29,7 @@ export async function DELETE(
 
     if (!response.ok) {
       return NextResponse.json(
-        error(ERROR_CODES.EXTERNAL_ERROR, 'Erro ao excluir arquivo'),
+        error(ERROR_CODES.EXTERNAL_ERROR, data?.message || 'Erro ao excluir arquivo'),
         { status: response.status },
       );
     }

@@ -56,14 +56,19 @@ describe('OrganizationService', () => {
       findById: jest.fn().mockResolvedValue(mockFunction),
       create: jest.fn().mockResolvedValue(mockFunction),
       update: jest.fn().mockResolvedValue(mockFunction),
-      softDelete: jest.fn().mockResolvedValue({ ...mockFunction, isActive: false }),
+      softDelete: jest
+        .fn()
+        .mockResolvedValue({ ...mockFunction, isActive: false }),
     };
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         OrganizationService,
         { provide: getModelToken(Organization.name), useValue: orgModel },
-        { provide: getModelToken(OrganizationMember.name), useValue: memberModel },
+        {
+          provide: getModelToken(OrganizationMember.name),
+          useValue: memberModel,
+        },
         { provide: UsersService, useValue: usersService },
         { provide: OrganizationFunctionRepository, useValue: functionRepo },
       ],
@@ -74,6 +79,12 @@ describe('OrganizationService', () => {
 
   it('should be defined', () => {
     expect(service).toBeDefined();
+  });
+
+  it('should block creation of new organizations because Altaire is unique', async () => {
+    await expect(
+      service.create({ name: 'Outra', acronym: 'OTR' } as any, adminId),
+    ).rejects.toThrow(ForbiddenException);
   });
 
   describe('Organization Functions Catalog', () => {
@@ -92,7 +103,10 @@ describe('OrganizationService', () => {
     it('createFunction should create a function with organizationId and createdBy', async () => {
       const result = await service.createFunction(
         orgId,
-        { name: 'Editor de Vídeo', description: 'Edição de Reels e cortes verticais.' },
+        {
+          name: 'Editor de Vídeo',
+          description: 'Edição de Reels e cortes verticais.',
+        },
         memberId,
       );
       expect(result).toEqual(mockFunction);

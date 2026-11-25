@@ -1,5 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getBackendApiUrl, getBffAuthHeader, getBffOrgHeaders } from '@/lib/api/serverUtils';
+import {
+  getBackendApiUrl,
+  getBffAuthHeader,
+  getBffCompanyHeaders,
+  getBffOrgHeaders,
+} from '@/lib/api/serverUtils';
 import { success, error, ERROR_CODES } from '@/lib/api/response';
 
 export async function GET(request: NextRequest) {
@@ -7,16 +12,20 @@ export async function GET(request: NextRequest) {
     const backendUrl = getBackendApiUrl();
     const authHeader = await getBffAuthHeader(request);
     const orgHeaders = getBffOrgHeaders(request);
+    const companyHeaders = await getBffCompanyHeaders(request);
 
-    const headers: Record<string, string> = { ...orgHeaders };
+    const headers: Record<string, string> = { ...orgHeaders, ...companyHeaders };
     if (authHeader) headers['Authorization'] = authHeader;
 
-    const response = await fetch(`${backendUrl}/storage/assets`, { headers });
+    const brandId = request.nextUrl.searchParams.get('brandId');
+    const query = brandId ? `?brandId=${encodeURIComponent(brandId)}` : '';
+
+    const response = await fetch(`${backendUrl}/storage/assets${query}`, { headers });
     const data = await response.json().catch(() => null);
 
     if (!response.ok) {
       return NextResponse.json(
-        error(ERROR_CODES.EXTERNAL_ERROR, 'Erro ao listar arquivos'),
+        error(ERROR_CODES.EXTERNAL_ERROR, data?.message || 'Erro ao listar arquivos'),
         { status: response.status },
       );
     }

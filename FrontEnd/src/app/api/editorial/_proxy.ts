@@ -1,6 +1,6 @@
-import { getBackendApiUrl } from '@/lib/api/serverUtils';
+import { getBackendApiUrl, getBffCompanyHeaders } from '@/lib/api/serverUtils';
 import { getAuthTokenFromRequest } from '@/lib/auth/token.service';
-import { success, error, ERROR_CODES, ErrorCode, ErrorResponse } from '@/lib/api/response';
+import { error, ERROR_CODES, ErrorCode, ErrorResponse } from '@/lib/api/response';
 
 interface ProxyOptions {
   method?: string;
@@ -12,16 +12,18 @@ export async function proxyEditorialRequest(
   request: Request,
   path: string,
   init?: ProxyOptions,
-): Promise<{ ok: true; status: number; data: unknown } | ErrorResponse> {
+): Promise<{ ok: true; status: number; data: unknown } | (ErrorResponse & { status: number })> {
   const backendUrl = getBackendApiUrl();
 
   try {
     const token = await getAuthTokenFromRequest(request);
+    const companyHeaders = await getBffCompanyHeaders(request);
 
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
-      'x-org-id': 'altaire',
-      'x-org-role': 'member',
+      'x-org-id': request.headers.get('x-org-id') || 'altaire',
+      'x-org-role': request.headers.get('x-org-role') || 'member',
+      ...companyHeaders,
       ...(init?.headers || {}),
     };
 
@@ -48,7 +50,10 @@ export async function proxyEditorialRequest(
       const message = typeof data === 'object' && data && 'message' in data
         ? (data as Record<string, unknown>).message as string
         : `Erro na requisição (${response.status})`;
-      return error(code, message, data);
+      return {
+        ...error(code, message, data),
+        status: response.status,
+      };
     }
 
     return { ok: true, status: response.status, data };
@@ -56,7 +61,10 @@ export async function proxyEditorialRequest(
     const message = err instanceof Error
       ? err.message
       : 'Falha ao conectar com o backend';
-    return error(ERROR_CODES.INTERNAL_ERROR, message);
+    return {
+      ...error(ERROR_CODES.INTERNAL_ERROR, message),
+      status: 502,
+    };
   }
 }
 

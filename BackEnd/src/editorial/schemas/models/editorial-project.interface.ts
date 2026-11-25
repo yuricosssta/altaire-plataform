@@ -13,6 +13,8 @@ export interface IEditorialProject {
   calendarStatus: CalendarStatus;
   createdBy: string;
   orgId: string;
+  companyId: string;
+  brandId: string;
   isActive: boolean;
   createdAt?: Date;
   updatedAt?: Date;
@@ -24,6 +26,9 @@ export interface ICreateEditorialProject {
   subniche: string;
   currentObjective: string;
   createdBy: string;
+  companyId: string;
+  brandId: string;
+  orgId?: string;
 }
 
 export interface IUpdateEditorialProject {

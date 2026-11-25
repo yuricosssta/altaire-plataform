@@ -3,6 +3,7 @@ import { configureStore } from '@reduxjs/toolkit';
 import authReducer from './slices/authSlice';
 import userReducer from './slices/userSlice';
 import organizationReducer from './slices/organizationSlice';
+import companyReducer from './slices/companySlice';
 import scriptsReducer from './slices/scriptsSlice';
 
 export const store = configureStore({
@@ -10,6 +11,7 @@ export const store = configureStore({
     auth: authReducer,
     user: userReducer,
     organizations: organizationReducer,
+    companies: companyReducer,
     scripts: scriptsReducer,
   },
 });

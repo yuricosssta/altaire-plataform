@@ -34,7 +34,7 @@ export class OrganizationService {
     private memberModel: Model<OrganizationMemberDocument>,
     private usersService: UsersService,
     private readonly functionRepo: OrganizationFunctionRepository,
-  ) {}
+  ) { }
 
   private async resolveActiveFunctionForOrg(
     orgId: string,
@@ -56,6 +56,49 @@ export class OrganizationService {
     }
 
     return new (Types.ObjectId as any)(String(fn._id));
+  }
+
+  /**
+   * Garante e retorna a organização canônica única "Altaire".
+   */
+  async getCanonicalAltaireOrganization(fallbackOwnerId?: string): Promise<{
+    _id: string;
+    name: string;
+    slug: string;
+    acronym: string;
+  }> {
+    let altaireOrg = await this.orgModel.findOne({ slug: 'altaire' }).exec();
+    if (!altaireOrg) {
+      const ownerObjId =
+        fallbackOwnerId && (Types.ObjectId as any).isValid(fallbackOwnerId)
+          ? new (Types.ObjectId as any)(String(fallbackOwnerId))
+          : new (Types.ObjectId as any)();
+      try {
+        altaireOrg = await this.orgModel.create({
+          name: 'Altaire',
+          acronym: 'ALT',
+          slug: 'altaire',
+          ownerId: ownerObjId,
+          plan: 'PRO',
+          status: 'active',
+        });
+      } catch {
+        altaireOrg = await this.orgModel.findOne({ slug: 'altaire' }).exec();
+      }
+    }
+
+    if (!altaireOrg) {
+      throw new NotFoundException(
+        'Organização canônica Altaire não encontrada.',
+      );
+    }
+
+    return {
+      _id: String(altaireOrg._id),
+      name: altaireOrg.name,
+      slug: altaireOrg.slug,
+      acronym: altaireOrg.acronym,
+    };
   }
 
   /**
@@ -83,27 +126,11 @@ export class OrganizationService {
       // segue com default MEMBER se não encontrar
     }
 
-    let altaireOrg = await this.orgModel.findOne({ slug: 'altaire' }).exec();
-    if (!altaireOrg) {
-      try {
-        altaireOrg = await this.orgModel.create({
-          name: 'Altaire',
-          acronym: 'ALT',
-          slug: 'altaire',
-          ownerId: userObjectId,
-          plan: 'PRO',
-          status: 'ACTIVE',
-        });
-      } catch {
-        altaireOrg = await this.orgModel.findOne({ slug: 'altaire' }).exec();
-      }
-    }
-
-    if (!altaireOrg) return;
+    const altaireOrg = await this.getCanonicalAltaireOrganization(userId);
 
     const existingMembership = await this.memberModel
       .findOne({
-        organizationId: altaireOrg._id,
+        organizationId: new (Types.ObjectId as any)(String(altaireOrg._id)),
         userId: userObjectId,
       })
       .exec();
@@ -114,25 +141,25 @@ export class OrganizationService {
     if (!existingMembership) {
       const allowedProjects = Array.isArray(userDoc?.allowedProjects)
         ? userDoc.allowedProjects
-            .filter((pid: any) => (Types.ObjectId as any).isValid(String(pid)))
-            .map((pid: any) => new (Types.ObjectId as any)(String(pid)))
+          .filter((pid: any) => (Types.ObjectId as any).isValid(String(pid)))
+          .map((pid: any) => new (Types.ObjectId as any)(String(pid)))
         : [];
       const permissions = Array.isArray(userDoc?.permissions)
         ? userDoc.permissions.map(String)
         : [];
       const invitedBy =
         userDoc?.invitedBy &&
-        (Types.ObjectId as any).isValid(String(userDoc.invitedBy))
+          (Types.ObjectId as any).isValid(String(userDoc.invitedBy))
           ? new (Types.ObjectId as any)(String(userDoc.invitedBy))
           : undefined;
       const functionId =
         userDoc?.functionId &&
-        (Types.ObjectId as any).isValid(String(userDoc.functionId))
+          (Types.ObjectId as any).isValid(String(userDoc.functionId))
           ? new (Types.ObjectId as any)(String(userDoc.functionId))
           : undefined;
 
       await this.memberModel.create({
-        organizationId: altaireOrg._id,
+        organizationId: new (Types.ObjectId as any)(String(altaireOrg._id)),
         userId: userObjectId,
         role: targetRole,
         allowedProjects,
@@ -146,58 +173,13 @@ export class OrganizationService {
     }
   }
 
-  // 1. CRIAÇÃO E VÍNCULO AUTOMÁTICO
-  async create(createDto: CreateOrganizationDto, ownerId: string) {
-    // 1. Busca todas as empresas onde este usuário é o DONO
-    const ownedMemberships = await this.memberModel
-      .find({
-        userId: new (Types.ObjectId as any)(ownerId),
-        role: 'OWNER',
-      })
-      .exec();
-
-    // Se ele já for dono de alguma empresa, precisamos verificar se ele tem o plano ENTERPRISE
-    if (ownedMemberships.length >= 1) {
-      const ownedOrgIds = ownedMemberships.map((m) => m.organizationId);
-
-      // Busca quantas empresas que ele é dono possuem o plano ENTERPRISE
-      const enterpriseOrgsCount = await this.orgModel.countDocuments({
-        _id: { $in: ownedOrgIds },
-        plan: 'ENTERPRISE',
-      });
-
-      // Se NENHUMA empresa dele for ENTERPRISE, bloqueia a criação de novas.
-      if (enterpriseOrgsCount === 0) {
-        throw new BadRequestException(
-          'LIMITE_FREE_EXCEDIDO: Você atingiu o limite de 1 empresa por conta. Faça o upgrade para o plano ENTERPRISE para criar e gerenciar múltiplas empresas.',
-        );
-      }
-    }
-
-    const slug = createDto.slug || this.generateSlug(createDto.name);
-
-    const existing = await this.orgModel.findOne({ slug });
-    if (existing) {
-      throw new BadRequestException(
-        'Este endereço (URL) ou sigla já está em uso.',
-      );
-    }
-
-    const createdOrg = new this.orgModel({
-      ...createDto,
-      slug,
-      ownerId: new (Types.ObjectId as any)(ownerId),
-      plan: 'FREE', // Toda nova empresa nasce no Free por padrão
-    });
-    const savedOrg = await createdOrg.save();
-
-    await this.memberModel.create({
-      organizationId: savedOrg._id,
-      userId: new (Types.ObjectId as any)(ownerId),
-      role: 'OWNER',
-    });
-
-    return savedOrg;
+  // 1. CRIAÇÃO BLOQUEADA (A organização Altaire é única; empresas são criadas via POST /companies)
+  async create(_createDto: CreateOrganizationDto, _ownerId: string) {
+    void _createDto;
+    void _ownerId;
+    throw new ForbiddenException(
+      'A organização Altaire é única. Crie uma nova empresa via POST /companies.',
+    );
   }
 
   // 2. LISTAGEM (Garante vínculo automático na organização "Altaire")
@@ -251,7 +233,8 @@ export class OrganizationService {
       .find(filter)
       .populate({
         path: 'userId',
-        select: 'name email role allowedProjects permissions invitedBy functionId',
+        select:
+          'name email role allowedProjects permissions invitedBy functionId',
       })
       .populate({
         path: 'functionId',
@@ -278,7 +261,10 @@ export class OrganizationService {
             : undefined;
         const fnDoc = m.functionId as any;
         const isFnActive = Boolean(
-          fnDoc && typeof fnDoc === 'object' && fnDoc._id && fnDoc.isActive !== false,
+          fnDoc &&
+          typeof fnDoc === 'object' &&
+          fnDoc._id &&
+          fnDoc.isActive !== false,
         );
 
         return {
@@ -294,10 +280,10 @@ export class OrganizationService {
             functionId: isFnActive ? String(fnDoc._id) : null,
             customFunction: isFnActive
               ? {
-                  _id: String(fnDoc._id),
-                  name: fnDoc.name,
-                  description: fnDoc.description,
-                }
+                _id: String(fnDoc._id),
+                name: fnDoc.name,
+                description: fnDoc.description,
+              }
               : null,
           },
         };
@@ -334,8 +320,8 @@ export class OrganizationService {
 
     const allowedProjectIds: string[] = Array.isArray(userData.allowedProjects)
       ? userData.allowedProjects
-          .map(String)
-          .filter((pid: string) => (Types.ObjectId as any).isValid(pid))
+        .map(String)
+        .filter((pid: string) => (Types.ObjectId as any).isValid(pid))
       : [];
     const permissions: string[] = Array.isArray(userData.permissions)
       ? userData.permissions.map(String)
@@ -500,9 +486,7 @@ export class OrganizationService {
         extra.functionId,
       );
       updatePayload.functionId = resolvedFnId ?? null;
-      userUpdatePayload.functionId = resolvedFnId
-        ? String(resolvedFnId)
-        : null;
+      userUpdatePayload.functionId = resolvedFnId ? String(resolvedFnId) : null;
     }
 
     const updated = await this.memberModel.findOneAndUpdate(

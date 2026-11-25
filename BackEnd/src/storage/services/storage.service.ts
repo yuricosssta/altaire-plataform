@@ -1,8 +1,9 @@
-//src/storage/storage.service.ts
 import {
+  BadRequestException,
+  ForbiddenException,
   Injectable,
   InternalServerErrorException,
-  ForbiddenException,
+  NotFoundException,
 } from '@nestjs/common';
 import {
   S3Client,
@@ -10,13 +11,16 @@ import {
   DeleteObjectCommand,
 } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
-import { InjectModel } from '@nestjs/mongoose';
-import { Model, Types } from 'mongoose';
+import { FileAssetRepository } from '../repositories/file-asset.repository';
+import { CompanyRepository } from '../../company/repositories/company.repository';
 import {
-  OrganizationDocument,
-  Organization,
-} from '../../organization/schemas/organization.schema';
-import { FileAsset, FileAssetDocument } from '../schemas/file-asset.schema';
+  CompanyAccessService,
+  AuthUserPayload,
+} from '../../company/services/company-access.service';
+import { BrandRepository } from '../../brand/repositories/brand.repository';
+import { isClientOrExternalRole } from '../../shared/utils/org-role.util';
+
+const OBJECT_ID_REGEX = /^[0-9a-fA-F]{24}$/;
 
 @Injectable()
 export class StorageService {
@@ -24,7 +28,6 @@ export class StorageService {
   private bucketName = process.env.R2_BUCKET_NAME;
   private publicDomain = process.env.R2_PUBLIC_DOMAIN;
 
-  // Limites em Bytes (500MB, 50GB, 500GB)
   private readonly LIMITS = {
     FREE: 500 * 1024 * 1024,
     PRO: 50 * 1024 * 1024 * 1024,
@@ -32,10 +35,10 @@ export class StorageService {
   };
 
   constructor(
-    @InjectModel(Organization.name)
-    private orgModel: Model<OrganizationDocument>,
-    @InjectModel(FileAsset.name)
-    private fileAssetModel: Model<FileAssetDocument>,
+    private readonly fileAssetRepo: FileAssetRepository,
+    private readonly companyRepo: CompanyRepository,
+    private readonly companyAccessService: CompanyAccessService,
+    private readonly brandRepo: BrandRepository,
   ) {
     this.s3Client = new S3Client({
       region: 'auto',
@@ -47,23 +50,67 @@ export class StorageService {
     });
   }
 
+  private async validateBrandScopeIfProvided(
+    companyId: string,
+    brandId: string | undefined | null,
+    user: AuthUserPayload,
+    requireWrite = false,
+  ): Promise<string | null> {
+    const ctx = await this.companyAccessService.resolveCompanyContext(
+      user,
+      companyId,
+    );
+
+    if (requireWrite && isClientOrExternalRole(ctx.userRole)) {
+      throw new ForbiddenException(
+        'Usuários clientes ou externos não têm permissão para enviar arquivos.',
+      );
+    }
+
+    if (!brandId) {
+      return null;
+    }
+
+    if (!OBJECT_ID_REGEX.test(String(brandId))) {
+      throw new BadRequestException('ID da marca inválido.');
+    }
+
+    const brand = await this.brandRepo.findById(String(brandId));
+    if (!brand || String(brand.companyId) !== String(ctx.companyId)) {
+      throw new NotFoundException('Marca não encontrada nesta empresa.');
+    }
+
+    if (!ctx.isCompanyManager) {
+      this.companyAccessService.assertCanAccessBrand(ctx, String(brand._id));
+    }
+
+    return String(brand._id);
+  }
+
   async getPresignedUploadUrl(
-    orgId: string,
+    companyId: string,
+    user: AuthUserPayload,
     fileName: string,
     fileType: string,
     sizeBytes: number,
+    brandId?: string,
   ): Promise<{ uploadUrl: string; fileUrl: string }> {
-    // 1. Verifica a cota da empresa
-    const org = await this.orgModel
-      .findById(orgId)
-      .select('plan storageUsed')
-      .exec();
-    if (!org) throw new ForbiddenException('Organização não encontrada.');
+    const validBrandId = await this.validateBrandScopeIfProvided(
+      companyId,
+      brandId,
+      user,
+      true,
+    );
+
+    const company = await this.companyRepo.findById(companyId);
+    if (!company) {
+      throw new ForbiddenException('Empresa não encontrada.');
+    }
 
     const limit =
-      this.LIMITS[org.plan as keyof typeof this.LIMITS] || this.LIMITS.FREE;
+      this.LIMITS[company.plan as keyof typeof this.LIMITS] || this.LIMITS.FREE;
 
-    if (org.storageUsed + sizeBytes > limit) {
+    if (company.storageUsed + sizeBytes > limit) {
       throw new ForbiddenException(
         `LIMITE DE ARMAZENAMENTO EXCEDIDO: Seu plano permite até ${limit / (1024 * 1024)}MB. Faça upgrade para liberar mais espaço.`,
       );
@@ -76,7 +123,8 @@ export class StorageService {
         .slice(0, 10)
         .replace(/-/g, '/');
       const uniqueId = Math.random().toString(36).substring(2, 8);
-      const fileKey = `${orgId}/${datePrefix}/${uniqueId}-${cleanFileName}`;
+      const brandScope = validBrandId || 'general';
+      const fileKey = `${company._id}/${brandScope}/${datePrefix}/${uniqueId}-${cleanFileName}`;
 
       const command = new PutObjectCommand({
         Bucket: this.bucketName,
@@ -99,85 +147,125 @@ export class StorageService {
   }
 
   async confirmUploadAndRegister(
-    orgId: string,
-    userId: string,
-    fileUrl: string,
-    fileName: string,
-    mimeType: string,
-    sizeBytes: number,
+    companyId: string,
+    user: AuthUserPayload,
+    payload: {
+      fileUrl: string;
+      fileName: string;
+      mimeType: string;
+      sizeBytes: number;
+      brandId?: string;
+    },
   ) {
-    // 1. Salva o registro do arquivo no MongoDB
-    const newAsset = new this.fileAssetModel({
-      organizationId: new (Types.ObjectId as any)(String(orgId)),
-      uploadedBy: new (Types.ObjectId as any)(String(userId)),
-      fileName,
-      fileUrl,
-      mimeType,
-      sizeBytes,
-    });
-    await newAsset.save();
+    const validBrandId = await this.validateBrandScopeIfProvided(
+      companyId,
+      payload.brandId,
+      user,
+      true,
+    );
 
-    // 2. Aumenta o "Medidor" da Organização
-    await this.orgModel.findByIdAndUpdate(orgId, {
-      $inc: { storageUsed: sizeBytes },
+    const company = await this.companyRepo.findById(companyId);
+    if (!company) {
+      throw new NotFoundException('Empresa não encontrada.');
+    }
+
+    const userId = String(user?.sub || user?.id || '');
+    const newAsset = await this.fileAssetRepo.create({
+      organizationId: company.organizationId,
+      companyId: company._id,
+      brandId: validBrandId,
+      uploadedBy: userId,
+      fileName: payload.fileName,
+      fileUrl: payload.fileUrl,
+      mimeType: payload.mimeType,
+      sizeBytes: payload.sizeBytes,
     });
+
+    await this.companyRepo.incrementStorageUsed(company._id, payload.sizeBytes);
 
     return newAsset;
   }
 
-  // LISTAGEM DE ARQUIVOS (Isolado por usuário se userId for informado)
-  async getOrganizationAssets(orgId: string, userId?: string) {
-    const org = (Types.ObjectId as any).isValid(orgId)
-      ? await this.orgModel.findById(orgId).select('storageUsed').exec()
-      : await this.orgModel
-          .findOne({ slug: 'altaire' })
-          .select('storageUsed')
-          .exec();
-
-    if (!org)
-      throw new InternalServerErrorException('Organização não encontrada.');
-
-    const filter: Record<string, any> = {
-      organizationId: org._id,
-    };
-
-    if (userId && (Types.ObjectId as any).isValid(userId)) {
-      filter.uploadedBy = new (Types.ObjectId as any)(String(userId));
+  async getCompanyAssets(
+    companyId: string,
+    user: AuthUserPayload,
+    requestedBrandId?: string,
+  ) {
+    const ctx = await this.companyAccessService.resolveCompanyContext(
+      user,
+      companyId,
+    );
+    const company = await this.companyRepo.findById(ctx.companyId);
+    if (!company) {
+      throw new NotFoundException('Empresa não encontrada.');
     }
 
-    const assets = await this.fileAssetModel
-      .find(filter)
-      .sort({ createdAt: -1 })
-      .lean()
-      .exec();
+    if (isClientOrExternalRole(ctx.userRole)) {
+      return {
+        storageUsed: company.storageUsed || 0,
+        assets: [],
+      };
+    }
 
-    const userStorageUsed = userId
-      ? assets.reduce((sum, a: any) => sum + (Number(a.sizeBytes) || 0), 0)
-      : org.storageUsed || 0;
+    if (requestedBrandId) {
+      const validBrandId = await this.validateBrandScopeIfProvided(
+        ctx.companyId,
+        requestedBrandId,
+        user,
+        false,
+      );
+      const assets = await this.fileAssetRepo.findAll({
+        companyId: ctx.companyId,
+        brandId: validBrandId,
+      });
+      return {
+        storageUsed: company.storageUsed || 0,
+        assets,
+      };
+    }
+
+    if (ctx.isCompanyManager) {
+      const assets = await this.fileAssetRepo.findAll({
+        companyId: ctx.companyId,
+      });
+      return {
+        storageUsed: company.storageUsed || 0,
+        assets,
+      };
+    }
+
+    const assets = await this.fileAssetRepo.findAll({
+      companyId: ctx.companyId,
+      allowedBrandIds: ctx.allowedBrandIds || [],
+      includeGeneral: true,
+    });
 
     return {
-      storageUsed: userStorageUsed,
+      storageUsed: company.storageUsed || 0,
       assets,
     };
   }
 
-  // EXCLUSÃO DE ARQUIVOS (Banco + Nuvem)
-  async deleteAsset(orgId: string, assetId: string, userId?: string) {
-    const org = (Types.ObjectId as any).isValid(orgId)
-      ? await this.orgModel.findById(orgId).select('_id').exec()
-      : await this.orgModel.findOne({ slug: 'altaire' }).select('_id').exec();
+  async deleteAsset(
+    companyId: string,
+    assetId: string,
+    user: AuthUserPayload,
+  ) {
+    const ctx = await this.companyAccessService.resolveCompanyContext(
+      user,
+      companyId,
+    );
 
-    const query: Record<string, any> = {
-      _id: new (Types.ObjectId as any)(String(assetId)),
-    };
-    if (org) {
-      query.organizationId = org._id;
-    }
-    if (userId && (Types.ObjectId as any).isValid(userId)) {
-      query.uploadedBy = new (Types.ObjectId as any)(String(userId));
+    if (isClientOrExternalRole(ctx.userRole)) {
+      throw new ForbiddenException(
+        'Usuários clientes ou externos não podem excluir arquivos.',
+      );
     }
 
-    const asset = await this.fileAssetModel.findOne(query);
+    const asset = await this.fileAssetRepo.findByIdInCompany(
+      ctx.companyId,
+      assetId,
+    );
 
     if (!asset) {
       throw new ForbiddenException(
@@ -185,12 +273,15 @@ export class StorageService {
       );
     }
 
-    // 2. Extrai a "Key" (O caminho interno) removendo o domínio público da URL
-    // Ex: transforma "https://arquivos.site.com/123/foto.jpg" em "123/foto.jpg"
+    if (!ctx.isCompanyManager && String(asset.uploadedBy) !== ctx.userId) {
+      throw new ForbiddenException(
+        'Sem permissão para excluir um arquivo enviado por outro usuário.',
+      );
+    }
+
     const fileKey = asset.fileUrl.replace(`${this.publicDomain}/`, '');
 
     try {
-      // Exclui o arquivo fisicamente da Cloudflare R2
       await (this.s3Client as any).send(
         new DeleteObjectCommand({
           Bucket: this.bucketName,
@@ -204,13 +295,11 @@ export class StorageService {
       );
     }
 
-    // Exclui o registro do Cartório (MongoDB)
-    await this.fileAssetModel.findByIdAndDelete(asset._id);
-
-    // Devolve os Megabytes para a conta da Empresa (Subtrai o tamanho)
-    await this.orgModel.findByIdAndUpdate(orgId, {
-      $inc: { storageUsed: -Math.abs(asset.sizeBytes) }, // Math.abs garante que sempre será uma subtração
-    });
+    await this.fileAssetRepo.deleteById(asset._id);
+    await this.companyRepo.incrementStorageUsed(
+      ctx.companyId,
+      -Math.abs(asset.sizeBytes),
+    );
 
     return { message: 'Arquivo excluído e espaço liberado com sucesso.' };
   }

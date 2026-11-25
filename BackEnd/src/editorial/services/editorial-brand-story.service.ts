@@ -11,19 +11,17 @@ export class EditorialBrandStoryService {
     private readonly brandStoryRepository: EditorialBrandStoryRepository,
   ) {}
 
-  async get(
-    userId: string,
-    organizationId = 'altaire',
+  async getByBrand(
+    brandId: string,
+    companyId = '',
   ): Promise<IEditorialBrandStory> {
-    const found = await this.brandStoryRepository.findByUserId(
-      userId,
-      organizationId,
-    );
+    const found = await this.brandStoryRepository.findByBrandId(brandId);
     if (found) return found;
 
     return {
-      organizationId,
-      userId,
+      organizationId: 'altaire',
+      companyId,
+      brandId,
       originStory: '',
       keyTurnarounds: [],
       failures: [],
@@ -34,11 +32,17 @@ export class EditorialBrandStoryService {
     };
   }
 
-  async upsert(
-    userId: string,
-    organizationId = 'altaire',
+  async upsertByBrand(
+    brandId: string,
+    companyId: string,
     data: IUpsertEditorialBrandStory,
+    updatedBy?: string,
   ): Promise<IEditorialBrandStory> {
-    return this.brandStoryRepository.upsert(userId, organizationId, data);
+    return this.brandStoryRepository.upsertByBrand(
+      brandId,
+      companyId,
+      data,
+      updatedBy,
+    );
   }
 }

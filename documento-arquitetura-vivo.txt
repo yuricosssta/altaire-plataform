@@ -1,3 +1,29 @@
+## HIERARQUIA ORGANIZACIONAL ALTAIRE -> EMPRESA -> MARCA -> PROJETO (FASES 1-3) - 25/11/2026 ##
+Resumo Técnico — Organização Única "Altaire", Módulos `Company` e `Brand`, Isolamento Multi-Empresa/Marca e BFF/Redux:
+
+1. Hierarquia e Governança (`BackEnd/src/organization`, `company`, `brand`):
+   - `Organization` ("Altaire", `slug: 'altaire'`) consolidada como singleton canônica via `OrganizationService.getCanonicalAltaireOrganization()`; `POST /organizations` bloqueado (`403 Forbidden`).
+   - Papéis de sistema únicos no usuário (`OWNER`, `ADMIN`, `MEMBER`, `CLIENT`, `EXTERNAL`), onde `OWNER` e `ADMIN` existem exclusivamente na organização Altaire (via `.env`).
+   - Criado módulo `CompanyModule` (`companies`, `company_members`, `company_functions`) seguindo o padrão Controller -> Service -> Repository -> Mongoose + Zod:
+     - Qualquer usuário (`OWNER`/`ADMIN`/`MEMBER`) pode criar empresas (`POST /companies`) vinculadas à Altaire; o criador (`createdBy`) é adicionado automaticamente em `CompanyMember` e tem gestão completa sobre as empresas que criou.
+     - `CompanyAccessService` / `CompanyAccessGuard`: resolve `ICompanyContext` via `x-company-id` ou `:companyId`. `OWNER`/`ADMIN` da Altaire e o criador têm acesso irrestrito na empresa; `MEMBER` convidado vê assuntos gerais da empresa e exclusivamente as marcas em `brandIds`; `CLIENT`/`EXTERNAL` ficam restritos a `allowedProjects` dentro da empresa.
+     - `CompanyFunction`: catálogo particular de cargos/funções por empresa (apenas título e descrição, sem interferir em papéis de sistema), com soft delete bloqueado se houver membros vinculados.
+   - Criado módulo `BrandModule` (`brands`):
+     - Marcas pertencem a uma `Company` (`companyId`) e possuem soft delete protegido contra exclusão caso existam `EditorialProject` ativos vinculados.
+     - Endpoints `/companies/:companyId/brands`, `/brands/:brandId` e `/brands/:brandId/brand-story`.
+
+2. Integração de Editorial, BrandStory e Storage (`BackEnd/src/editorial`, `storage`):
+   - `EditorialProject`: agora exige `companyId` e `brandId` obrigatórios; `EditorialProjectService` e `EditorialProjectController` exigem `x-company-id` e aplicam isolamento por empresa, marca (`brandIds`) e `allowedProjects`.
+   - `EditorialBrandStory`: migrado de `{ userId, organizationId }` para índice único `{ brandId: 1 }` com `companyId` obrigatório, compartilhado pela Marca.
+   - `Storage`: refatorado para Repository (`FileAssetRepository` / `FileAssetMongooseRepository`) com `companyId` obrigatório e `brandId` opcional; cota (`plan` e `storageUsed`) movida para `Company` e prefixo R2 estruturado em `${companyId}/${brandId || 'general'}/...`.
+   - CORS em `BackEnd/src/main.ts` atualizado para aceitar o header `x-company-id`.
+
+3. BFF, Redux, Services e Types (`FrontEnd`):
+   - Criados `FrontEnd/src/types/company.ts` e atualizado `editorial.schema.ts` (`brandId` em `ProjectCreateSchema` e `companyId`/`brandId` opcionais em `ProjectCardSchema`).
+   - Criadas rotas BFF em `FrontEnd/src/app/api/companies/*` e `FrontEnd/src/app/api/brands/*`; atualizados `serverUtils.ts`, `editorial/_proxy.ts`, `editorial/projects/route.ts` e `storage/*` para propagar `x-company-id`.
+   - Criados `companySlice.ts` (registrado em `store.ts`), `companyService.ts` e `brandService.ts`; atualizados `http.ts`, `editorialService.ts` e `storageService.ts` para injetar `x-company-id` da empresa selecionada.
+   - Próxima etapa (Fase 4): UI/UX do seletor de empresas na Sidebar, onboarding 1ª Empresa/Marca, gestão de Marcas na Central Estratégica e adaptação de Pessoas/Funções/Storage.
+
 ## CATÁLOGO DE FUNÇÕES / CARGOS CUSTOMIZADOS POR ORGANIZAÇÃO (`OrganizationFunction`) - 16/11/2026 ##
 Resumo Técnico — Designações de Funções Livres Desacopladas da `role` de Sistema:
 

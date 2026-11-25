@@ -48,7 +48,9 @@ export function resolveAltaireRoleByEmail(
       return 'OWNER';
     }
 
-    const adminEmails = new Set(parseEmailList(process.env.ALTAIRE_ADMIN_EMAILS));
+    const adminEmails = new Set(
+      parseEmailList(process.env.ALTAIRE_ADMIN_EMAILS),
+    );
     if (adminEmails.has(normalized)) {
       return 'ADMIN';
     }
@@ -78,5 +80,3 @@ export function isClientOrExternalRole(roleClaim?: string | null): boolean {
   const upperRole = roleClaim?.toUpperCase();
   return upperRole === 'CLIENT' || upperRole === 'EXTERNAL';
 }
-
-

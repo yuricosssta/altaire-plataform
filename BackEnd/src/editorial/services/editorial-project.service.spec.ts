@@ -1,23 +1,80 @@
 import { Test, TestingModule } from '@nestjs/testing';
+import {
+  BadRequestException,
+  ForbiddenException,
+  NotFoundException,
+} from '@nestjs/common';
 import { EditorialProjectService } from './editorial-project.service';
 import { EditorialProjectRepository } from '../repositories/editorial-project.repository';
-import { ForbiddenException, NotFoundException } from '@nestjs/common';
+import { CompanyAccessService } from '../../company/services/company-access.service';
+import { BrandRepository } from '../../brand/repositories/brand.repository';
+import { ICompanyContext } from '../../company/schemas/models/company-member.interface';
 
 describe('EditorialProjectService', () => {
   let service: EditorialProjectService;
   let repository: Partial<EditorialProjectRepository>;
+  let companyAccessService: Partial<CompanyAccessService>;
+  let brandRepository: Partial<BrandRepository>;
+
+  const companyId = '507f1f77bcf86cd799439010';
+  const brandId = '507f1f77bcf86cd799439020';
+  const otherBrandId = '507f1f77bcf86cd799439021';
+  const userId = '507f1f77bcf86cd799439012';
+  const projectId = '507f1f77bcf86cd799439011';
 
   const mockProject = {
-    _id: '507f1f77bcf86cd799439011',
+    _id: projectId,
+    id: projectId,
     name: 'Projeto Teste',
     niche: 'Marketing',
     subniche: 'Marketing Digital',
     currentObjective: 'Criar conteúdo',
-    editorialLineStatus: 'active',
-    calendarStatus: 'pending',
-    createdBy: '507f1f77bcf86cd799439012',
+    editorialLineStatus: 'active' as const,
+    calendarStatus: 'pending' as const,
+    createdBy: userId,
     orgId: 'altaire',
+    companyId,
+    brandId,
     isActive: true,
+  };
+
+  const mockBrand = {
+    _id: brandId,
+    organizationId: '507f1f77bcf86cd799439001',
+    companyId,
+    name: 'Marca Alpha',
+    slug: 'marca-alpha',
+    createdBy: userId,
+    isActive: true,
+  };
+
+  const managerCtx: ICompanyContext = {
+    companyId,
+    organizationId: '507f1f77bcf86cd799439001',
+    userId,
+    userRole: 'MEMBER',
+    isAltaireAdmin: false,
+    isCompanyCreator: true,
+    isCompanyManager: true,
+    allowedBrandIds: null,
+    allowedProjectIds: null,
+  };
+
+  const guestMemberCtx: ICompanyContext = {
+    ...managerCtx,
+    isCompanyCreator: false,
+    isCompanyManager: false,
+    allowedBrandIds: [brandId],
+    allowedProjectIds: null,
+  };
+
+  const clientCtx: ICompanyContext = {
+    ...managerCtx,
+    userRole: 'CLIENT',
+    isCompanyCreator: false,
+    isCompanyManager: false,
+    allowedBrandIds: [],
+    allowedProjectIds: [projectId],
   };
 
   beforeEach(async () => {
@@ -29,10 +86,26 @@ describe('EditorialProjectService', () => {
       softDelete: jest.fn().mockResolvedValue(mockProject),
     };
 
+    companyAccessService = {
+      resolveCompanyContext: jest.fn().mockResolvedValue(managerCtx),
+      assertCanAccessBrand: jest.fn().mockImplementation((ctx, bId) => {
+        if (ctx.isCompanyManager) return;
+        if (!ctx.allowedBrandIds?.includes(String(bId))) {
+          throw new ForbiddenException('Sem acesso à marca.');
+        }
+      }),
+    };
+
+    brandRepository = {
+      findById: jest.fn().mockResolvedValue(mockBrand),
+    };
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         EditorialProjectService,
         { provide: EditorialProjectRepository, useValue: repository },
+        { provide: CompanyAccessService, useValue: companyAccessService },
+        { provide: BrandRepository, useValue: brandRepository },
       ],
     }).compile();
 
@@ -44,103 +117,186 @@ describe('EditorialProjectService', () => {
   });
 
   describe('findAll', () => {
-    it('should return all projects for an orgId', async () => {
-      const result = await service.findAll('altaire');
+    it('should return all company projects for company manager', async () => {
+      const result = await service.findAll(companyId, { sub: userId });
       expect(result).toEqual([mockProject]);
-      expect(repository.findAll).toHaveBeenCalledWith('altaire');
+      expect(repository.findAll).toHaveBeenCalledWith({ companyId });
+    });
+
+    it('should filter by allowedBrandIds for invited MEMBER', async () => {
+      companyAccessService.resolveCompanyContext = jest
+        .fn()
+        .mockResolvedValue(guestMemberCtx);
+      const result = await service.findAll(companyId, { sub: userId });
+      expect(result).toEqual([mockProject]);
+      expect(repository.findAll).toHaveBeenCalledWith({
+        companyId,
+        brandIds: [brandId],
+      });
+    });
+
+    it('should throw ForbiddenException if invited MEMBER requests unauthorized brandId', async () => {
+      companyAccessService.resolveCompanyContext = jest
+        .fn()
+        .mockResolvedValue(guestMemberCtx);
+      brandRepository.findById = jest.fn().mockResolvedValue({
+        ...mockBrand,
+        _id: otherBrandId,
+      });
+
+      await expect(
+        service.findAll(companyId, { sub: userId }, otherBrandId),
+      ).rejects.toThrow(ForbiddenException);
     });
 
     it('should return empty array when CLIENT/EXTERNAL has empty allowedProjectIds', async () => {
-      const result = await service.findAll('altaire', undefined, []);
+      companyAccessService.resolveCompanyContext = jest
+        .fn()
+        .mockResolvedValue({ ...clientCtx, allowedProjectIds: [] });
+
+      const result = await service.findAll(companyId, {
+        sub: userId,
+        role: 'CLIENT',
+      });
       expect(result).toEqual([]);
       expect(repository.findAll).not.toHaveBeenCalled();
     });
 
-    it('should filter by allowedProjectIds when provided for CLIENT/EXTERNAL', async () => {
-      const allowed = [mockProject._id];
-      const result = await service.findAll('altaire', undefined, allowed);
+    it('should filter by allowedProjectIds for CLIENT/EXTERNAL', async () => {
+      companyAccessService.resolveCompanyContext = jest
+        .fn()
+        .mockResolvedValue(clientCtx);
+
+      const result = await service.findAll(companyId, {
+        sub: userId,
+        role: 'CLIENT',
+      });
       expect(result).toEqual([mockProject]);
-      expect(repository.findAll).toHaveBeenCalledWith(
-        'altaire',
-        undefined,
-        allowed,
-      );
+      expect(repository.findAll).toHaveBeenCalledWith({
+        companyId,
+        allowedProjectIds: [projectId],
+      });
     });
   });
 
   describe('findById', () => {
-    it('should return a project when found', async () => {
-      const result = await service.findById(mockProject._id);
+    it('should return a project when found and authorized', async () => {
+      const result = await service.findById(projectId, { sub: userId });
       expect(result).toEqual(mockProject);
-      expect(repository.findById).toHaveBeenCalledWith(mockProject._id);
     });
 
     it('should throw NotFoundException when not found', async () => {
       repository.findById = jest.fn().mockResolvedValue(null);
-      await expect(service.findById('nonexistent')).rejects.toThrow(
-        NotFoundException,
-      );
+      await expect(
+        service.findById('nonexistent', { sub: userId }),
+      ).rejects.toThrow(NotFoundException);
     });
 
     it('should throw ForbiddenException when CLIENT/EXTERNAL is not allowed to view the project', async () => {
+      companyAccessService.resolveCompanyContext = jest
+        .fn()
+        .mockResolvedValue({
+          ...clientCtx,
+          allowedProjectIds: ['507f1f77bcf86cd799439099'],
+        });
+
       await expect(
-        service.findById(mockProject._id, 'other-user', ['507f1f77bcf86cd799439099']),
+        service.findById(projectId, { sub: userId, role: 'CLIENT' }),
       ).rejects.toThrow(ForbiddenException);
     });
 
-    it('should return project when CLIENT/EXTERNAL has project in allowedProjectIds', async () => {
-      const result = await service.findById(mockProject._id, 'other-user', [
-        mockProject._id,
-      ]);
-      expect(result).toEqual(mockProject);
+    it('should throw ForbiddenException when invited MEMBER is not linked to project brand', async () => {
+      companyAccessService.resolveCompanyContext = jest
+        .fn()
+        .mockResolvedValue({
+          ...guestMemberCtx,
+          allowedBrandIds: [otherBrandId],
+        });
+
+      await expect(
+        service.findById(projectId, { sub: userId }),
+      ).rejects.toThrow(ForbiddenException);
     });
   });
 
   describe('create', () => {
-    it('should create a new project', async () => {
+    it('should create a new project scoped to company and brand', async () => {
       const input = {
         name: 'Novo Projeto',
         niche: 'Educação',
         subniche: 'EAD',
         currentObjective: 'Lançar curso',
-        createdBy: '507f1f77bcf86cd799439012',
+        brandId,
       };
-      const result = await service.create(input);
+      const result = await service.create(companyId, input, { sub: userId });
       expect(result).toEqual(mockProject);
-      expect(repository.create).toHaveBeenCalledWith(input);
+      expect(repository.create).toHaveBeenCalledWith({
+        ...input,
+        companyId,
+        brandId,
+        createdBy: userId,
+        orgId: 'altaire',
+      });
+    });
+
+    it('should throw BadRequestException if brand does not belong to company', async () => {
+      brandRepository.findById = jest.fn().mockResolvedValue({
+        ...mockBrand,
+        companyId: '507f1f77bcf86cd799439099',
+      });
+
+      await expect(
+        service.create(
+          companyId,
+          {
+            name: 'Novo Projeto',
+            niche: 'Educação',
+            subniche: 'EAD',
+            currentObjective: 'Lançar curso',
+            brandId,
+          },
+          { sub: userId },
+        ),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it('should throw ForbiddenException for CLIENT/EXTERNAL', async () => {
+      companyAccessService.resolveCompanyContext = jest
+        .fn()
+        .mockResolvedValue(clientCtx);
+
+      await expect(
+        service.create(
+          companyId,
+          {
+            name: 'Novo Projeto',
+            niche: 'Educação',
+            subniche: 'EAD',
+            currentObjective: 'Lançar curso',
+            brandId,
+          },
+          { sub: userId, role: 'CLIENT' },
+        ),
+      ).rejects.toThrow(ForbiddenException);
     });
   });
 
   describe('update', () => {
-    it('should update a project when found', async () => {
+    it('should update a project when authorized', async () => {
       const input = { name: 'Atualizado' };
-      const result = await service.update(mockProject._id, input);
+      const result = await service.update(projectId, input, { sub: userId });
       expect(result).toEqual(mockProject);
-      expect(repository.update).toHaveBeenCalledWith(mockProject._id, input);
-    });
-
-    it('should throw NotFoundException when project not found', async () => {
-      repository.update = jest.fn().mockResolvedValue(null);
-      await expect(
-        service.update('nonexistent', { name: 'X' }),
-      ).rejects.toThrow(NotFoundException);
+      expect(repository.update).toHaveBeenCalledWith(projectId, input);
     });
   });
 
   describe('delete', () => {
-    it('should soft delete a project when found', async () => {
-      const result = await service.delete(mockProject._id);
+    it('should soft delete a project when authorized', async () => {
+      const result = await service.delete(projectId, { sub: userId });
       expect(result).toEqual({
         message: 'Projeto editorial removido com sucesso.',
       });
-      expect(repository.softDelete).toHaveBeenCalledWith(mockProject._id);
-    });
-
-    it('should throw NotFoundException when project not found', async () => {
-      repository.softDelete = jest.fn().mockResolvedValue(null);
-      await expect(service.delete('nonexistent')).rejects.toThrow(
-        NotFoundException,
-      );
+      expect(repository.softDelete).toHaveBeenCalledWith(projectId);
     });
   });
 });

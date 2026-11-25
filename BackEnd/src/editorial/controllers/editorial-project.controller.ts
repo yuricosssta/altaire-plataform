@@ -1,17 +1,20 @@
 import {
+  BadRequestException,
   Body,
   Controller,
   Delete,
   ForbiddenException,
   Get,
+  Headers,
   Param,
   Post,
   Put,
+  Query,
+  Req,
   UseGuards,
 } from '@nestjs/common';
 import { AuthGuard } from '../../auth/auth.guard';
 import { ZodValidationPipe } from '../../shared/pipe/zod-validation.pipe';
-import { GetUser } from '../../shared/decorators/get-user-decorator';
 import { EditorialProjectService } from '../services/editorial-project.service';
 import { EditorialVersionService } from '../services/editorial-version.service';
 import {
@@ -24,7 +27,6 @@ import {
   onboardingSchema,
   OnboardingInput,
 } from '../validations/onboarding.zod';
-import { ICreateEditorialProject } from '../schemas/models/editorial-project.interface';
 import { isClientOrExternalRole } from '../../shared/utils/org-role.util';
 
 @UseGuards(AuthGuard)
@@ -33,90 +35,77 @@ export class EditorialProjectController {
   constructor(
     private readonly projectService: EditorialProjectService,
     private readonly versionService: EditorialVersionService,
-  ) {}
+  ) { }
 
   @Get()
-  async findAll(@GetUser() user: any) {
-    const userId = typeof user === 'string' ? user : user?.sub;
-    if (isClientOrExternalRole(user?.role)) {
-      const allowedProjects = Array.isArray(user?.allowedProjects)
-        ? user.allowedProjects.map(String)
-        : [];
-      return this.projectService.findAll('altaire', undefined, allowedProjects);
+  async findAll(
+    @Headers('x-company-id') companyId: string,
+    @Query('brandId') brandId: string | undefined,
+    @Req() req: any,
+  ) {
+    if (!companyId) {
+      throw new BadRequestException(
+        'O cabeçalho x-company-id é obrigatório para listar projetos.',
+      );
     }
-    return this.projectService.findAll('altaire', userId);
+    return this.projectService.findAll(companyId, req.user, brandId);
   }
 
   @Get(':id')
-  async findById(@Param('id') id: string, @GetUser() user: any) {
-    const userId = typeof user === 'string' ? user : user?.sub;
-    if (isClientOrExternalRole(user?.role)) {
-      const allowedProjects = Array.isArray(user?.allowedProjects)
-        ? user.allowedProjects.map(String)
-        : [];
-      return this.projectService.findById(id, userId, allowedProjects);
-    }
-    return this.projectService.findById(id, userId);
+  async findById(@Param('id') id: string, @Req() req: any) {
+    return this.projectService.findById(id, req.user);
   }
 
   @Post()
   async create(
+    @Headers('x-company-id') companyId: string,
     @Body(new ZodValidationPipe(createProjectSchema)) data: CreateProject,
-    @GetUser() user: any,
+    @Req() req: any,
   ) {
-    if (isClientOrExternalRole(user?.role)) {
-      throw new ForbiddenException(
-        'Usuários clientes ou externos não têm permissão para criar projetos.',
+    if (!companyId) {
+      throw new BadRequestException(
+        'O cabeçalho x-company-id é obrigatório para criar projetos.',
       );
     }
-    const userId = typeof user === 'string' ? user : user?.sub;
-    return this.projectService.create({
-      ...data,
-      createdBy: userId,
-    } as ICreateEditorialProject);
+    return this.projectService.create(companyId, data as any, req.user);
   }
 
   @Put(':id')
   async update(
     @Param('id') id: string,
     @Body(new ZodValidationPipe(updateProjectSchema)) data: UpdateProject,
-    @GetUser() user: any,
+    @Req() req: any,
   ) {
-    if (isClientOrExternalRole(user?.role)) {
-      throw new ForbiddenException(
-        'Usuários clientes ou externos não têm permissão para editar configurações do projeto.',
-      );
-    }
-    return this.projectService.update(id, data);
+    return this.projectService.update(id, data as any, req.user);
   }
 
   @Delete(':id')
-  async delete(@Param('id') id: string, @GetUser() user: any) {
-    if (isClientOrExternalRole(user?.role)) {
-      throw new ForbiddenException(
-        'Usuários clientes ou externos não têm permissão para excluir projetos.',
-      );
-    }
-    return this.projectService.delete(id);
+  async delete(@Param('id') id: string, @Req() req: any) {
+    return this.projectService.delete(id, req.user);
   }
 
   @Post(':projectId/onboarding')
   async submitOnboarding(
     @Param('projectId') projectId: string,
     @Body(new ZodValidationPipe(onboardingSchema)) data: OnboardingInput,
-    @GetUser() user: any,
+    @Req() req: any,
   ) {
-    if (isClientOrExternalRole(user?.role)) {
+    if (isClientOrExternalRole(req.user?.role)) {
       throw new ForbiddenException(
         'Usuários clientes ou externos não têm permissão para alterar o onboarding do projeto.',
       );
     }
-    const userId = typeof user === 'string' ? user : user?.sub;
+    await this.projectService.findById(projectId, req.user);
+    const userId = String(req.user?.sub || req.user?.id || '');
     return this.versionService.createFromOnboarding(projectId, data, userId);
   }
 
   @Get(':projectId/versions')
-  async listVersions(@Param('projectId') projectId: string) {
+  async listVersions(
+    @Param('projectId') projectId: string,
+    @Req() req: any,
+  ) {
+    await this.projectService.findById(projectId, req.user);
     return this.versionService.findByProjectId(projectId);
   }
 }

@@ -1,5 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getBackendApiUrl, getBffAuthHeader, getBffOrgHeaders } from '@/lib/api/serverUtils';
+import {
+  getBackendApiUrl,
+  getBffAuthHeader,
+  getBffCompanyHeaders,
+  getBffOrgHeaders,
+} from '@/lib/api/serverUtils';
 import { success, error, ERROR_CODES } from '@/lib/api/response';
 
 export async function POST(request: NextRequest) {
@@ -15,10 +20,12 @@ export async function POST(request: NextRequest) {
     const backendUrl = getBackendApiUrl();
     const authHeader = await getBffAuthHeader(request);
     const orgHeaders = getBffOrgHeaders(request);
+    const companyHeaders = await getBffCompanyHeaders(request);
 
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
       ...orgHeaders,
+      ...companyHeaders,
     };
     if (authHeader) headers['Authorization'] = authHeader;
 

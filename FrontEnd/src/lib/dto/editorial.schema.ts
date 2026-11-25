@@ -13,6 +13,8 @@ export const ProjectCardSchema = z.object({
   currentObjective: z.string(),
   editorialLineStatus: z.enum(['pending', 'active', 'archived']),
   calendarStatus: z.enum(['pending', 'active', 'archived']),
+  companyId: objectIdSchema.optional(),
+  brandId: objectIdSchema.optional(),
   updatedAt: z.date(),
 });
 
@@ -58,6 +60,7 @@ export const ProjectCreateSchema = z.object({
   niche: z.string().min(2, 'O nicho é obrigatório.'),
   subniche: z.string().min(2, 'O subnicho é obrigatório.'),
   currentObjective: z.string().min(2, 'Defina o objetivo atual do projeto.'),
+  brandId: objectIdSchema,
 });
 
 export const EditorialVersionSchema = z.object({

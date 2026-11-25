@@ -24,10 +24,16 @@ export class EditorialProject {
   calendarStatus: string;
 
   @Prop({ required: true, type: Types.ObjectId, ref: 'User' })
-  createdBy: string;
+  createdBy: Types.ObjectId;
 
   @Prop({ required: true, default: 'altaire' })
   orgId: string;
+
+  @Prop({ required: true, type: Types.ObjectId, ref: 'Company', index: true })
+  companyId: Types.ObjectId;
+
+  @Prop({ required: true, type: Types.ObjectId, ref: 'Brand', index: true })
+  brandId: Types.ObjectId;
 
   @Prop({ required: true, default: true })
   isActive: boolean;
@@ -36,4 +42,11 @@ export class EditorialProject {
 export const EditorialProjectSchema =
   SchemaFactory.createForClass(EditorialProject);
 
+EditorialProjectSchema.index({
+  companyId: 1,
+  brandId: 1,
+  isActive: 1,
+  updatedAt: -1,
+});
+EditorialProjectSchema.index({ brandId: 1, isActive: 1 });
 EditorialProjectSchema.index({ orgId: 1, isActive: 1, updatedAt: -1 });
