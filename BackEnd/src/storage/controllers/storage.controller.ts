@@ -6,6 +6,7 @@ import {
   Get,
   Headers,
   Param,
+  Patch,
   Post,
   Query,
   Req,
@@ -13,6 +14,7 @@ import {
 } from '@nestjs/common';
 import { StorageService } from '../services/storage.service';
 import { GetPresignedUrlDto } from '../dto/get-presigned-url.dto';
+import { IFileAsset } from '../dto/storage.interface';
 import { AuthGuard } from '../../auth/auth.guard';
 
 @Controller('storage')
@@ -53,7 +55,7 @@ export class StorageController {
       mimeType: string;
       sizeBytes: number;
       brandId?: string;
-    },
+    } & Partial<IFileAsset>,
   ) {
     if (!companyId) {
       throw new BadRequestException(
@@ -81,6 +83,42 @@ export class StorageController {
     }
 
     return this.storageService.getCompanyAssets(companyId, req.user, brandId);
+  }
+
+  @Post('assets')
+  async createAsset(
+    @Headers('x-company-id') companyId: string,
+    @Req() req: any,
+    @Body() body: Partial<IFileAsset>,
+  ) {
+    if (!companyId) {
+      throw new BadRequestException(
+        'Contexto da empresa (x-company-id) é obrigatório.',
+      );
+    }
+
+    return this.storageService.createBrandAsset(companyId, req.user, body);
+  }
+
+  @Patch('assets/:id')
+  async updateAsset(
+    @Param('id') assetId: string,
+    @Headers('x-company-id') companyId: string,
+    @Req() req: any,
+    @Body() body: Partial<IFileAsset>,
+  ) {
+    if (!companyId) {
+      throw new BadRequestException(
+        'Contexto da empresa (x-company-id) é obrigatório.',
+      );
+    }
+
+    return this.storageService.updateBrandAsset(
+      companyId,
+      assetId,
+      req.user,
+      body,
+    );
   }
 
   @Delete('assets/:id')

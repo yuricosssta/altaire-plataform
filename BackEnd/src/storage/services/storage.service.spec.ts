@@ -48,6 +48,9 @@ describe('StorageService', () => {
       create: jest.fn().mockResolvedValue({ _id: 'asset1', companyId }),
       findAll: jest.fn().mockResolvedValue([]),
       findByIdInCompany: jest.fn(),
+      updateByIdInCompany: jest
+        .fn()
+        .mockResolvedValue({ _id: 'asset1', companyId }),
       deleteById: jest.fn().mockResolvedValue(true),
     };
     companyRepo = {
@@ -124,6 +127,30 @@ describe('StorageService', () => {
       companyId,
       2048,
     );
+  });
+
+  it('createBrandAsset should create guideline asset without fileUrl or storage increment', async () => {
+    await service.createBrandAsset(
+      companyId,
+      { sub: userId },
+      {
+        title: 'Cor Primária Dourado',
+        category: 'paleta',
+        hexPreview: '#D4AF37',
+        brandId,
+      },
+    );
+
+    expect(fileAssetRepo.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        companyId,
+        brandId,
+        title: 'Cor Primária Dourado',
+        category: 'paleta',
+        sizeBytes: 0,
+      }),
+    );
+    expect(companyRepo.incrementStorageUsed).not.toHaveBeenCalled();
   });
 
   it('getPresignedUploadUrl should block CLIENT/EXTERNAL', async () => {

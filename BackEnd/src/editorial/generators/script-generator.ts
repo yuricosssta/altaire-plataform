@@ -16,6 +16,13 @@ export interface IScriptGenerationContext {
   mode: ScriptMode;
   themeTitle?: string;
   retinaType?: RetinaType;
+  niche?: string;
+  subniche?: string;
+  editorialPillar?: string;
+  strategicObjective?: string;
+  icpPainOrObjection?: string;
+  businessMoment?: string;
+  platform?: string;
   briefing?: IScriptBriefing;
 }
 
@@ -26,4 +33,26 @@ export abstract class ScriptGenerator {
     block: IScriptBlock,
     context?: string,
   ): Promise<IScriptBlock>;
+
+  abstract regenerateStoryCard(context: {
+    period: 'Manhã' | 'Almoço' | 'Tarde' | 'Noite';
+    cardNumber: number;
+    currentCard: Record<string, unknown>;
+    icpPainOrObjection?: string;
+    subniche?: string;
+  }): Promise<Record<string, unknown>>;
+
+  abstract adaptScriptToProject(context: {
+    sourceScript: Record<string, unknown>;
+    targetProject: {
+      id: string;
+      name: string;
+      niche: string;
+      subniche: string;
+      currentObjective: string;
+    };
+    targetStrategicBase?: Record<string, unknown>;
+    customTitle?: string;
+    preserveComplementaryMaterial?: boolean;
+  }): Promise<Record<string, unknown>>;
 }

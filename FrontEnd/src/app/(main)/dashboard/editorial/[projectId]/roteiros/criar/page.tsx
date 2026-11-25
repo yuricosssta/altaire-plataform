@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { ArrowLeft, ChevronRight, Loader2, FileText } from 'lucide-react';
-import { FORMAT_LABELS, FORMAT_DESCRIPTIONS, FORMAT_ICONS, FORMAT_ROUTE } from '@/lib/mocks/scripts.mock';
+import { FORMAT_LABELS, FORMAT_DESCRIPTIONS, FORMAT_ICONS, FORMAT_ROUTE } from '@/lib/constants/script-formats';
 import type { ScriptFormat, ScriptMode } from '@/lib/dto/editorial.schema';
 
 const ICON_MAP: Record<string, typeof ArrowLeft> = { Video: ArrowLeft, Film: ArrowLeft, Radio: ArrowLeft, Columns: ArrowLeft, Image: ArrowLeft, Square: ArrowLeft };

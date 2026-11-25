@@ -13,5 +13,9 @@ export abstract class EditorialVersionRepository {
     id: string,
     data: IUpdateEditorialVersion,
   ): Promise<IEditorialVersion | null>;
+  abstract archiveOthers(
+    projectId: string,
+    activeVersionId: string,
+  ): Promise<void>;
   abstract softDelete(id: string): Promise<IEditorialVersion | null>;
 }

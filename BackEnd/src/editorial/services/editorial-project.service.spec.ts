@@ -193,12 +193,10 @@ describe('EditorialProjectService', () => {
     });
 
     it('should throw ForbiddenException when CLIENT/EXTERNAL is not allowed to view the project', async () => {
-      companyAccessService.resolveCompanyContext = jest
-        .fn()
-        .mockResolvedValue({
-          ...clientCtx,
-          allowedProjectIds: ['507f1f77bcf86cd799439099'],
-        });
+      companyAccessService.resolveCompanyContext = jest.fn().mockResolvedValue({
+        ...clientCtx,
+        allowedProjectIds: ['507f1f77bcf86cd799439099'],
+      });
 
       await expect(
         service.findById(projectId, { sub: userId, role: 'CLIENT' }),
@@ -206,12 +204,10 @@ describe('EditorialProjectService', () => {
     });
 
     it('should throw ForbiddenException when invited MEMBER is not linked to project brand', async () => {
-      companyAccessService.resolveCompanyContext = jest
-        .fn()
-        .mockResolvedValue({
-          ...guestMemberCtx,
-          allowedBrandIds: [otherBrandId],
-        });
+      companyAccessService.resolveCompanyContext = jest.fn().mockResolvedValue({
+        ...guestMemberCtx,
+        allowedBrandIds: [otherBrandId],
+      });
 
       await expect(
         service.findById(projectId, { sub: userId }),
@@ -232,6 +228,7 @@ describe('EditorialProjectService', () => {
       expect(result).toEqual(mockProject);
       expect(repository.create).toHaveBeenCalledWith({
         ...input,
+        brandOrClientName: mockBrand.name,
         companyId,
         brandId,
         createdBy: userId,

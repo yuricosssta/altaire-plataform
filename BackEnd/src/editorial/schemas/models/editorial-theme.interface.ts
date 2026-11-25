@@ -15,7 +15,14 @@ export type JourneyStage =
   | 'experiencia'
   | 'compartilhamento';
 
-export type ThemeStatus = 'active' | 'archived' | 'favorite' | 'test';
+export type ThemeStatus =
+  | 'active'
+  | 'archived'
+  | 'favorite'
+  | 'test'
+  | 'priority_next_cycle'
+  | 'saved_for_sales'
+  | 'market_test';
 
 export type ThemeFlag = 'prioritario_proximo_ciclo' | 'guardado_para_vendas';
 
@@ -60,6 +67,18 @@ export interface IEditorialTheme {
   batchId?: string;
   angle?: string;
   approach?: ThemeApproach;
+  // Campos estendidos da UI
+  techniqueUsed?: string;
+  romaPillar?: string;
+  consciousnessAxis?: string;
+  recommendedFormat?: string;
+  recommendedPlatform?: string;
+  painDesireOrObjection?: string;
+  isFavorite?: boolean;
+  isPriorityNextCycle?: boolean;
+  isSavedForSales?: boolean;
+  isMarketTest?: boolean;
+  allocatedSlotIds?: string[];
   isActive: boolean;
   createdAt?: Date;
   updatedAt?: Date;
@@ -82,6 +101,17 @@ export interface IUpdateEditorialTheme {
   flags?: ThemeFlag[];
   angle?: string;
   approach?: ThemeApproach;
+  techniqueUsed?: string;
+  romaPillar?: string;
+  consciousnessAxis?: string;
+  recommendedFormat?: string;
+  recommendedPlatform?: string;
+  painDesireOrObjection?: string;
+  isFavorite?: boolean;
+  isPriorityNextCycle?: boolean;
+  isSavedForSales?: boolean;
+  isMarketTest?: boolean;
+  allocatedSlotIds?: string[];
 }
 
 export interface IThemeFilters {
@@ -92,7 +122,8 @@ export interface IThemeFilters {
 
 // ===== Parâmetros de geração =====
 
-export type ThemeVolume = '20' | '50' | '100';
+export type ThemeVolume =
+  '12' | '15' | '18' | '20' | '24' | '30' | '45' | '50' | '100';
 
 export interface IRomaAvatarParams {
   volume: ThemeVolume;
@@ -115,9 +146,9 @@ export interface IObjectiveParams {
 }
 
 export type IThemeGenerationRequest =
-  | { mode: 'roma_avatar'; params: IRomaAvatarParams }
-  | { mode: 'market'; params: IMarketParams }
-  | { mode: 'objective'; params: IObjectiveParams };
+  | { mode: 'roma_avatar'; params: IRomaAvatarParams; persist?: boolean }
+  | { mode: 'market'; params: IMarketParams; persist?: boolean }
+  | { mode: 'objective'; params: IObjectiveParams; persist?: boolean };
 
 export interface IThemeGenerationResult {
   batchId: string;
@@ -148,6 +179,7 @@ export interface IThemeSlot {
 export interface IRebalanceResult {
   report: IBalanceReport;
   slots: IThemeSlot[];
+  updatedSlots?: Record<string, unknown>[];
 }
 
 export interface ISlotSuggestion {

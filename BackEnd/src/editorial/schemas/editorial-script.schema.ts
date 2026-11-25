@@ -154,11 +154,11 @@ export class EditorialScript {
   @Prop({ required: true, type: Types.ObjectId, ref: 'EditorialProject' })
   projectId: Types.ObjectId;
 
-  @Prop({ type: Types.ObjectId })
-  calendarSlotId?: Types.ObjectId;
+  @Prop({ type: SchemaTypes.Mixed })
+  calendarSlotId?: Types.ObjectId | string;
 
-  @Prop({ type: Types.ObjectId, ref: 'EditorialTheme' })
-  themeId?: Types.ObjectId;
+  @Prop({ type: SchemaTypes.Mixed })
+  themeId?: Types.ObjectId | string;
 
   @Prop({ required: true })
   format: string;
@@ -202,7 +202,125 @@ export class EditorialScript {
   @Prop({ type: [ScriptAttachmentSubDocSchema], default: [] })
   attachments: ScriptAttachmentSubDoc[];
 
-  @Prop({ required: true, type: Types.ObjectId })
+  // Campos ricos do Studio (RoteirosEditorialModule)
+  @Prop()
+  formatSlug?: string;
+
+  @Prop()
+  calendarSlotFormat?: string;
+
+  @Prop()
+  originType?: string;
+
+  @Prop()
+  linkedSlotId?: string;
+
+  @Prop()
+  linkedSlotLabel?: string;
+
+  @Prop()
+  linkedThemeId?: string;
+
+  @Prop()
+  retinaType?: string;
+
+  @Prop()
+  strategicObjective?: string;
+
+  @Prop()
+  editorialPillar?: string;
+
+  @Prop()
+  icpPainOrObjection?: string;
+
+  @Prop()
+  businessMoment?: string;
+
+  @Prop()
+  platform?: string;
+
+  @Prop()
+  estimatedDurationOrSize?: string;
+
+  @Prop()
+  speakingMode?: string;
+
+  @Prop()
+  versionLabel?: string;
+
+  @Prop({ type: [SchemaTypes.Mixed], default: [] })
+  scriptBlocks?: Record<string, unknown>[];
+
+  @Prop({ type: [String], default: [] })
+  connectionSevenLinesChecklist?: string[];
+
+  @Prop({ type: [SchemaTypes.Mixed], default: [] })
+  carouselSlides?: Record<string, unknown>[];
+
+  @Prop({ type: [SchemaTypes.Mixed], default: [] })
+  storyPeriods?: Record<string, unknown>[];
+
+  @Prop({ type: [SchemaTypes.Mixed], default: [] })
+  predictiveQAs?: Record<string, unknown>[];
+
+  @Prop({ type: [String], default: [] })
+  postLiveStoriesSummary?: string[];
+
+  @Prop()
+  captionOutdoorHook?: string;
+
+  @Prop()
+  captionBody?: string;
+
+  @Prop()
+  captionCta?: string;
+
+  @Prop({ type: [String], default: [] })
+  seoKeywords?: string[];
+
+  @Prop({ type: [String], default: [] })
+  seoTags?: string[];
+
+  @Prop({ type: [String], default: [] })
+  youtubeChapters?: string[];
+
+  @Prop({ type: [SchemaTypes.Mixed], default: [] })
+  titleVariations?: Record<string, unknown>[];
+
+  @Prop({ type: [SchemaTypes.Mixed], default: [] })
+  imagePrompts?: Record<string, unknown>[];
+
+  @Prop({ default: false })
+  qualifiedForComplementaryMaterial?: boolean;
+
+  @Prop({ type: SchemaTypes.Mixed })
+  complementaryMaterial?: Record<string, unknown>;
+
+  @Prop({ type: SchemaTypes.Mixed })
+  explanationMaterial?: Record<string, unknown>;
+
+  @Prop()
+  briefingCutAdjustment?: string;
+
+  @Prop()
+  mandatoryExamplesToInclude?: string;
+
+  @Prop()
+  brandStoryConnection?: string;
+
+  @Prop()
+  selectedReferenceNote?: string;
+
+  @Prop({ type: [SchemaTypes.Mixed], default: [] })
+  versionHistory?: Record<string, unknown>[];
+
+  @Prop({ default: false })
+  isFavorite?: boolean;
+
+  @Prop()
+  adaptedFromId?: string;
+
+  @Prop({ required: true, type: Types.ObjectId, ref: 'User' })
   createdBy: Types.ObjectId;
 
   @Prop({ default: true })
@@ -213,5 +331,4 @@ export const EditorialScriptSchema =
   SchemaFactory.createForClass(EditorialScript);
 
 EditorialScriptSchema.index({ projectId: 1, isActive: 1, format: 1 });
-EditorialScriptSchema.index({ calendarSlotId: 1 });
-EditorialScriptSchema.index({ themeId: 1 });
+EditorialScriptSchema.index({ projectId: 1, status: 1 });

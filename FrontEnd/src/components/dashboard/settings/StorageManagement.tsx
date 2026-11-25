@@ -22,7 +22,7 @@ import {
   selectCurrentCompany,
 } from "@/lib/redux/slices/companySlice";
 import { RootState } from "@/lib/redux/store";
-import { uploadFileToR2 } from "@/lib/services/storageService";
+import { storageService, uploadFileToR2 } from "@/lib/services/storageService";
 
 const LIMITS = {
   FREE: 500 * 1024 * 1024,
@@ -91,25 +91,11 @@ export function StorageManagement() {
 
     try {
       setIsLoading(true);
-      const query = selectedBrandFilter
-        ? `?brandId=${encodeURIComponent(selectedBrandFilter)}`
-        : "";
-      const response = await fetch(`/api/storage/assets${query}`, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "x-company-id": companyId,
-        },
-        cache: "no-store",
-      });
-
-      const json = await response.json().catch(() => null);
-      if (!response.ok) {
-        throw new Error(json?.error?.message || "Erro ao listar arquivos.");
-      }
-
-      const payload = json?.data || json;
-      setAssets(Array.isArray(payload?.assets) ? payload.assets : []);
-      setStorageUsed(Number(payload?.storageUsed || 0));
+      const data = await storageService.getAssets(
+        selectedBrandFilter || undefined
+      );
+      setAssets(Array.isArray(data?.assets) ? data.assets : []);
+      setStorageUsed(Number(data?.storageUsed || 0));
     } catch (error: any) {
       toast.error(error?.message || "Erro ao buscar arquivos da empresa.");
     } finally {
@@ -191,17 +177,7 @@ export function StorageManagement() {
 
     try {
       setIsDeleting(asset._id);
-      const response = await fetch(`/api/storage/assets/${asset._id}`, {
-        method: "DELETE",
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "x-company-id": companyId,
-        },
-      });
-      if (!response.ok) {
-        const json = await response.json().catch(() => null);
-        throw new Error(json?.error?.message || "Falha ao excluir o arquivo.");
-      }
+      await storageService.deleteAsset(asset._id);
 
       setAssets((prev) => prev.filter((item) => item._id !== asset._id));
       setStorageUsed((prev) => Math.max(0, prev - asset.sizeBytes));

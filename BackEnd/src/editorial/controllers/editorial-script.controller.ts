@@ -4,6 +4,7 @@ import {
   Delete,
   ForbiddenException,
   Get,
+  Headers,
   Param,
   Patch,
   Post,
@@ -20,6 +21,8 @@ import { EditorialBrandStoryService } from '../services/editorial-brand-story.se
 import { EditorialProjectService } from '../services/editorial-project.service';
 import { isClientOrExternalRole } from '../../shared/utils/org-role.util';
 import {
+  adaptPublicationSchema,
+  AdaptPublicationInput,
   addAttachmentSchema,
   AddAttachmentInput,
   createScriptSchema,
@@ -30,6 +33,8 @@ import {
   GenerateScriptInput,
   regenerateBlockSchema,
   RegenerateBlockInput,
+  regenerateStoryCardSchema,
+  RegenerateStoryCardInput,
   updateScriptSchema,
   UpdateScriptInput,
 } from '../validations/editorial-script.zod';
@@ -46,7 +51,34 @@ export class EditorialScriptController {
     private readonly scriptService: EditorialScriptService,
     private readonly brandStoryService: EditorialBrandStoryService,
     private readonly projectService: EditorialProjectService,
-  ) { }
+  ) {}
+
+  @Get('publications')
+  async listPublications(
+    @Headers('x-company-id') companyId?: string,
+    @Query('format') format?: ContentFormat,
+    @Query('brandId') brandId?: string,
+    @Req() req?: any,
+  ) {
+    if (!companyId) return [];
+    const projects = await this.projectService.findAll(
+      companyId,
+      req?.user,
+      brandId,
+    );
+    return this.scriptService.findAllForProjects(projects, format);
+  }
+
+  @Post('publications/:scriptId/adapt')
+  async adaptPublication(
+    @Param('scriptId') scriptId: string,
+    @Body(new ZodValidationPipe(adaptPublicationSchema))
+    data: AdaptPublicationInput,
+    @GetUser() user: any,
+  ) {
+    const userId = typeof user === 'string' ? user : user?.sub;
+    return this.scriptService.adaptPublication(scriptId, userId, data);
+  }
 
   @Get('projects/:projectId/scripts')
   async findAll(
@@ -84,10 +116,7 @@ export class EditorialScriptController {
   }
 
   @Get('projects/:projectId/scripts/brand-story')
-  async getBrandStory(
-    @Param('projectId') projectId: string,
-    @Req() req: any,
-  ) {
+  async getBrandStory(@Param('projectId') projectId: string, @Req() req: any) {
     const project = await this.projectService.findById(projectId, req.user);
     return this.brandStoryService.getByBrand(
       String(project.brandId),
@@ -224,5 +253,15 @@ export class EditorialScriptController {
     data: RegenerateBlockInput,
   ) {
     return this.scriptService.regenerateBlock(scriptId, blockId, data.context);
+  }
+
+  @Post('projects/:projectId/scripts/:scriptId/stories/regenerate')
+  async regenerateStoryCard(
+    @Param('projectId') _projectId: string,
+    @Param('scriptId') scriptId: string,
+    @Body(new ZodValidationPipe(regenerateStoryCardSchema))
+    data: RegenerateStoryCardInput,
+  ) {
+    return this.scriptService.regenerateStoryCard(scriptId, data);
   }
 }

@@ -1,7 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { proxyEditorialRequest } from '@/app/api/editorial/_proxy';
-import { SimulateRequestSchema } from '@/lib/dto/themes.schema';
-import { error, ERROR_CODES } from '@/lib/api/response';
 
 export async function POST(
   request: NextRequest,
@@ -9,30 +7,13 @@ export async function POST(
 ) {
   const { projectId, calendarId } = await params;
   const body = await request.json().catch(() => ({}));
-
-  const parsed = SimulateRequestSchema.safeParse(body);
-  if (!parsed.success) {
-    return NextResponse.json(
-      error(
-        ERROR_CODES.VALIDATION_ERROR,
-        'Parâmetros de simulação inválidos.',
-        parsed.error.flatten(),
-      ),
-      { status: 400 },
-    );
-  }
-
   const result = await proxyEditorialRequest(
     request,
     `/projects/${projectId}/themes/calendars/${calendarId}/simulate`,
-    {
-      method: 'POST',
-      body: parsed.data,
-    },
+    { method: 'POST', body },
   );
-
   if ('ok' in result) {
     return NextResponse.json(result.data);
   }
-  return NextResponse.json(result, { status: 502 });
+  return NextResponse.json(result, { status: (result as any)?.status || 502 });
 }

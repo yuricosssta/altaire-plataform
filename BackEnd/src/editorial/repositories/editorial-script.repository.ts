@@ -11,6 +11,10 @@ export abstract class EditorialScriptRepository {
     projectId: string,
     filters?: IScriptFilters,
   ): Promise<IEditorialScript[]>;
+  abstract findAllAcrossProjects(
+    projectIds: string[],
+    filters?: IScriptFilters,
+  ): Promise<IEditorialScript[]>;
   abstract findById(id: string): Promise<IEditorialScript | null>;
   abstract create(data: ICreateEditorialScript): Promise<IEditorialScript>;
   abstract update(

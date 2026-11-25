@@ -38,10 +38,12 @@ import {
   Play,
   Plus,
   Radio,
+  RefreshCw,
   RotateCcw,
   Save,
   Search,
   Sparkles,
+  Trash2,
   Video,
   X,
 } from "lucide-react";
@@ -53,12 +55,22 @@ import {
 import {
   FORMAT_META,
   RETINA_META,
+  mapBackendCalendarToRecord,
+  mapBackendFormatToUi,
+  mapBackendRetinaToUi,
   type CalendarSlotItem,
-  type EditorialCalendarRecord,
   type RetinaTypeKey,
   type SlotContentFormat,
 } from "./CalendarioEditorialModule";
-import type { StrategicThemeRecord } from "./TemasEditorialModule";
+import {
+  mapBackendThemeToRecord,
+  type StrategicThemeRecord,
+} from "./TemasEditorialModule";
+import { scriptsService } from "@/lib/services/scriptsService";
+import { editorialService } from "@/lib/services/editorialService";
+import { themesService } from "@/lib/services/themesService";
+import { storageService } from "@/lib/services/storageService";
+import type { ScriptFormat } from "@/lib/dto/editorial.schema";
 
 /* ========================================================================== */
 /* CONTRATOS E TIPAGENS ESTRITAS DA FUNÇÃO 03 (ROTEIROS E ATIVOS)             */
@@ -101,6 +113,7 @@ export interface CarouselSlideItem {
 }
 
 export interface StoryCardItem {
+  readonly id?: string;
   readonly cardNumber: 1 | 2 | 3 | 4 | 5;
   readonly cardType: "video_fala" | "texto_sobre_foto" | "bastidor_prova";
   readonly intentionLabel: string;
@@ -435,756 +448,305 @@ export function mapSlotFormatToScriptSlug(
 }
 
 /* ========================================================================== */
-/* MOTOR GERADOR DE PACOTE COMPLETO DE ROTEIRO POR FORMATO                    */
+/* MAPEAMENTO DETERMINÍSTICO ENTRE SCHEMA BACKEND BFF E UI DA FUNÇÃO 03       */
 /* ========================================================================== */
 
-export function buildCompleteScriptPackage(params: {
-  readonly id?: string;
-  readonly projectId: string;
-  readonly title: string;
-  readonly formatSlug: ScriptFormatSlug;
-  readonly originType: "calendar_slot" | "theme_library";
-  readonly linkedSlotId?: string;
-  readonly linkedSlotLabel: string;
-  readonly linkedThemeId?: string;
-  readonly retinaType: RetinaTypeKey;
-  readonly strategicObjective: string;
-  readonly editorialPillar: string;
-  readonly icpPainOrObjection: string;
-  readonly businessMoment: string;
-  readonly platform: string;
-  readonly niche: string;
-  readonly subniche: string;
-  readonly speakingMode?: ScriptSpeakingMode;
-  readonly qualifiedForMaterial?: boolean;
-  readonly status?: ScriptProductionStatus;
-}): EditorialScriptRecord {
-  const {
-    projectId,
-    title,
-    formatSlug,
-    originType,
-    linkedSlotId,
-    linkedSlotLabel,
-    linkedThemeId,
-    retinaType,
-    strategicObjective,
-    editorialPillar,
-    icpPainOrObjection,
-    businessMoment,
-    platform,
-    niche,
-    subniche,
-  } = params;
+const SCRIPT_OBJECT_ID_REGEX = /^[0-9a-fA-F]{24}$/;
 
-  const formatMeta =
+function mapScriptSlugToBackendFormat(slug: ScriptFormatSlug): ScriptFormat {
+  if (slug === "short_video") return "reel";
+  return slug;
+}
+
+function mapBackendFormatToScriptSlug(
+  format?: string,
+  formatSlug?: string
+): ScriptFormatSlug {
+  const candidate = String(formatSlug || format || "").toLowerCase();
+  if (candidate === "reel" || candidate === "short_video" || candidate === "reel_curto") {
+    return "short_video";
+  }
+  if (candidate === "long_video" || candidate === "video_longo") {
+    return "long_video";
+  }
+  if (candidate === "carousel" || candidate === "carrossel") {
+    return "carousel";
+  }
+  if (candidate === "static_post" || candidate === "post_estatico") {
+    return "static_post";
+  }
+  if (candidate === "live" || candidate === "live_semanal") {
+    return "live";
+  }
+  if (candidate === "stories_sequence" || candidate === "sequencia_stories") {
+    return "stories_sequence";
+  }
+  return "short_video";
+}
+
+function mapBackendStatusToUiStatus(st?: string): ScriptProductionStatus {
+  const val = String(st || "").toLowerCase();
+  if (val === "pronto" || val === "ready") return "ready";
+  if (val === "in_production" || val === "em_producao") return "in_production";
+  if (val === "teste_ab" || val === "ab_test") return "ab_test";
+  if (val === "publicado" || val === "published") return "published";
+  if (val === "arquivado" || val === "archived") return "archived";
+  return "draft";
+}
+
+function mapUiStatusToBackendStatus(
+  st: ScriptProductionStatus
+): "rascunho" | "in_production" | "pronto" | "teste_ab" | "publicado" | "arquivado" {
+  switch (st) {
+    case "ready":
+      return "pronto";
+    case "in_production":
+      return "in_production";
+    case "ab_test":
+      return "teste_ab";
+    case "published":
+      return "publicado";
+    case "archived":
+      return "arquivado";
+    default:
+      return "rascunho";
+  }
+}
+
+function mapBackendScriptToRecord(
+  s: any,
+  brandStoryFallback = "",
+  referenceNoteFallback = ""
+): EditorialScriptRecord {
+  const formatSlug = mapBackendFormatToScriptSlug(s.format, s.formatSlug);
+  const meta =
     SCRIPT_FORMATS_CATALOG.find((f) => f.slug === formatSlug) ??
     SCRIPT_FORMATS_CATALOG[0]!;
 
-  const resolvedMode: ScriptSpeakingMode = formatMeta.forcesConnectionModeOnly
-    ? "conexao_bullets"
-    : params.speakingMode || "conexao_bullets";
+  const speakingMode: ScriptSpeakingMode =
+    meta.forcesConnectionModeOnly ||
+    s.mode === "conexao" ||
+    s.speakingMode === "BULLET_POINTS" ||
+    s.speakingMode === "conexao_bullets"
+      ? "conexao_bullets"
+      : "seguranca_palavra";
 
-  const isQualified =
-    params.qualifiedForMaterial ??
-    (formatSlug === "long_video" ||
-      formatSlug === "carousel" ||
-      formatSlug === "live");
-
-  /* 1. Blocos Estruturados (Vídeo Curto / Vídeo Longo / Live / Post Estático) */
   const scriptBlocks: ScriptBlockRow[] =
-    formatSlug === "long_video"
-      ? [
-          {
-            id: "blk-long-1",
-            timecodeOrStage: "0:00 – 1:00 · Fase 1: Introdução Impactante",
-            psychologicalRole:
-              "Quebra de padrão imediata + Contrato de Clique + Contraste do Motivo Irresistível",
-            visualAndAudioDirection:
-              "[0:00] Enquadramento fechado, corte seco sem vinheta. [0:18] B-Roll contrastando operação manual caótica vs. painel estruturado + SFX Swoosh grave.",
-            wordForWordSpeech: `Se você continua tentando escalar seus resultados em ${subniche} repetindo o padrão tradicional do mercado, você está pagando o imposto mais caro que existe: o imposto do improviso. Nos próximos minutos, vou abrir os 4 pilares exatos para resolver "${title}" — mas preste muita atenção no terceiro pilar, porque é nele que 90% dos profissionais travam.`,
-            connectionBulletLine: `BULLET 1 (MOTIVO IRRESISTÍVEL): Contraste o que o comprador ganha aplicando "${title}" hoje vs. o custo invisível de continuar improvisando em ${subniche}.`,
-          },
-          {
-            id: "blk-long-2",
-            timecodeOrStage: "1:00 – 2:30 · Fase 2: Contextualização & Autoridade",
-            psychologicalRole:
-              "Ancoragem de autoridade prática + Desconstrução do mito central do ICP",
-            visualAndAudioDirection:
-              "[1:15] Zoom in gradual de 8% + GC na parte inferior com a tese central. [1:45] Gráfico comparativo surgindo na tela à esquerda.",
-            wordForWordSpeech: `Quando analisamos dezenas de operações reais de ${niche}, descobrimos um padrão silencioso. O problema nunca foi falta de esforço técnico; foi tentar executar peças isoladas sem conectar com a oferta e com o Mecanismo Único. Veja por que a abordagem comum falha...`,
-            connectionBulletLine: `BULLET 2 (ESCLARECIMENTO EM CAIXA ALTA): "EXISTEM 4 PILARES ESSENCIAIS PARA DOMINAR ISSO EM ${subniche.toUpperCase()}, MAS O TERCEIRO É O QUE SEPARA AMADORES DE PROFISSIONAIS."`,
-          },
-          {
-            id: "blk-long-3",
-            timecodeOrStage:
-              "2:30 – 8:30 · Fase 3: Desenvolvimento em Microciclos (MUV)",
-            psychologicalRole:
-              "Entrega densa dos pilares + Demonstração prática do método proprietário",
-            visualAndAudioDirection:
-              "[Marcação a cada 20s] Alternar entre câmera principal, compartilhamento de tela/quadro branco e B-Roll demonstrativo do passo a passo.",
-            wordForWordSpeech: `O primeiro movimento consiste em isolar a variável crítica de ${subniche}. Em vez de olhar para dezenas de indicadores soltos, você aplica o filtro de contexto: qual decisão precisa ser tomada antes que a execução comece? Vamos ver na tela os 3 passos operacionais...`,
-            connectionBulletLine: `BULLET 3 (DESENVOLVIMENTO MUV): Apresente os 3 passos práticos do pilar "${editorialPillar}", usando exemplo real de bastidor e mantendo open loop para o fechamento.`,
-          },
-          {
-            id: "blk-long-4",
-            timecodeOrStage:
-              "8:30 – 11:30 · Fase 4: Quebra de Objeção & Virada de Chave",
-            psychologicalRole:
-              "Neutralização da trava mental do comprador + Prova de viabilidade na rotina",
-            visualAndAudioDirection:
-              "[8:45] Mudança de trilha sonora para tom mais firme e consultivo. Corte para câmera próxima aos olhos.",
-            wordForWordSpeech: `Talvez você esteja pensando: "${icpPainOrObjection}". E é exatamente por isso que desenhamos este protocolo para funcionar em blocos enxutos, sem exigir que você refaça tudo do zero toda semana.`,
-            connectionBulletLine: `BULLET 4 (QUEBRA DE OBJEÇÃO): Responda diretamente à objeção "${icpPainOrObjection}" mostrando como o método economiza tempo real.`,
-          },
-          {
-            id: "blk-long-5",
-            timecodeOrStage:
-              "11:30 – 13:30 · Fase 5: CTA Estratégico & Material Complementar",
-            psychologicalRole:
-              "Chamada para ação sem parecer encerramento precoce + Entrega da isca/próximo passo",
-            visualAndAudioDirection:
-              "[11:40] Exibir mockup do Material Complementar na tela + Link destacado no primeiro comentário fixado.",
-            wordForWordSpeech: `Para você aplicar imediatamente essa estrutura na sua operação de ${subniche}, deixei aqui abaixo o acesso ao nosso diagnóstico prático e ao próximo passo da nossa formação. Clique no primeiro link da descrição agora mesmo.`,
-            connectionBulletLine: `BULLET 5 (FECHAMENTO & CTA): Convide para baixar o Material Complementar qualificado e dar o próximo passo na oferta principal.`,
-          },
-        ]
-      : formatSlug === "live"
-        ? [
-            {
-              id: "blk-live-1",
-              timecodeOrStage:
-                "00:00 – 08:00 · Bloco 1: Abertura Magnética & Acordo da Live",
-              psychologicalRole:
-                "Retenção dos primeiros espectadores + Promessa da transmissão + Incentivo de compartilhamento",
-              visualAndAudioDirection:
-                "Quadro branco ou slides de apoio visíveis. Pedir para a audiência digitar no chat de qual cidade/nicho estão acompanhando.",
-              wordForWordSpeech:
-                "[Modo Segurança desativado em Lives para preservar naturalidade ao vivo]",
-              connectionBulletLine: `• Dar boas-vindas energéticas e cravar a promessa da Live: "${title}".\n• Fazer pergunta diagnóstica no chat: "Quem aqui sente que ${icpPainOrObjection}?"\n• Anunciar o Material Complementar exclusivo para quem ficar até o bloco final.`,
-            },
-            {
-              id: "blk-live-2",
-              timecodeOrStage:
-                "08:00 – 25:00 · Bloco 2: Desconstrução do Erro Invisível",
-              psychologicalRole:
-                "Elevar nível de consciência mostrando por que as tentativas anteriores falharam",
-              visualAndAudioDirection:
-                "Desenhar o contraste entre o 'Modelo Improvisado' e o 'Sistema Orientado por Contexto'.",
-              wordForWordSpeech: "",
-              connectionBulletLine: `• Explicar por que 90% do mercado de ${niche} erra ao ignorar "${editorialPillar}".\n• Contar caso real de bastidor demonstrando o custo de operar no improviso.\n• Ler 2 comentários do chat para validar a dor em tempo real.`,
-            },
-            {
-              id: "blk-live-3",
-              timecodeOrStage:
-                "25:00 – 45:00 · Bloco 3: Entrega dos 3 Pilares Práticos (MUV)",
-              psychologicalRole:
-                "Ensino profundo de autoridade + Demonstração do Mecanismo Único da Oferta",
-              visualAndAudioDirection:
-                "Mostrar na tela o passo a passo estruturado e abrir para 2 diagnósticos ao vivo.",
-              wordForWordSpeech: "",
-              connectionBulletLine: `• Entregar os 3 pilares práticos de "${title}" sem esconder o jogo no "o quê", gerando desejo pelo "como implementar com acompanhamento".\n• Fazer micro-pitch consultivo conectando o método à oferta principal.`,
-            },
-            {
-              id: "blk-live-4",
-              timecodeOrStage:
-                "45:00 – 60:00 · Bloco 4: Q&A Estratégico & Convite de Conversão",
-              psychologicalRole:
-                "Quebra de objeções ao vivo + Direcionamento direto para aplicação/compra",
-              visualAndAudioDirection:
-                "Fixar link/palavra-chave no chat e exibir QR Code ou comando de Direct.",
-              wordForWordSpeech: "",
-              connectionBulletLine: `• Responder as 3 dúvidas mais quentes do chat conectando cada resposta à superação de "${icpPainOrObjection}".\n• Chamada direta para ação (CTA): instruir exatamente onde clicar para acessar o Material Complementar e a oferta.`,
-            },
-          ]
-        : [
-            {
-              id: "blk-short-1",
-              timecodeOrStage: "00s – 03s · 1. Gancho (Hook Ininterrupto)",
-              psychologicalRole:
-                "Parar o scroll nos primeiros 2 segundos expondo uma contradição ou erro invisível",
-              visualAndAudioDirection:
-                "Corte seco no frame 1. Expressão firme olhando direto para a lente + Legenda dinâmica destacando a palavra-chave em dourado.",
-              wordForWordSpeech: `O maior erro que trava seus resultados em ${subniche} não é falta de técnica — é começar toda semana no improviso.`,
-              connectionBulletLine: `1. GANCHO (0-3s): Crave a tese contraintuitiva sobre "${title}" logo na primeira frase.`,
-            },
-            {
-              id: "blk-short-2",
-              timecodeOrStage: "03s – 12s · 2. Agitação do Problema Real",
-              psychologicalRole:
-                "Gerar identificação visceral descrevendo o sintoma exato que o ICP vive na rotina",
-              visualAndAudioDirection:
-                "Leve aproximação de câmera (zoom in 1.08x) + B-Roll rápido de 2s ilustrando a dor do comprador.",
-              wordForWordSpeech: `Você dedica horas na operação, tenta aplicar táticas soltas, mas na hora de converter em vendas previsíveis, parece que todo esforço evapora.`,
-              connectionBulletLine: `2. AGITAÇÃO (3-12s): Descreva o sintoma diário de quem sofre com "${icpPainOrObjection}".`,
-            },
-            {
-              id: "blk-short-3",
-              timecodeOrStage:
-                "12s – 35s · 3. Virada de Chave & Mecanismo Único",
-              psychologicalRole:
-                "Entregar a lógica de causa e efeito do método proprietário (MUV)",
-              visualAndAudioDirection:
-                "Mostrar 3 tópicos visuais curtos surgindo na tela à medida que enumera os pontos.",
-              wordForWordSpeech: `Isso acontece porque peças soltas não constroem autoridade. Quando você conecta Base Estratégica, Linha Editorial e execução em ${subniche}, cada ação passa a cumprir uma função clara de conversão.`,
-              connectionBulletLine: `3. MECANISMO (12-35s): Explique em 3 passos rápidos como o pilar "${editorialPillar}" resolve a raiz do problema.`,
-            },
-            {
-              id: "blk-short-4",
-              timecodeOrStage: "35s – 48s · 4. Quebra de Objeção & Prova",
-              psychologicalRole:
-                "Remover a desculpa mental imediata do espectador",
-              visualAndAudioDirection:
-                "Retorno para enquadramento central limpo, tom de voz seguro e pausado.",
-              wordForWordSpeech: `E você não precisa de mais horas no seu dia para fazer isso — você precisa apenas parar de decidir em cima da hora.`,
-              connectionBulletLine: `4. QUEBRA DE OBJEÇÃO (35-48s): Neutralize a trava de tempo/complexidade mostrando que método reduz esforço.`,
-            },
-            {
-              id: "blk-short-5",
-              timecodeOrStage: "48s – 60s · 5. Chamada para Ação (CTA Contextual)",
-              psychologicalRole:
-                "Conduzir para salvamento, comentário-chave ou leitura da legenda",
-              visualAndAudioDirection:
-                "Indicação visual apontando para a legenda / ícone de salvar.",
-              wordForWordSpeech: `Eu deixei o passo a passo completo detalhado aqui na legenda. Leia agora e salve este vídeo para consultar antes da sua próxima semana.`,
-              connectionBulletLine: `5. CTA (48-60s): Peça para salvar o vídeo e ler a legenda onde está o detalhamento prático.`,
-            },
-          ];
+    Array.isArray(s.scriptBlocks) && s.scriptBlocks.length > 0
+      ? s.scriptBlocks.map((b: any, idx: number) => ({
+          id: String(b.id || `blk-${idx + 1}`),
+          timecodeOrStage: String(b.timecodeOrStage || `Bloco ${idx + 1}`),
+          psychologicalRole: String(b.psychologicalRole || "Desenvolvimento estratégico"),
+          visualAndAudioDirection: String(b.visualAndAudioDirection || ""),
+          wordForWordSpeech: String(b.wordForWordSpeech || ""),
+          connectionBulletLine: String(b.connectionBulletLine || ""),
+        }))
+      : Array.isArray(s.blocks)
+        ? s.blocks.map((b: any, idx: number) => ({
+            id: String(b.id || b._id || `blk-${idx + 1}`),
+            timecodeOrStage: b.timeRange
+              ? `${b.timeRange} · ${b.title || `Bloco ${idx + 1}`}`
+              : String(b.title || `Bloco ${idx + 1}`),
+            psychologicalRole: String(b.type || "Desenvolvimento"),
+            visualAndAudioDirection: String(b.visualDirection || ""),
+            wordForWordSpeech: String(b.content || ""),
+            connectionBulletLine: `• ${b.title || `Bloco ${idx + 1}`}: ${b.content || ""}`,
+          }))
+        : [];
 
-  /* Lista de 7 linhas sequenciais do Modo Conexão (Seção 4.1.2) */
-  const connectionSevenLinesChecklist: string[] = [
-    `01. [GANCHO 0-3s] Pare de tentar resolver ${subniche} no improviso diário.`,
-    `02. [SINTOMA] Você trabalha muito no bastidor, mas sua comunicação não reflete seu nível real.`,
-    `03. [CAUSA RAIZ] O problema não é o seu produto — é agir sem conectar com "${editorialPillar}".`,
-    `04. [VIRADA MUV] Primeiro defina o contexto e a promessa ROMA; só depois execute a peça.`,
-    `05. [PASSO PRÁTICO] Aplique a regra de 1 objetivo claro e 1 tipo RETINA (${retinaType}) por publicação.`,
-    `06. [QUEBRA DE TRAVA] Isso leva menos de 45 minutos por semana quando o sistema está montado.`,
-    `07. [CTA DIRETO] Salve este conteúdo e leia a legenda para aplicar o protocolo completo hoje.`,
-  ];
+  const carouselSlides: CarouselSlideItem[] = Array.isArray(s.carouselSlides)
+    ? s.carouselSlides.map((sl: any, idx: number) => ({
+        slideNumber: Number(sl.slideNumber || idx + 1),
+        roleLabel: String(sl.roleLabel || `Slide ${String(idx + 1).padStart(2, "0")}`),
+        headline: String(sl.headline || ""),
+        bodyLineBreakCopy: String(sl.bodyLineBreakCopy || ""),
+        visualDesignNote: String(sl.visualDesignNote || ""),
+        imagePromptEN: String(sl.imagePromptEN || ""),
+      }))
+    : [];
 
-  /* 2. Lâminas de Carrossel 4:5 (10 slides completos — Seção 4.4) */
-  const carouselSlides: CarouselSlideItem[] = [
-    {
-      slideNumber: 1,
-      roleLabel: "Slide 01 · Capa Magnética (Hook & Promessa)",
-      headline: title,
-      bodyLineBreakCopy: `O protocolo prático para dominar ${subniche}\nsem depender de improviso diário.`,
-      visualDesignNote:
-        "Fundo #080B12 (Obsidian Dark), tipografia principal em branco puro, destaque na palavra-chave em Ouro (#D4AF37), seta discreta de swipe no canto direito.",
-      imagePromptEN: `Minimalist luxury editorial cover, dark obsidian background #080B12, subtle champagne gold geometric lines #D4AF37, high contrast studio lighting, executive authority aesthetic for ${niche}, 4:5 aspect ratio --ar 4:5`,
-    },
-    {
-      slideNumber: 2,
-      roleLabel: "Slide 02 · O Sintoma Silencioso (Identificação)",
-      headline: "Por que tanto esforço gera tão pouca previsibilidade?",
-      bodyLineBreakCopy: `A maioria dos profissionais em ${niche} acredita que\nprecisa apenas aumentar o volume de trabalho.\n\nMas volume sem direção estratégica só acelera o desgaste.`,
-      visualDesignNote:
-        "Layout editorial em 2 blocos com linha divisória dourada sutil.",
-      imagePromptEN: `Abstract dark editorial graphic showing scattered arrows vs one single golden laser beam of direction, dark navy and gold palette --ar 4:5`,
-    },
-    {
-      slideNumber: 3,
-      roleLabel: "Slide 03 · Diagnóstico do Erro Invisível",
-      headline: "Onde 90% das operações travam de verdade",
-      bodyLineBreakCopy: `O gargalo acontece quando você tenta decidir o que fazer\nno exato momento de executar.\n\nIsso gera ruído e atrai apenas curiosos desqualificados.`,
-      visualDesignNote:
-        "Destaque em caixa de alerta escura com borda âmbar/dourada.",
-      imagePromptEN: `Dark glassmorphism UI card showing diagnostic metrics in gold and emerald on deep black background --ar 4:5`,
-    },
-    {
-      slideNumber: 4,
-      roleLabel: "Slide 04 · A Virada de Paradigma (A Tese)",
-      headline: "A execução nunca começa pela peça final.",
-      bodyLineBreakCopy: `Ela começa pelo contexto estratégico:\n• Qual oferta precisa ser apoiada?\n• Qual objeção do ICP será quebrada?\n• Qual função RETINA (${retinaType}) está em jogo?`,
-      visualDesignNote: "Lista numerada escaneável com ícones dourados.",
-      imagePromptEN: `Architectural blueprint in glowing gold lines over dark matte obsidian surface, precision engineering metaphor --ar 4:5`,
-    },
-    {
-      slideNumber: 5,
-      roleLabel: "Slide 05 · Passo 01 do Método (MUV em Ação)",
-      headline: "Passo 01: Isole a Variável Prioritária",
-      bodyLineBreakCopy: `Em ${subniche}, elimine tudo que não contribui para\n"${strategicObjective}".\n\nFoque 100% da mensagem em uma única transformação clara.`,
-      visualDesignNote: "Badge 'PASSO 01' no topo esquerdo em fundo dourado.",
-      imagePromptEN: `Minimalist golden compass needle pointing north on dark slate texture, macro photography, shallow depth of field --ar 4:5`,
-    },
-    {
-      slideNumber: 6,
-      roleLabel: "Slide 06 · Passo 02 do Método (Estrutura)",
-      headline: "Passo 02: Conecte o Pilar à Dor do Comprador",
-      bodyLineBreakCopy: `Pilar ativo: ${editorialPillar}.\n\nQuando o comprador percebe que você descreve o problema dele\nmelhor do que ele mesmo, a autoridade é instantânea.`,
-      visualDesignNote:
-        "Diagrama simples de causa -> efeito no centro da lâmina.",
-      imagePromptEN: `Two interlocking golden rings symbolizing connection between strategy and buyer psychology on dark background --ar 4:5`,
-    },
-    {
-      slideNumber: 7,
-      roleLabel: "Slide 07 · Passo 03 do Método (Ritmo Realista)",
-      headline: "Passo 03: Respeite sua Capacidade Real",
-      bodyLineBreakCopy: `Não construa um plano de fantasia.\n\nUma agenda enxuta executada com precisão supera qualquer\nplanejamento gigante que morre na segunda semana.`,
-      visualDesignNote:
-        "Comparativo visual lado a lado: Fantasia (X) vs. Realidade Executável (✓).",
-      imagePromptEN: `Clean dark executive calendar grid with glowing gold highlights, high-end SaaS interface aesthetic --ar 4:5`,
-    },
-    {
-      slideNumber: 8,
-      roleLabel: "Slide 08 · Quebra da Objeção Principal",
-      headline: `"Mas e se: ${icpPainOrObjection}?"`,
-      bodyLineBreakCopy: `É exatamente quando a rotina está intensa que você mais\nprecisa de um sistema pré-definido.\n\nO método existe para devolver tempo, não para tomar.`,
-      visualDesignNote:
-        "Citação da objeção no topo + resposta direta em destaque.",
-      imagePromptEN: `Dark luxury hourglass with golden sand flowing smoothly, symbol of time mastery and executive control --ar 4:5`,
-    },
-    {
-      slideNumber: 9,
-      roleLabel: "Slide 09 · Resumo Executivo (Lâmina de Salvamento)",
-      headline: "Resumo para Consultar Sempre:",
-      bodyLineBreakCopy: `1. Nunca execute sem contexto estratégico.\n2. Ataque uma dor ou objeção real de ${subniche}.\n3. Equilibre os 6 tipos da matriz RETINA.\n4. Transforme cada pauta em um ativo reutilizável.`,
-      visualDesignNote:
-        "Quadro estilo 'Cheat Sheet' desenhado para estimular o clique em Salvar.",
-      imagePromptEN: `Structured golden checklist card floating over dark carbon background, crisp lighting --ar 4:5`,
-    },
-    {
-      slideNumber: 10,
-      roleLabel: "Slide 10 · Chamada para Ação (CTA & Próximo Passo)",
-      headline: "Salve este post para aplicar na sua semana.",
-      bodyLineBreakCopy: `Quer ter acesso ao nosso material prático de ${subniche}?\n\nLeia a legenda abaixo e comente a palavra-chave ou acesse\no link do nosso perfil.`,
-      visualDesignNote:
-        "Botão visual de Salvar + Compartilhar destacados em ouro champagne.",
-      imagePromptEN: `Minimalist dark luxury closing slide with golden bookmark icon and subtle spotlight --ar 4:5`,
-    },
-  ];
+  const storyPeriods: StoryPeriodSequence[] = Array.isArray(s.storyPeriods)
+    ? s.storyPeriods.map((sp: any) => ({
+        period: (sp.period || "Manhã") as "Manhã" | "Almoço" | "Tarde" | "Noite",
+        suggestedTime: String(sp.suggestedTime || "09:00"),
+        narrativeTheme: String(sp.narrativeTheme || ""),
+        cards: Array.isArray(sp.cards)
+          ? sp.cards.map((c: any, cIdx: number) => ({
+              id: c.id ? String(c.id) : undefined,
+              cardNumber: Math.min(5, Math.max(1, Number(c.cardNumber || cIdx + 1))) as
+                | 1
+                | 2
+                | 3
+                | 4
+                | 5,
+              cardType: (c.cardType || "video_fala") as
+                | "video_fala"
+                | "texto_sobre_foto"
+                | "bastidor_prova",
+              intentionLabel: String(c.intentionLabel || `Card ${cIdx + 1}`),
+              wordForWordScript: String(c.wordForWordScript || c.spokenText || ""),
+              connectionBullet: String(c.connectionBullet || c.wordForWordScript || ""),
+              mirrorCaptionNoSound: String(c.mirrorCaptionNoSound || c.mirrorCaption || ""),
+              instagramSticker: String(c.instagramSticker || c.sticker || "Sem sticker"),
+              visualBrandingNote: String(c.visualBrandingNote || ""),
+            }))
+          : [],
+      }))
+    : [];
 
-  /* 3. Sequências Diárias de Stories (4 Blocos x 5 Cards = 20 Stories + Q&A — Seção 4.6) */
-  const buildStoryCardsForPeriod = (
-    period: "Manhã" | "Almoço" | "Tarde" | "Noite"
-  ): StoryCardItem[] => [
-    {
-      cardNumber: 1,
-      cardType: "texto_sobre_foto",
-      intentionLabel: `Card 1 (${period}) · Abertura & Contextualização Silenciosa`,
-      wordForWordScript: `Hoje o foco na nossa operação de ${subniche} está em um ponto que 90% ignora: "${title}".\n\nSe você já sentiu que ${icpPainOrObjection.toLowerCase()}, acompanhe os próximos stories.`,
-      connectionBullet: `Foto de bastidor de trabalho + Texto de 3 parágrafos curtos introduzindo "${title}".`,
-      mirrorCaptionNoSound: `Foco do dia em ${subniche}: como resolver "${title}" sem improviso.`,
-      instagramSticker:
-        "Enquete: Você já tem isso estruturado hoje? [Sim, 100% / Ainda travo nisso]",
-      visualBrandingNote:
-        "Foto autoral escurecida em 40% + Caixa de texto com fundo preto translúcido e título em Ouro.",
-    },
-    {
-      cardNumber: 2,
-      cardType: "video_fala",
-      intentionLabel: `Card 2 (${period}) · Diagnóstico Falado + Legenda Espelho`,
-      wordForWordScript: `Olha só: muita gente me pergunta por que trava nessa etapa de ${subniche}. A verdade é que sem definir "${editorialPillar}" antes, qualquer esforço vira retrabalho.`,
-      connectionBullet: `[VÍDEO 15s] Olhar direto p/ câmera -> Explicar a causa raiz de "${title}" em 1 frase forte.`,
-      mirrorCaptionNoSound: `RESUMO NA TELA: Por que tentar executar ${subniche} sem definir "${editorialPillar}" gera retrabalho constante.`,
-      instagramSticker:
-        "Sem sticker (foco total na retenção da fala e leitura da legenda espelho)",
-      visualBrandingNote:
-        "Enquadramento vertical limpo + Legenda espelho posicionada no terço central para leitura sem áudio.",
-    },
-    {
-      cardNumber: 3,
-      cardType: "bastidor_prova",
-      intentionLabel: `Card 3 (${period}) · Bastidor Prático / Framework na Tela`,
-      wordForWordScript: `Aqui está exatamente como nós estruturamos esse bloco na prática:\n1. Diagnóstico do gargalo\n2. Alinhamento com a promessa ROMA\n3. Execução enxuta conectada à meta de ${strategicObjective.toLowerCase()}.`,
-      connectionBullet: `Print ou foto da tela mostrando os 3 passos práticos aplicados no projeto.`,
-      mirrorCaptionNoSound: `Os 3 passos que usamos no bastidor para garantir ${strategicObjective.toLowerCase()}.`,
-      instagramSticker:
-        "Slider de Reação (🔥): Faz sentido essa lógica para o seu momento?",
-      visualBrandingNote:
-        "Fundo #080B12 ou foto de monitor com setas douradas apontando para a estrutura.",
-    },
-    {
-      cardNumber: 4,
-      cardType: "video_fala",
-      intentionLabel: `Card 4 (${period}) · Quebra de Objeção & Aprofundamento`,
-      wordForWordScript: `E se você acha que precisa do dia inteiro livre para aplicar isso em ${niche}, é justamente o contrário: ter essa clareza economiza horas da sua semana.`,
-      connectionBullet: `[VÍDEO 15s] Quebrar a objeção "${icpPainOrObjection}" com exemplo real.`,
-      mirrorCaptionNoSound: `Clareza estratégica não toma o seu tempo — ela devolve horas da sua semana em ${niche}.`,
-      instagramSticker: "Sem sticker",
-      visualBrandingNote:
-        "Legenda espelho com destaque colorido nas palavras-chave de transformação.",
-    },
-    {
-      cardNumber: 5,
-      cardType: "texto_sobre_foto",
-      intentionLabel: `Card 5 (${period}) · Fechamento do Bloco & Abertura de Interação`,
-      wordForWordScript: `Qual é a sua maior dúvida hoje sobre aplicar essa estrutura na sua operação de ${subniche}?\n\nDeixe aqui abaixo que vou responder as mais estratégicas no próximo bloco.`,
-      connectionBullet: `Card final do bloco convidando para interação direta na caixinha ou Direct.`,
-      mirrorCaptionNoSound: `Mande sua dúvida específica sobre ${subniche} na caixinha abaixo.`,
-      instagramSticker:
-        period === "Tarde" || period === "Noite"
-          ? `Caixa de Perguntas: "Qual seu maior gargalo hoje em ${subniche}?"`
-          : `Enquete Qualificadora: "Quer ver um exemplo prático disso no próximo bloco?"`,
-      visualBrandingNote:
-        "Design limpo centralizando o Sticker interativo na zona de toque confortável (Lei de Fitts).",
-    },
-  ];
+  const titleVariations: TitleVariationItem[] = Array.isArray(s.titleVariations)
+    ? s.titleVariations.map((tv: any, idx: number) => ({
+        id: String(tv.id || `tv-${idx + 1}`),
+        hookCategory: (tv.hookCategory || "Erro Invisível") as TitleVariationItem["hookCategory"],
+        titleText: String(tv.titleText || tv.title || s.title || ""),
+        estimatedCtrBadge: String(tv.estimatedCtrBadge || "Variação estratégica"),
+        isSelected: Boolean(tv.isSelected),
+      }))
+    : Array.isArray(s.titles)
+      ? s.titles.map((tv: any, idx: number) => ({
+          id: `tv-${idx + 1}`,
+          hookCategory: "Erro Invisível",
+          titleText: String(tv.title || tv),
+          estimatedCtrBadge: String(tv.hookType || "Sugestão"),
+          isSelected: idx === 0,
+        }))
+      : [];
 
-  const storyPeriods: StoryPeriodSequence[] = [
-    {
-      period: "Manhã",
-      suggestedTime: "08:30",
-      narrativeTheme: `Abertura Contextual & Diagnóstico — ${title}`,
-      cards: buildStoryCardsForPeriod("Manhã"),
-    },
-    {
-      period: "Almoço",
-      suggestedTime: "12:30",
-      narrativeTheme: `Bastidor Técnico & Micro-Transformação — ${editorialPillar}`,
-      cards: buildStoryCardsForPeriod("Almoço"),
-    },
-    {
-      period: "Tarde",
-      suggestedTime: "16:30",
-      narrativeTheme: `Autoridade, Prova Real & Manifesto de Valores`,
-      cards: buildStoryCardsForPeriod("Tarde"),
-    },
-    {
-      period: "Noite",
-      suggestedTime: "20:30",
-      narrativeTheme: `Respostas Preditivas de Q&A & Condução para Oferta`,
-      cards: buildStoryCardsForPeriod("Noite"),
-    },
-  ];
+  const imagePrompts: ImagePromptAsset[] = Array.isArray(s.imagePrompts)
+    ? s.imagePrompts.map((ip: any, idx: number) => ({
+        id: String(ip.id || `img-${idx + 1}`),
+        targetPiece: String(ip.targetPiece || "Capa Editorial"),
+        visualConceptPT: String(ip.visualConceptPT || ""),
+        promptEnglish: String(ip.promptEnglish || ""),
+        textOverlaySuggestion: String(ip.textOverlaySuggestion || ""),
+      }))
+    : Array.isArray(s.thumbnailPrompts)
+      ? s.thumbnailPrompts.map((tp: any, idx: number) => ({
+          id: `img-${idx + 1}`,
+          targetPiece: `Capa ${idx + 1}`,
+          visualConceptPT: String(tp.description || ""),
+          promptEnglish: String(tp.promptEn || ""),
+          textOverlaySuggestion: String(s.title || "").slice(0, 48).toUpperCase(),
+        }))
+      : [];
 
-  const predictiveQAs: PredictiveQAItem[] = [
-    {
-      id: "qa-1",
-      questionFromAudience: `Como começar a estruturar isso em ${subniche} se minha rotina já está no limite?`,
-      strategicAnswerCopy: `Comece isolando apenas os 2 formatos de maior alavancagem da sua semana. Você não vence pelo volume de horas, mas pela precisão do contexto estratégico antes de executar.`,
-      recommendedFormat: "Vídeo com Legenda Espelho",
-      qualifiedForMaterial: true,
-    },
-    {
-      id: "qa-2",
-      questionFromAudience: `Essa metodologia funciona mesmo para quem tem um público muito técnico em ${niche}?`,
-      strategicAnswerCopy: `Públicos técnicos são os que mais rejeitam promessas rasas e mais valorizam método claro (MUV). Quando você organiza sua linha editorial por pilares lógicos, sua autoridade multiplica.`,
-      recommendedFormat: "Texto sobre Foto",
-      qualifiedForMaterial: false,
-    },
-    {
-      id: "qa-3",
-      questionFromAudience: `Qual é o próximo passo para implementar isso com o acompanhamento de vocês?`,
-      strategicAnswerCopy: `Nós organizamos todo esse ecossistema junto com você para que sua operação rode com previsibilidade. Me envie a palavra "DIREÇÃO" aqui no Direct que te explico como funciona.`,
-      recommendedFormat: "Vídeo com Legenda Espelho",
-      qualifiedForMaterial: true,
-    },
-  ];
+  const compMat = s.complementaryMaterial || s.complementaryMaterials?.[0];
+  const explMat = s.explanationMaterial || s.explanationMaterials?.[0];
 
-  /* 4. Legenda com Gancho Outdoor + SEO */
-  const captionOutdoorHook = `${title.toUpperCase()} — A verdade que separa operações previsíveis de quem vive apagando incêndio em ${subniche}.`;
-  const captionBody = [
-    `Publicar ou executar ações isoladas em ${niche} sem uma direção estratégica clara é o caminho mais rápido para trabalhar muito e colher resultados inconstantes.`,
-    `Quando analisamos o pilar "${editorialPillar}", fica evidente que o verdadeiro gargalo não está na falta de esforço, mas em tentar decidir tudo no improviso.`,
-    `Neste conteúdo, estruturamos os 3 pontos centrais para você virar essa chave:\n• Como identificar o erro invisível que drena sua margem;\n• Como conectar cada ação ao Mecanismo Único da sua oferta;\n• Como manter consistência respeitando sua capacidade real de produção.`,
-  ].join("\n\n");
-  const captionCta = isQualified
-    ? `Salve este conteúdo para consultar na sua semana e comente "MAPA" (ou acesse o link da descrição/bio) para baixar o material complementar prático desta pauta.`
-    : `Salve este post para revisar antes do seu próximo planejamento semanal e compartilhe com quem precisa organizar a operação de ${subniche}.`;
+  const versionHistory: ScriptVersionSnapshot[] = Array.isArray(s.versionHistory)
+    ? s.versionHistory.map((vh: any) => ({
+        versionLabel: String(vh.versionLabel || `v${vh.version || 1}.0`),
+        savedAt: String(vh.savedAt || "Salvo"),
+        modeUsed: speakingMode,
+        summaryNote: String(vh.summaryNote || vh.comment || ""),
+      }))
+    : [];
 
-  /* 5. Mínimo de 6 Títulos Etiquetados por Gancho + Prompts de Imagem (EN) */
-  const titleVariations: TitleVariationItem[] = [
-    {
-      id: "ttl-1",
-      hookCategory: "Erro Invisível",
-      titleText: title,
-      estimatedCtrBadge: "CTR Alto • Principal",
-      isSelected: true,
-    },
-    {
-      id: "ttl-2",
-      hookCategory: "Contraste Direto",
-      titleText: `Por que 90% trava em ${subniche} (e o protocolo de 4 etapas para ter previsibilidade)`,
-      estimatedCtrBadge: "Retenção Forte",
-      isSelected: false,
-    },
-    {
-      id: "ttl-3",
-      hookCategory: "Mecanismo Único (MUV)",
-      titleText: `A Engenharia Silenciosa por trás de uma operação de ${subniche} enxuta e lucrativa`,
-      estimatedCtrBadge: "Autoridade Premium",
-      isSelected: false,
-    },
-    {
-      id: "ttl-4",
-      hookCategory: "Anti-Clichê",
-      titleText: `Pare de seguir a regra tradicional de ${niche}: faça este ajuste estrutural antes`,
-      estimatedCtrBadge: "Quebra de Padrão",
-      isSelected: false,
-    },
-    {
-      id: "ttl-5",
-      hookCategory: "Quebra de Objeção",
-      titleText: `Como dominar ${subniche} em menos de 1 hora por semana sem depender de improviso`,
-      estimatedCtrBadge: "Foco em Rotina",
-      isSelected: false,
-    },
-    {
-      id: "ttl-6",
-      hookCategory: "Estudo de Caso / Prova",
-      titleText: `Por dentro do nosso sistema de ${subniche}: o que mudamos para destravar a conversão`,
-      estimatedCtrBadge: "Bastidor Real",
-      isSelected: false,
-    },
-  ];
-
-  const imagePrompts: ImagePromptAsset[] = [
-    {
-      id: "img-1",
-      targetPiece: "Thumbnail Principal / Capa de Alto CTR",
-      visualConceptPT:
-        "Especialista em ambiente de estúdio escuro sofisticado, expressão firme de diagnóstico, elemento gráfico dourado representando clareza vs. ruído ao fundo.",
-      promptEnglish: `Cinematic executive portrait in a dark luxury studio #080B12, dramatic rim lighting in champagne gold #D4AF37, subtle holographic strategy blueprint in the background representing ${subniche}, ultra-sharp 8k photography, high contrast, editorial authority aesthetic --ar 16:9`,
-      textOverlaySuggestion: `FIM DO IMPROVISO EM ${subniche.toUpperCase()}`,
-    },
-    {
-      id: "img-2",
-      targetPiece:
-        "Capa Vertical 9:16 / 4:5 (Reels, Carrossel ou Post Estático)",
-      visualConceptPT:
-        "Composição minimalista Dark/Gold com metáfora visual de precisão e controle estratégico.",
-      promptEnglish: `Minimalist dark obsidian composition #080B12 with a glowing golden compass and architectural grid lines #CFA965, depth of field, luxury SaaS brand identity for ${niche}, clean negative space at top for typography --ar 4:5`,
-      textOverlaySuggestion: title.slice(0, 48),
-    },
-  ];
+  const updatedLabel = s.updatedAt
+    ? new Date(s.updatedAt).toLocaleDateString("pt-BR")
+    : "Atualizado";
 
   return {
-    id: params.id || `scr-${Date.now()}`,
-    projectId,
-    title,
+    id: String(s.id || s._id || ""),
+    projectId: String(s.projectId || ""),
+    title: String(s.title || "Roteiro Editorial"),
     formatSlug,
-    calendarSlotFormat: formatMeta.slotFormat,
-    originType,
-    linkedSlotId,
-    linkedSlotLabel,
-    linkedThemeId,
-    retinaType,
-    strategicObjective,
-    editorialPillar,
-    icpPainOrObjection,
-    businessMoment,
-    platform,
-    estimatedDurationOrSize: formatMeta.defaultDuration,
-    status: params.status || "ready",
-    speakingMode: resolvedMode,
-    version: "v1.0",
-    updatedAt: "Gerado e sincronizado agora",
+    calendarSlotFormat: s.calendarSlotFormat
+      ? mapBackendFormatToUi(s.calendarSlotFormat)
+      : meta.slotFormat,
+    originType: s.originType === "theme_library" ? "theme_library" : "calendar_slot",
+    linkedSlotId: s.linkedSlotId || s.calendarSlotId || undefined,
+    linkedSlotLabel:
+      s.linkedSlotLabel ||
+      (s.calendarSlotId ? "Vinculado ao Calendário Editorial" : "Criado no Studio"),
+    linkedThemeId: s.linkedThemeId || s.themeId || undefined,
+    retinaType: mapBackendRetinaToUi(s.retinaType),
+    strategicObjective: String(s.strategicObjective || "Posicionamento"),
+    editorialPillar: String(s.editorialPillar || "Pilar Estratégico"),
+    icpPainOrObjection: String(
+      s.icpPainOrObjection || "Contexto mapeado na Base Estratégica."
+    ),
+    businessMoment: String(s.businessMoment || "Ciclo editorial atual"),
+    platform: String(s.platform || "Instagram"),
+    estimatedDurationOrSize: String(
+      s.estimatedDurationOrSize || meta.defaultDuration
+    ),
+    status: mapBackendStatusToUiStatus(s.status),
+    speakingMode,
+    version:
+      s.versionLabel || (typeof s.version === "number" ? `v${s.version}.0` : "v1.0"),
+    updatedAt: updatedLabel,
     scriptBlocks,
-    connectionSevenLinesChecklist,
+    connectionSevenLinesChecklist: Array.isArray(s.connectionSevenLinesChecklist)
+      ? s.connectionSevenLinesChecklist.map(String)
+      : [],
     carouselSlides,
     storyPeriods,
-    predictiveQAs,
-    postLiveStoriesSummary: [
-      "Story Pós-Live 01 (Texto sobre Foto): Bastidor da mesa de trabalho + 'Acabamos de encerrar uma aula densa sobre os 3 pilares da semana' + Enquete.",
-      "Story Pós-Live 02 (Vídeo com Legenda Espelho): Resumo de 15s da maior virada de chave da Live + chamada para assistir à gravação.",
-      "Story Pós-Live 03 (Card de Conversão): Link direto para baixar o Material Complementar liberado durante a transmissão.",
-    ],
-    captionOutdoorHook,
-    captionBody,
-    captionCta,
-    seoKeywords: [
-      niche.toLowerCase(),
-      subniche.toLowerCase(),
-      "estratégia",
-      "método passo a passo",
-      "previsibilidade",
-    ],
-    seoTags: [
-      `#${niche.replace(/\s+/g, "")}`,
-      `#${subniche.replace(/\s+/g, "")}`,
-      "#AutoridadeImperial",
-      "#EstrategiaEditorial",
-    ],
-    youtubeChapters: [
-      "00:00 O erro invisível que trava a operação",
-      "01:15 Por que o modelo tradicional falha",
-      "03:10 Pilar 1: Diagnóstico de contexto",
-      "06:20 Pilar 2: Aplicação do Mecanismo Único (MUV)",
-      "09:40 Quebra de objeção prática na rotina",
-      "11:50 Próximo passo + Material Complementar",
-    ],
+    predictiveQAs: Array.isArray(s.predictiveQAs) ? s.predictiveQAs : [],
+    postLiveStoriesSummary: Array.isArray(s.postLiveStoriesSummary)
+      ? s.postLiveStoriesSummary.map(String)
+      : [],
+    captionOutdoorHook: String(s.captionOutdoorHook || ""),
+    captionBody: String(s.captionBody || s.caption || ""),
+    captionCta: String(s.captionCta || ""),
+    seoKeywords: Array.isArray(s.seoKeywords) ? s.seoKeywords.map(String) : [],
+    seoTags: Array.isArray(s.seoTags) ? s.seoTags.map(String) : [],
+    youtubeChapters: Array.isArray(s.youtubeChapters)
+      ? s.youtubeChapters.map(String)
+      : [],
     titleVariations,
     imagePrompts,
-    qualifiedForComplementaryMaterial: isQualified,
-    complementaryMaterial: {
-      typeLabel:
-        formatSlug === "long_video"
-          ? "Planilha Executiva XLSX"
-          : "Checklist PDF",
-      title: `Diagnóstico & Checklist Executivo — ${title.slice(0, 44)}`,
-      promise: `Aplicar em 15 minutos os critérios de ${subniche} abordados neste conteúdo sem perder etapas.`,
-      sectionsOutline: [
-        "1. Recapitulação do Problema Real com as palavras do comprador",
-        "2. Checklist de Verificação Rápida em 5 Critérios (Sim / Não)",
-        "3. Matriz de Ação Imediata conectada ao Mecanismo Único (MUV)",
-        "4. Convite proporcional para o próximo passo da oferta principal",
-      ],
-    },
-    explanationMaterial: {
-      typeLabel: "Mapa Mental da Aula",
-      title: `Mapa Mental & Diagrama Didático — ${editorialPillar}`,
-      diagramNodes: [
-        `Nó Central: ${title}`,
-        `Ramo 01 (Causa Raiz): Superar "${icpPainOrObjection}"`,
-        `Ramo 02 (Pilar da Linha): ${editorialPillar}`,
-        `Ramo 03 (Função RETINA): ${RETINA_META[retinaType].label} — ${strategicObjective}`,
-        `Ramo 04 (Execução Prática): Checklist de implementação semanal`,
-      ],
-    },
-    briefingCutAdjustment:
-      "Manter tom direto, pragmático e orientado a causa e efeito, sem promessas apelativas.",
-    mandatoryExamplesToInclude: `Citar exemplo real de tomada de decisão em ${subniche} comparando operação no improviso vs. operação guiada por método.`,
-    brandStoryConnection:
-      "Conectar com a tese soberana da marca: nenhum ativo nasce solto; toda peça serve à estratégia do negócio.",
-    selectedReferenceNote:
-      "Estrutura validada de alta retenção nos primeiros 3 segundos + corte de linha escaneável.",
-    versionHistory: [
-      {
-        versionLabel: "v1.0 (Original)",
-        savedAt: "Criado hoje",
-        modeUsed: resolvedMode,
-        summaryNote: `Gerado com contexto completo de ${originType === "calendar_slot" ? "Slot do Calendário" : "Tema da Biblioteca"}.`,
-      },
-    ],
+    qualifiedForComplementaryMaterial: Boolean(
+      s.qualifiedForComplementaryMaterial ?? compMat
+    ),
+    complementaryMaterial: compMat
+      ? {
+          typeLabel: (compMat.typeLabel || "Checklist PDF") as
+            | "Checklist PDF"
+            | "Workbook Prático"
+            | "Planilha Executiva XLSX",
+          title: String(compMat.title || `Material: ${s.title || "Conteúdo"}`),
+          promise: String(compMat.promise || ""),
+          sectionsOutline: Array.isArray(compMat.sectionsOutline)
+            ? compMat.sectionsOutline.map(String)
+            : Array.isArray(compMat.structure)
+              ? compMat.structure.map(String)
+              : [],
+        }
+      : {
+          typeLabel: "Checklist PDF",
+          title: "Material complementar",
+          promise: "",
+          sectionsOutline: [],
+        },
+    explanationMaterial: explMat
+      ? {
+          typeLabel: (explMat.typeLabel || "Mapa Mental da Aula") as
+            | "Mapa Mental da Aula"
+            | "Framework Visual PDF"
+            | "Planilha Didática",
+          title: String(explMat.title || "Mapa Mental de Apoio"),
+          diagramNodes: Array.isArray(explMat.diagramNodes)
+            ? explMat.diagramNodes.map(String)
+            : explMat.content
+              ? String(explMat.content).split("\n").filter(Boolean)
+              : [],
+        }
+      : {
+          typeLabel: "Mapa Mental da Aula",
+          title: "Mapa Mental de Apoio",
+          diagramNodes: [],
+        },
+    briefingCutAdjustment: String(s.briefingCutAdjustment || ""),
+    mandatoryExamplesToInclude: String(s.mandatoryExamplesToInclude || ""),
+    brandStoryConnection: String(
+      s.brandStoryConnection || brandStoryFallback || ""
+    ),
+    selectedReferenceNote: String(
+      s.selectedReferenceNote || referenceNoteFallback || ""
+    ),
+    versionHistory,
   };
-}
-
-function createInitialScriptsDataset(
-  projectId: string,
-  niche: string,
-  subniche: string
-): EditorialScriptRecord[] {
-  return [
-    buildCompleteScriptPackage({
-      id: "scr-canon-01",
-      projectId,
-      title: `O erro invisível que trava resultados em ${subniche} mesmo dedicando horas`,
-      formatSlug: "short_video",
-      originType: "calendar_slot",
-      linkedSlotId: "slot-w1-d2-1",
-      linkedSlotLabel: "Segunda-feira, 02 Nov • 12:00 • Instagram Reels",
-      retinaType: "Engajamento",
-      strategicObjective:
-        "Atrair audiência qualificada quebrando uma crença comum",
-      editorialPillar: "01. Visão de Mundo & Quebra de Mitos do Mercado",
-      icpPainOrObjection: "Mito de que volume bruto sem direção gera resultado",
-      businessMoment: "Aquecimento — Semana 2 de 4",
-      platform: "Instagram",
-      niche,
-      subniche,
-      speakingMode: "conexao_bullets",
-      qualifiedForMaterial: false,
-      status: "ready",
-    }),
-    buildCompleteScriptPackage({
-      id: "scr-canon-02",
-      projectId,
-      title: `Como diagnosticar gargalos operacionais em ${subniche} em 15 minutos`,
-      formatSlug: "carousel",
-      originType: "calendar_slot",
-      linkedSlotId: "slot-w1-d2-2",
-      linkedSlotLabel: "Segunda-feira, 02 Nov • 19:00 • Carrossel 4:5",
-      retinaType: "Transformacao",
-      strategicObjective:
-        "Gerar salvamentos qualificados e provar competência técnica",
-      editorialPillar: "04. Educação Prática & Transformação Aplicável",
-      icpPainOrObjection:
-        "Desejo de ter um método prático que caiba na rotina real",
-      businessMoment: "Aquecimento — Semana 2 de 4",
-      platform: "Instagram",
-      niche,
-      subniche,
-      qualifiedForMaterial: true,
-      status: "ready",
-    }),
-    buildCompleteScriptPackage({
-      id: "scr-canon-03",
-      projectId,
-      title: `Masterclass: Como estruturar o Mecanismo Único de ${subniche} do zero até a conversão`,
-      formatSlug: "long_video",
-      originType: "calendar_slot",
-      linkedSlotId: "slot-w1-d4-1",
-      linkedSlotLabel: "Quarta-feira, 04 Nov • 17:00 • YouTube",
-      retinaType: "Transformacao",
-      strategicObjective:
-        "Aprofundar consciência e demonstrar domínio técnico",
-      editorialPillar: "03. Mecanismo Único da Oferta (MUV em Ação)",
-      icpPainOrObjection: "Precisa ver profundidade técnica antes de confiar",
-      businessMoment: "Aquecimento — Semana 2 de 4",
-      platform: "YouTube",
-      niche,
-      subniche,
-      speakingMode: "seguranca_palavra",
-      qualifiedForMaterial: true,
-      status: "ready",
-    }),
-    buildCompleteScriptPackage({
-      id: "scr-canon-04",
-      projectId,
-      title: `Live Semanal #1: Consultoria Ao Vivo & Quebra de Travas em ${subniche}`,
-      formatSlug: "live",
-      originType: "calendar_slot",
-      linkedSlotId: "slot-w1-d6-1",
-      linkedSlotLabel: "Sexta-feira, 06 Nov • 20:00 • YouTube & Instagram",
-      retinaType: "Autoridade",
-      strategicObjective:
-        "Interagir ao vivo, demonstrar repertório e conduzir para a oferta",
-      editorialPillar: "06. Superação de Objeções & Condução para Oferta",
-      icpPainOrObjection:
-        "Dúvida se o método funciona especificamente para o seu modelo",
-      businessMoment: "Aquecimento — Semana 2 de 4",
-      platform: "YouTube",
-      niche,
-      subniche,
-      qualifiedForMaterial: true,
-      status: "draft",
-    }),
-    buildCompleteScriptPackage({
-      id: "scr-canon-05",
-      projectId,
-      title: `Diagnóstico Comparativo: Operador Amador vs. Estrategista em ${niche}`,
-      formatSlug: "static_post",
-      originType: "calendar_slot",
-      linkedSlotId: "slot-w1-d3-2",
-      linkedSlotLabel: "Terça-feira, 03 Nov • 18:30 • Post Estático",
-      retinaType: "Interacao",
-      strategicObjective:
-        "Gerar comentários qualificados e mapear objeções no Direct",
-      editorialPillar: "02. Diagnóstico dos Erros Invisíveis do ICP",
-      icpPainOrObjection:
-        "Dúvida sobre em qual estágio o próprio negócio está travado",
-      businessMoment: "Aquecimento — Semana 2 de 4",
-      platform: "Instagram",
-      niche,
-      subniche,
-      qualifiedForMaterial: false,
-      status: "ready",
-    }),
-    buildCompleteScriptPackage({
-      id: "scr-canon-06",
-      projectId,
-      title: `Narrativa Diária de Stories — 4 Sequências Completas (Manhã, Almoço, Tarde e Noite + Q&A)`,
-      formatSlug: "stories_sequence",
-      originType: "calendar_slot",
-      linkedSlotId: "slot-w1-d2-stories",
-      linkedSlotLabel:
-        "Segunda-feira, 02 Nov • 08:30 / 12:30 / 16:30 / 20:30",
-      retinaType: "Relacionamento",
-      strategicObjective:
-        "Sustentar narrativa fracionada ao longo do dia com Q&A",
-      editorialPillar: "05. Bastidores da Execução & Provas Reais",
-      icpPainOrObjection:
-        "Manter o comprador aquecido combinando rotina, prova e interação",
-      businessMoment: "Aquecimento — Semana 2 de 4",
-      platform: "Instagram",
-      niche,
-      subniche,
-      speakingMode: "conexao_bullets",
-      qualifiedForMaterial: false,
-      status: "ready",
-    }),
-  ];
 }
 
 /* ========================================================================== */
@@ -1192,25 +754,18 @@ function createInitialScriptsDataset(
 /* ========================================================================== */
 
 export function RoteirosEditorialModule(props: RoteirosEditorialModuleProps) {
-  const resolvedProjectId = props.projectId || "proj-default";
-  const projectName = props.projectName || "Produto X — Lançamento Semente";
-  const resolvedNiche = props.projectNiche || "Finanças & Investimentos";
-  const resolvedSubniche = props.projectSubniche || "Algorithmic Trading";
-  const resolvedObjective = props.projectObjective || "Conversão";
-  const resolvedPhase = props.currentPhase || "Aquecimento — Semana 2 de 4";
+  const resolvedProjectId = props.projectId || "";
+  const hasValidProjectId = SCRIPT_OBJECT_ID_REGEX.test(resolvedProjectId);
+  const projectName = props.projectName || "Projeto Editorial";
+  const resolvedObjective = props.projectObjective || "Posicionamento";
+  const resolvedPhase = props.currentPhase || "Ciclo editorial atual";
 
-  const scriptsStorageKey = `la-roteiros-editorial-v2-${resolvedProjectId}`;
-  const calendarStorageKey = `la-calendario-editorial-v2-${resolvedProjectId}`;
-  const themesStorageKey = `la-temas-editorial-v2-${resolvedProjectId}`;
-
-  /* Lista de Roteiros do Projeto */
-  const [scripts, setScripts] = useState<readonly EditorialScriptRecord[]>(() =>
-    createInitialScriptsDataset(
-      resolvedProjectId,
-      resolvedNiche,
-      resolvedSubniche
-    )
-  );
+  /* Lista de Roteiros do Projeto (MongoDB via BFF) */
+  const [scripts, setScripts] = useState<readonly EditorialScriptRecord[]>([]);
+  const [isLoadingData, setIsLoadingData] = useState<boolean>(hasValidProjectId);
+  const [isSubmittingScript, setIsSubmittingScript] = useState<boolean>(false);
+  const [brandStorySummary, setBrandStorySummary] = useState<string>("");
+  const [brandAssetReference, setBrandAssetReference] = useState<string>("");
 
   /* Slots do Calendário (F01) e Temas da Biblioteca (F02) carregados automaticamente */
   const [calendarSlots, setCalendarSlots] = useState<
@@ -1233,7 +788,7 @@ export function RoteirosEditorialModule(props: RoteirosEditorialModuleProps) {
     useState<ScriptFormatSlug>(props.initialFormatSlug || "short_video");
 
   const [activeScriptId, setActiveScriptId] = useState<string>(
-    props.initialScriptId || "scr-canon-01"
+    props.initialScriptId || ""
   );
 
   /* Aba Interna dentro da Tela de Listagem do Formato */
@@ -1281,6 +836,7 @@ export function RoteirosEditorialModule(props: RoteirosEditorialModuleProps) {
     useState<ScriptSpeakingMode>("conexao_bullets");
 
   const studioTitleRef = useRef<HTMLTextAreaElement | null>(null);
+  const updateTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   /* Opções dinâmicas para os seletores do Modal de Criação */
   const createSlotSelectOptions = useMemo((): readonly CustomSelectOption<string>[] => {
@@ -1303,50 +859,81 @@ export function RoteirosEditorialModule(props: RoteirosEditorialModuleProps) {
     ];
   }, [themeLibrary]);
 
-  /* Carrega Roteiros, Calendário (F01) e Temas (F02) do localStorage */
-  useEffect(() => {
-    try {
-      const savedScripts = window.localStorage.getItem(scriptsStorageKey);
-      if (savedScripts) {
-        const parsed = JSON.parse(savedScripts) as EditorialScriptRecord[];
-        if (Array.isArray(parsed) && parsed.length > 0) {
-          setScripts(parsed);
-          if (props.initialScriptId) {
-            const exists = parsed.some((s) => s.id === props.initialScriptId);
-            if (exists) {
-              setActiveScriptId(props.initialScriptId);
-              setViewStage("studio");
-            }
-          }
-        }
-      }
-
-      const savedCals = window.localStorage.getItem(calendarStorageKey);
-      if (savedCals) {
-        const parsedCals = JSON.parse(savedCals) as EditorialCalendarRecord[];
-        if (Array.isArray(parsedCals) && parsedCals[0]?.slots) {
-          setCalendarSlots(parsedCals[0].slots);
-        }
-      }
-
-      const savedThemes = window.localStorage.getItem(themesStorageKey);
-      if (savedThemes) {
-        const parsedThemes = JSON.parse(
-          savedThemes
-        ) as StrategicThemeRecord[];
-        if (Array.isArray(parsedThemes)) {
-          setThemeLibrary(parsedThemes);
-        }
-      }
-    } catch {
-      /* Ignora bloqueio de storage */
+  /* Carrega Roteiros, Calendário (F01), Temas (F02), BrandStory e Ativos via BFF */
+  const loadScriptsWorkspaceData = useCallback(async () => {
+    if (!hasValidProjectId) {
+      setIsLoadingData(false);
+      return;
     }
-  }, [
-    scriptsStorageKey,
-    calendarStorageKey,
-    themesStorageKey,
-    props.initialScriptId,
-  ]);
+
+    setIsLoadingData(true);
+    try {
+      const [rawScripts, rawCalendars, rawThemes, brandStoryRes, assetsRes] =
+        await Promise.all([
+          scriptsService.listScripts(resolvedProjectId),
+          editorialService.listCalendars(resolvedProjectId),
+          themesService.listLibrary(resolvedProjectId),
+          scriptsService.getBrandStory(resolvedProjectId).catch(() => null),
+          storageService.getAssets().catch(() => ({ assets: [] })),
+        ]);
+
+      const brandStoryText =
+        brandStoryRes?.narrative ||
+        brandStoryRes?.story ||
+        brandStoryRes?.summary ||
+        "";
+      const refAssetTitle = assetsRes?.assets?.[0]?.title
+        ? `Ativo de marca: ${assetsRes.assets[0].title}`
+        : "";
+      setBrandStorySummary(brandStoryText);
+      setBrandAssetReference(refAssetTitle);
+
+      const mappedScripts = rawScripts.map((s) =>
+        mapBackendScriptToRecord(s, brandStoryText, refAssetTitle)
+      );
+      setScripts(mappedScripts);
+
+      if (props.initialScriptId) {
+        const exists = mappedScripts.some(
+          (s) => s.id === props.initialScriptId
+        );
+        if (exists) {
+          setActiveScriptId(props.initialScriptId);
+          setViewStage("studio");
+        }
+      } else if (mappedScripts[0]) {
+        setActiveScriptId((prev) =>
+          prev && mappedScripts.some((s) => s.id === prev)
+            ? prev
+            : mappedScripts[0]!.id
+        );
+      }
+
+      const activeCalRaw =
+        rawCalendars.find((c) => c.status === "active") ?? rawCalendars[0];
+      if (activeCalRaw) {
+        const mappedCal = mapBackendCalendarToRecord(
+          activeCalRaw,
+          "Linha Editorial"
+        );
+        setCalendarSlots(mappedCal.slots);
+      } else {
+        setCalendarSlots([]);
+      }
+
+      setThemeLibrary(rawThemes.map(mapBackendThemeToRecord));
+    } catch {
+      setCopiedFeedback(
+        "Não foi possível carregar os roteiros do servidor agora."
+      );
+    } finally {
+      setIsLoadingData(false);
+    }
+  }, [hasValidProjectId, resolvedProjectId, props.initialScriptId]);
+
+  useEffect(() => {
+    void loadScriptsWorkspaceData();
+  }, [loadScriptsWorkspaceData]);
 
   /* Se veio com um Slot ou Tema pré-selecionado da Aba Calendário ou Temas, abre criação */
   useEffect(() => {
@@ -1359,38 +946,10 @@ export function RoteirosEditorialModule(props: RoteirosEditorialModuleProps) {
     }
   }, [props.initialPreselectedSlotId, props.initialPreselectedThemeTitle]);
 
-  const persistScripts = useCallback(
-    (nextScripts: readonly EditorialScriptRecord[]) => {
-      setScripts(nextScripts);
-      try {
-        window.localStorage.setItem(
-          scriptsStorageKey,
-          JSON.stringify(nextScripts)
-        );
-      } catch {
-        /* Ignora erro */
-      }
-    },
-    [scriptsStorageKey]
-  );
-
-  const currentScript = useMemo((): EditorialScriptRecord => {
-    return (
-      scripts.find((s) => s.id === activeScriptId) ??
-      scripts[0] ??
-      createInitialScriptsDataset(
-        resolvedProjectId,
-        resolvedNiche,
-        resolvedSubniche
-      )[0]!
-    );
-  }, [
-    scripts,
-    activeScriptId,
-    resolvedProjectId,
-    resolvedNiche,
-    resolvedSubniche,
-  ]);
+  const currentScript = useMemo((): EditorialScriptRecord | null => {
+    if (scripts.length === 0) return null;
+    return scripts.find((s) => s.id === activeScriptId) ?? scripts[0] ?? null;
+  }, [scripts, activeScriptId]);
 
   /* Auto-ajuste de altura do título editável no Studio para nunca cortar */
   useEffect(() => {
@@ -1398,18 +957,86 @@ export function RoteirosEditorialModule(props: RoteirosEditorialModuleProps) {
     if (!el) return;
     el.style.height = "auto";
     el.style.height = `${Math.max(44, el.scrollHeight)}px`;
-  }, [currentScript.title, viewStage]);
+  }, [currentScript?.title, viewStage]);
 
   const updateCurrentScript = useCallback(
-    (updater: (prev: EditorialScriptRecord) => EditorialScriptRecord) => {
-      const next = scripts.map((s) =>
-        s.id === currentScript.id
-          ? { ...updater(s), updatedAt: "Salvo automaticamente agora" }
-          : s
+    (
+      updater: (prev: EditorialScriptRecord) => EditorialScriptRecord,
+      immediate = false
+    ) => {
+      if (!currentScript) return;
+      const targetId = currentScript.id;
+      let nextRecord: EditorialScriptRecord | null = null;
+
+      setScripts((prevList) =>
+        prevList.map((s) => {
+          if (s.id !== targetId) return s;
+          nextRecord = { ...updater(s), updatedAt: "Salvo agora" };
+          return nextRecord;
+        })
       );
-      persistScripts(next);
+
+      if (!hasValidProjectId || !SCRIPT_OBJECT_ID_REGEX.test(targetId)) return;
+
+      const persistPatch = async () => {
+        if (!nextRecord) return;
+        try {
+          await scriptsService.updateScript(resolvedProjectId, targetId, {
+            title: nextRecord.title,
+            status: mapUiStatusToBackendStatus(nextRecord.status),
+            mode:
+              nextRecord.speakingMode === "seguranca_palavra"
+                ? "seguranca"
+                : "conexao",
+            speakingMode:
+              nextRecord.speakingMode === "seguranca_palavra"
+                ? "TELEPROMPTER"
+                : "BULLET_POINTS",
+            scriptBlocks:
+              nextRecord.scriptBlocks as unknown as Record<string, unknown>[],
+            carouselSlides:
+              nextRecord.carouselSlides as unknown as Record<string, unknown>[],
+            storyPeriods:
+              nextRecord.storyPeriods as unknown as Record<string, unknown>[],
+            caption: [
+              nextRecord.captionOutdoorHook,
+              nextRecord.captionBody,
+              nextRecord.captionCta,
+            ]
+              .filter(Boolean)
+              .join("\n\n"),
+            captionOutdoorHook: nextRecord.captionOutdoorHook,
+            captionBody: nextRecord.captionBody,
+            captionCta: nextRecord.captionCta,
+            qualifiedForComplementaryMaterial:
+              nextRecord.qualifiedForComplementaryMaterial,
+            complementaryMaterial:
+              nextRecord.complementaryMaterial as unknown as Record<
+                string,
+                unknown
+              >,
+            briefingCutAdjustment: nextRecord.briefingCutAdjustment,
+            mandatoryExamplesToInclude: nextRecord.mandatoryExamplesToInclude,
+            brandStoryConnection: nextRecord.brandStoryConnection,
+            selectedReferenceNote: nextRecord.selectedReferenceNote,
+            versionLabel: nextRecord.version,
+          });
+        } catch {
+          /* Mantém UI responsiva caso edição ocorra offline */
+        }
+      };
+
+      if (immediate) {
+        if (updateTimerRef.current) clearTimeout(updateTimerRef.current);
+        void persistPatch();
+      } else {
+        if (updateTimerRef.current) clearTimeout(updateTimerRef.current);
+        updateTimerRef.current = setTimeout(() => {
+          void persistPatch();
+        }, 500);
+      }
     },
-    [scripts, currentScript.id, persistScripts]
+    [currentScript, hasValidProjectId, resolvedProjectId]
   );
 
   const handleCopyText = (text: string, label: string) => {
@@ -1423,79 +1050,111 @@ export function RoteirosEditorialModule(props: RoteirosEditorialModuleProps) {
   };
 
   /* Roteirizar diretamente um Slot do Calendário (Função 01 -> Função 03) */
-  const handleCreateScriptFromCalendarSlot = (slot: CalendarSlotItem) => {
+  const handleCreateScriptFromCalendarSlot = async (slot: CalendarSlotItem) => {
+    if (!hasValidProjectId || isSubmittingScript) return;
     const slug = mapSlotFormatToScriptSlug(slot.format);
-    const created = buildCompleteScriptPackage({
-      projectId: resolvedProjectId,
-      title: slot.mainTheme.trim() || slot.provisionalTitle,
-      formatSlug: slug,
-      originType: "calendar_slot",
-      linkedSlotId: slot.id,
-      linkedSlotLabel: `${slot.dayOfWeekLabel}, ${String(slot.dayNumber).padStart(2, "0")} ${slot.monthShort} • ${slot.suggestedTime} • ${slot.platforms.join("/")}`,
-      retinaType: slot.retinaType,
-      strategicObjective: slot.strategicObjective,
-      editorialPillar: slot.editorialPillar,
-      icpPainOrObjection: slot.icpPainDesireOrObjection,
-      businessMoment: resolvedPhase,
-      platform: slot.platforms[0] || "Instagram",
-      niche: resolvedNiche,
-      subniche: resolvedSubniche,
-      qualifiedForMaterial: slot.eligibleForComplementaryMaterial,
-      status: "ready",
-    });
+    setIsSubmittingScript(true);
 
-    const next = [created, ...scripts];
-    persistScripts(next);
-    setSelectedFormatSlug(slug);
-    setActiveScriptId(created.id);
-    setStudioActiveTab("roteiro_blocos");
-    setViewStage("studio");
+    try {
+      const createdRaw = await scriptsService.createScript(resolvedProjectId, {
+        format: mapScriptSlugToBackendFormat(slug),
+        mode: "conexao",
+        calendarSlotId: SCRIPT_OBJECT_ID_REGEX.test(slot.id)
+          ? slot.id
+          : undefined,
+        title: slot.mainTheme.trim() || slot.provisionalTitle,
+        autoGenerate: true,
+        formatSlug: slug,
+        calendarSlotFormat: slot.format,
+        originType: "calendar_slot",
+        linkedSlotId: slot.id,
+        linkedSlotLabel: `${slot.dayOfWeekLabel}, ${String(slot.dayNumber).padStart(2, "0")} ${slot.monthShort} • ${slot.suggestedTime} • ${slot.platforms.join("/")}`,
+        retinaType: slot.retinaType,
+        strategicObjective: slot.strategicObjective,
+        editorialPillar: slot.editorialPillar,
+        icpPainOrObjection: slot.icpPainDesireOrObjection,
+        businessMoment: resolvedPhase,
+        platform: slot.platforms[0] || "Instagram",
+        speakingMode: "BULLET_POINTS",
+      });
+
+      const created = mapBackendScriptToRecord(
+        createdRaw,
+        brandStorySummary,
+        brandAssetReference
+      );
+      setScripts((prev) => [created, ...prev]);
+      setSelectedFormatSlug(slug);
+      setActiveScriptId(created.id);
+      setStudioActiveTab("roteiro_blocos");
+      setViewStage("studio");
+    } catch {
+      setCopiedFeedback("Erro ao gerar pacote de roteiro a partir do slot.");
+    } finally {
+      setIsSubmittingScript(false);
+    }
   };
 
   /* Roteirizar diretamente um Tema da Biblioteca (Função 02 -> Função 03) */
-  const handleCreateScriptFromTheme = (
+  const handleCreateScriptFromTheme = async (
     theme: StrategicThemeRecord,
     overrideFormatSlug?: ScriptFormatSlug
   ) => {
+    if (!hasValidProjectId || isSubmittingScript) return;
     const slug =
       overrideFormatSlug || mapSlotFormatToScriptSlug(theme.recommendedFormat);
-    const created = buildCompleteScriptPackage({
-      projectId: resolvedProjectId,
-      title: theme.title,
-      formatSlug: slug,
-      originType: "theme_library",
-      linkedThemeId: theme.id,
-      linkedSlotLabel: `Criado a partir da Biblioteca de Temas (${theme.origin})`,
-      retinaType: theme.retinaType,
-      strategicObjective: `Apoiar ${resolvedObjective} na etapa de ${theme.journeyStage}`,
-      editorialPillar: theme.romaPillar,
-      icpPainOrObjection: theme.painDesireOrObjection,
-      businessMoment: resolvedPhase,
-      platform: theme.recommendedPlatform,
-      niche: resolvedNiche,
-      subniche: resolvedSubniche,
-      qualifiedForMaterial:
-        slug === "long_video" || slug === "carousel" || slug === "live",
-      status: "ready",
-    });
+    setIsSubmittingScript(true);
 
-    const next = [created, ...scripts];
-    persistScripts(next);
-    setSelectedFormatSlug(slug);
-    setActiveScriptId(created.id);
-    setStudioActiveTab("roteiro_blocos");
-    setViewStage("studio");
+    try {
+      const createdRaw = await scriptsService.createScript(resolvedProjectId, {
+        format: mapScriptSlugToBackendFormat(slug),
+        mode: "conexao",
+        themeId: SCRIPT_OBJECT_ID_REGEX.test(theme.id) ? theme.id : undefined,
+        title: theme.title,
+        autoGenerate: true,
+        formatSlug: slug,
+        calendarSlotFormat: theme.recommendedFormat,
+        originType: "theme_library",
+        linkedThemeId: theme.id,
+        linkedSlotLabel: `Criado a partir da Biblioteca de Temas (${theme.origin})`,
+        retinaType: theme.retinaType,
+        strategicObjective: `Apoiar ${resolvedObjective} na etapa de ${theme.journeyStage}`,
+        editorialPillar: theme.romaPillar,
+        icpPainOrObjection: theme.painDesireOrObjection,
+        businessMoment: resolvedPhase,
+        platform: theme.recommendedPlatform,
+        speakingMode: "BULLET_POINTS",
+      });
+
+      const created = mapBackendScriptToRecord(
+        createdRaw,
+        brandStorySummary,
+        brandAssetReference
+      );
+      setScripts((prev) => [created, ...prev]);
+      setSelectedFormatSlug(slug);
+      setActiveScriptId(created.id);
+      setStudioActiveTab("roteiro_blocos");
+      setViewStage("studio");
+    } catch {
+      setCopiedFeedback("Erro ao gerar roteiro a partir do tema selecionado.");
+    } finally {
+      setIsSubmittingScript(false);
+    }
   };
 
   /* Submissão do Modal de Criação */
-  const handleCreateScriptModalSubmit = (e: FormEvent<HTMLFormElement>) => {
+  const handleCreateScriptModalSubmit = async (
+    e: FormEvent<HTMLFormElement>
+  ) => {
     e.preventDefault();
+    if (!hasValidProjectId || isSubmittingScript) return;
 
     if (createOrigin === "calendar_slot" && createSelectedSlotId) {
       const slot = calendarSlots.find((s) => s.id === createSelectedSlotId);
       if (slot) {
         setIsCreateModalOpen(false);
-        handleCreateScriptFromCalendarSlot(slot);
+        await handleCreateScriptFromCalendarSlot(slot);
         return;
       }
     }
@@ -1504,104 +1163,224 @@ export function RoteirosEditorialModule(props: RoteirosEditorialModuleProps) {
       const theme = themeLibrary.find((t) => t.id === createSelectedThemeId);
       if (theme) {
         setIsCreateModalOpen(false);
-        handleCreateScriptFromTheme(theme, createFormatSlug);
+        await handleCreateScriptFromTheme(theme, createFormatSlug);
         return;
       }
     }
 
-    const created = buildCompleteScriptPackage({
-      projectId: resolvedProjectId,
-      title:
-        createCustomTitle.trim() ||
-        `Roteiro Estratégico de ${resolvedSubniche} — ${resolvedPhase}`,
-      formatSlug: createFormatSlug,
-      originType: createOrigin,
-      linkedSlotLabel:
-        createOrigin === "calendar_slot"
-          ? "Slot do Calendário Editorial Ativo"
-          : "Tema da Biblioteca Estratégica",
-      retinaType: "Transformacao",
-      strategicObjective: `Apoiar ${resolvedObjective} com conteúdo contextualizado`,
-      editorialPillar: "03. Mecanismo Único da Oferta (MUV em Ação)",
-      icpPainOrObjection: "Objeção prioritária mapeada na Base Estratégica",
-      businessMoment: resolvedPhase,
-      platform: createFormatSlug === "long_video" ? "YouTube" : "Instagram",
-      niche: resolvedNiche,
-      subniche: resolvedSubniche,
-      speakingMode: createSpeakingMode,
-      status: "ready",
-    });
+    setIsSubmittingScript(true);
+    try {
+      const formatMeta =
+        SCRIPT_FORMATS_CATALOG.find((f) => f.slug === createFormatSlug) ??
+        SCRIPT_FORMATS_CATALOG[0]!;
 
-    const next = [created, ...scripts];
-    persistScripts(next);
-    setSelectedFormatSlug(createFormatSlug);
-    setActiveScriptId(created.id);
-    setCreateCustomTitle("");
-    setIsCreateModalOpen(false);
-    setStudioActiveTab("roteiro_blocos");
-    setViewStage("studio");
+      const createdRaw = await scriptsService.createScript(resolvedProjectId, {
+        format: mapScriptSlugToBackendFormat(createFormatSlug),
+        mode:
+          createSpeakingMode === "seguranca_palavra" ? "seguranca" : "conexao",
+        title:
+          createCustomTitle.trim() ||
+          `Roteiro Estratégico — ${formatMeta.shortName}`,
+        autoGenerate: true,
+        formatSlug: createFormatSlug,
+        calendarSlotFormat: formatMeta.slotFormat,
+        originType: createOrigin,
+        linkedSlotLabel:
+          createOrigin === "calendar_slot"
+            ? "Slot do Calendário Editorial"
+            : "Tema da Biblioteca Estratégica",
+        retinaType: "Transformacao",
+        strategicObjective: `Apoiar ${resolvedObjective} com conteúdo contextualizado`,
+        editorialPillar: "Posicionamento & Oferta",
+        icpPainOrObjection: "Contexto mapeado na Base Estratégica",
+        businessMoment: resolvedPhase,
+        platform: createFormatSlug === "long_video" ? "YouTube" : "Instagram",
+        speakingMode:
+          createSpeakingMode === "seguranca_palavra"
+            ? "TELEPROMPTER"
+            : "BULLET_POINTS",
+      });
+
+      const created = mapBackendScriptToRecord(
+        createdRaw,
+        brandStorySummary,
+        brandAssetReference
+      );
+      setScripts((prev) => [created, ...prev]);
+      setSelectedFormatSlug(createFormatSlug);
+      setActiveScriptId(created.id);
+      setCreateCustomTitle("");
+      setIsCreateModalOpen(false);
+      setStudioActiveTab("roteiro_blocos");
+      setViewStage("studio");
+    } catch {
+      setCopiedFeedback("Erro ao criar pacote completo de roteiro.");
+    } finally {
+      setIsSubmittingScript(false);
+    }
   };
 
-  const handleDuplicateScript = (scr: EditorialScriptRecord) => {
-    const dup: EditorialScriptRecord = {
-      ...scr,
-      id: `scr-dup-${Date.now()}`,
-      title: `${scr.title} (Variação A/B)`,
-      status: "ab_test",
-      version: "v1.1-AB",
-      updatedAt: "Duplicado agora",
-    };
-    persistScripts([dup, ...scripts]);
+  const handleDuplicateScript = async (scr: EditorialScriptRecord) => {
+    if (!hasValidProjectId || !SCRIPT_OBJECT_ID_REGEX.test(scr.id)) return;
+    try {
+      const dupRaw = await scriptsService.duplicateScript(
+        resolvedProjectId,
+        scr.id
+      );
+      const dup = mapBackendScriptToRecord(
+        dupRaw,
+        brandStorySummary,
+        brandAssetReference
+      );
+      setScripts((prev) => [dup, ...prev]);
+      setCopiedFeedback("Variação A/B criada no servidor!");
+      setTimeout(() => setCopiedFeedback(null), 2600);
+    } catch {
+      setCopiedFeedback("Não foi possível duplicar este roteiro.");
+    }
   };
 
-  const handleSaveNewScriptVersion = () => {
+  const handleDeleteScript = async (scr: EditorialScriptRecord) => {
+    if (!hasValidProjectId || !SCRIPT_OBJECT_ID_REGEX.test(scr.id)) return;
+    try {
+      await scriptsService.archiveScript(resolvedProjectId, scr.id);
+      setScripts((prev) => prev.filter((item) => item.id !== scr.id));
+      if (activeScriptId === scr.id) {
+        setActiveScriptId("");
+      }
+      setCopiedFeedback("Roteiro arquivado com sucesso.");
+      setTimeout(() => setCopiedFeedback(null), 2400);
+    } catch {
+      setCopiedFeedback("Não foi possível remover o roteiro selecionado.");
+    }
+  };
+
+  const handleSaveNewScriptVersion = async () => {
+    if (
+      !currentScript ||
+      !hasValidProjectId ||
+      !SCRIPT_OBJECT_ID_REGEX.test(currentScript.id)
+    ) {
+      return;
+    }
+
     const nextVerNumber = currentScript.versionHistory.length + 1;
     const nextVerLabel = `v${nextVerNumber}.0`;
-    const snapshot: ScriptVersionSnapshot = {
-      versionLabel: nextVerLabel,
-      savedAt: "Salvo agora",
-      modeUsed: currentScript.speakingMode,
-      summaryNote: `Versão consolidada com ajustes de recorte (${currentScript.title.slice(0, 36)}...)`,
-    };
+    const note = `Versão consolidada (${currentScript.title.slice(0, 36)}...)`;
 
-    updateCurrentScript((prev) => ({
-      ...prev,
-      version: nextVerLabel,
-      versionHistory: [snapshot, ...prev.versionHistory],
-    }));
-
-    setCopiedFeedback(
-      `Nova versão ${nextVerLabel} salva no histórico deste roteiro!`
-    );
-    setTimeout(() => setCopiedFeedback(null), 2600);
+    try {
+      await scriptsService.createVersion(
+        resolvedProjectId,
+        currentScript.id,
+        note
+      );
+      const snapshot: ScriptVersionSnapshot = {
+        versionLabel: nextVerLabel,
+        savedAt: "Salvo agora",
+        modeUsed: currentScript.speakingMode,
+        summaryNote: note,
+      };
+      updateCurrentScript(
+        (prev) => ({
+          ...prev,
+          version: nextVerLabel,
+          versionHistory: [snapshot, ...prev.versionHistory],
+        }),
+        true
+      );
+      setCopiedFeedback(
+        `Nova versão ${nextVerLabel} salva no histórico deste roteiro!`
+      );
+      setTimeout(() => setCopiedFeedback(null), 2600);
+    } catch {
+      setCopiedFeedback("Não foi possível salvar a nova versão no servidor.");
+    }
   };
 
-  /* Regenerar um único card de Story mantendo o encadeamento (Seção 4.6.1) */
-  const handleRegenerateSingleStoryCard = (
+  /* Regenerar um único card de Story mantendo o encadeamento via BackEnd */
+  const handleRegenerateSingleStoryCard = async (
     period: "Manhã" | "Almoço" | "Tarde" | "Noite",
     cardNumber: 1 | 2 | 3 | 4 | 5
   ) => {
-    updateCurrentScript((prev) => ({
-      ...prev,
-      storyPeriods: prev.storyPeriods.map((sp) => {
-        if (sp.period !== period) return sp;
-        return {
-          ...sp,
-          cards: sp.cards.map((c) => {
-            if (c.cardNumber !== cardNumber) return c;
-            return {
-              ...c,
-              wordForWordScript: `${c.wordForWordScript}\n\n[Ângulo Regenerado pela IA]: Conectando diretamente à superação de "${prev.icpPainOrObjection}" em ${resolvedSubniche}.`,
-              mirrorCaptionNoSound: `${c.mirrorCaptionNoSound} (Versão otimizada p/ retenção sem som)`,
-            };
-          }),
-        };
-      }),
-    }));
-    setCopiedFeedback(
-      `Story #0${cardNumber} do bloco da ${period} regenerado sem quebrar o encadeamento!`
+    if (
+      !currentScript ||
+      !hasValidProjectId ||
+      !SCRIPT_OBJECT_ID_REGEX.test(currentScript.id)
+    ) {
+      return;
+    }
+
+    const activePeriod = currentScript.storyPeriods.find(
+      (p) => p.period === period
     );
-    setTimeout(() => setCopiedFeedback(null), 2400);
+    const existingCard = activePeriod?.cards.find(
+      (c) => c.cardNumber === cardNumber
+    );
+
+    try {
+      const res = await scriptsService.regenerateStoryCard(
+        resolvedProjectId,
+        currentScript.id,
+        {
+          period,
+          cardId: existingCard?.id,
+          cardNumber,
+          currentCard: existingCard as unknown as Record<string, unknown>,
+          currentObjective: existingCard?.intentionLabel,
+          currentText: existingCard?.wordForWordScript,
+        }
+      );
+
+      if (res?.script) {
+        const refreshed = mapBackendScriptToRecord(
+          res.script,
+          brandStorySummary,
+          brandAssetReference
+        );
+        setScripts((prev) =>
+          prev.map((s) => (s.id === refreshed.id ? refreshed : s))
+        );
+      } else if (res?.card) {
+        updateCurrentScript(
+          (prev) => ({
+            ...prev,
+            storyPeriods: prev.storyPeriods.map((sp) => {
+              if (sp.period !== period) return sp;
+              return {
+                ...sp,
+                cards: sp.cards.map((c) => {
+                  if (c.cardNumber !== cardNumber) return c;
+                  return {
+                    ...c,
+                    wordForWordScript: String(
+                      res.card.wordForWordScript ||
+                        res.card.spokenText ||
+                        c.wordForWordScript
+                    ),
+                    connectionBullet: String(
+                      res.card.connectionBullet || c.connectionBullet
+                    ),
+                    mirrorCaptionNoSound: String(
+                      res.card.mirrorCaptionNoSound ||
+                        res.card.mirrorCaption ||
+                        c.mirrorCaptionNoSound
+                    ),
+                  };
+                }),
+              };
+            }),
+          }),
+          true
+        );
+      }
+
+      setCopiedFeedback(
+        `Story #0${cardNumber} do bloco da ${period} regenerado sem quebrar o encadeamento!`
+      );
+      setTimeout(() => setCopiedFeedback(null), 2400);
+    } catch {
+      setCopiedFeedback("Não foi possível regenerar o card de Story agora.");
+    }
   };
 
   const activeFormatMeta = useMemo(() => {
@@ -1791,7 +1570,7 @@ export function RoteirosEditorialModule(props: RoteirosEditorialModuleProps) {
             })}
           </div>
 
-          {viewStage === "studio" ? (
+          {viewStage === "studio" && currentScript ? (
             <Link
               href={`/dashboard/editorial/${resolvedProjectId}/roteiros/${currentScript.formatSlug}/${currentScript.id}`}
               className="inline-flex items-center gap-1.5 rounded-la-md border border-la-border-gold/55 bg-la-gold-faint px-3 py-1.5 font-la-mono text-[0.6875rem] font-semibold text-la-gold-light hover:bg-la-gold hover:text-la-text-inverse"
@@ -2139,6 +1918,16 @@ export function RoteirosEditorialModule(props: RoteirosEditorialModuleProps) {
                           >
                             <Download className="h-3.5 w-3.5" />
                           </button>
+
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteScript(scr)}
+                            title="Arquivar / Excluir roteiro"
+                            aria-label={`Arquivar roteiro ${scr.title}`}
+                            className="inline-flex h-9 w-9 items-center justify-center rounded-la-md border border-white/12 bg-black/50 text-la-text-muted hover:border-rose-400/50 hover:text-rose-300"
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </button>
                         </div>
                       </div>
                     );
@@ -2164,6 +1953,22 @@ export function RoteirosEditorialModule(props: RoteirosEditorialModuleProps) {
               </div>
 
               <div className="grid grid-cols-1 gap-3.5 md:grid-cols-2">
+                {slotsForSelectedFormat.length === 0 ? (
+                  <div className="col-span-full rounded-la-xl border border-dashed border-white/15 bg-black/45 p-8 text-center">
+                    <p className="font-la-sans text-[0.9375rem] font-semibold text-la-text-primary">
+                      Nenhum slot de {activeFormatMeta.shortName} encontrado no calendário ativo.
+                    </p>
+                    {props.onGoToCalendarTab ? (
+                      <button
+                        type="button"
+                        onClick={props.onGoToCalendarTab}
+                        className="mt-3 rounded-la-md bg-la-gold px-4 py-2 font-la-sans text-[0.8125rem] font-semibold text-la-text-inverse"
+                      >
+                        Ir para Calendário Editorial
+                      </button>
+                    ) : null}
+                  </div>
+                ) : null}
                 {slotsForSelectedFormat.map((slot) => {
                   const retMeta = RETINA_META[slot.retinaType];
                   return (
@@ -2216,6 +2021,22 @@ export function RoteirosEditorialModule(props: RoteirosEditorialModuleProps) {
           {/* SUB-ABA C: TEMAS DA BIBLIOTECA DA FUNÇÃO 02 PARA ROTEIRIZAR NESTE FORMATO */}
           {formatListSubTab === "library_themes" ? (
             <div className="grid grid-cols-1 gap-3.5 md:grid-cols-2">
+              {themeLibrary.length === 0 ? (
+                <div className="col-span-full rounded-la-xl border border-dashed border-white/15 bg-black/45 p-8 text-center">
+                  <p className="font-la-sans text-[0.9375rem] font-semibold text-la-text-primary">
+                    Nenhum tema estratégico na biblioteca deste projeto ainda.
+                  </p>
+                  {props.onGoToThemesTab ? (
+                    <button
+                      type="button"
+                      onClick={props.onGoToThemesTab}
+                      className="mt-3 rounded-la-md bg-la-gold px-4 py-2 font-la-sans text-[0.8125rem] font-semibold text-la-text-inverse"
+                    >
+                      Gerar Temas na Função 02
+                    </button>
+                  ) : null}
+                </div>
+              ) : null}
               {themeLibrary.map((thm) => {
                 const retMeta = RETINA_META[thm.retinaType];
                 return (
@@ -2268,7 +2089,43 @@ export function RoteirosEditorialModule(props: RoteirosEditorialModuleProps) {
       {/* =================================================================== */}
       {/* CAMADA 3: STUDIO DEDICADO DO ROTEIRO E PACOTE DE ATIVOS COMPLETO    */}
       {/* =================================================================== */}
-      {viewStage === "studio" ? (
+      {viewStage === "studio" && !currentScript ? (
+        <section className="flex flex-col items-center gap-4 rounded-la-xl border border-dashed border-la-border-gold/45 bg-[#090D16]/90 p-10 text-center">
+          <FileText className="h-8 w-8 text-la-gold" />
+          <div>
+            <h3 className="font-la-sans text-[1.125rem] font-semibold text-la-text-primary">
+              {isLoadingData
+                ? "Carregando roteiros do projeto..."
+                : "Nenhum roteiro criado ou selecionado neste projeto ainda"}
+            </h3>
+            <p className="mt-1 font-la-sans text-[0.875rem] text-la-text-secondary">
+              {isLoadingData
+                ? "Buscando roteiros, slots e temas salvos no banco de dados..."
+                : "Crie seu primeiro pacote de roteiro contextualizado a partir de um slot do calendário ou tema da biblioteca."}
+            </p>
+          </div>
+          {!isLoadingData ? (
+            <div className="flex flex-wrap items-center justify-center gap-3">
+              <button
+                type="button"
+                onClick={() => setIsCreateModalOpen(true)}
+                className="rounded-la-md bg-la-gold px-4 py-2 font-la-sans text-[0.8125rem] font-semibold text-la-text-inverse"
+              >
+                Novo Roteiro Contextualizado
+              </button>
+              <button
+                type="button"
+                onClick={() => setViewStage("hub")}
+                className="rounded-la-md border border-white/15 px-4 py-2 font-la-sans text-[0.8125rem] text-la-text-secondary"
+              >
+                Voltar ao Painel dos 6 Formatos
+              </button>
+            </div>
+          ) : null}
+        </section>
+      ) : null}
+
+      {viewStage === "studio" && currentScript ? (
         <div className="flex flex-col gap-6">
           {/* Painel de Contexto Herdado das Funções 01 e 02 + Controles do Roteiro */}
           <section className="rounded-la-xl border border-la-gold/65 bg-[#090D16]/98 p-6 shadow-2xl">
@@ -2572,7 +2429,14 @@ export function RoteirosEditorialModule(props: RoteirosEditorialModuleProps) {
                       const slide =
                         currentScript.carouselSlides[
                           activeCarouselSlideIndex
-                        ] ?? currentScript.carouselSlides[0]!;
+                        ] ?? currentScript.carouselSlides[0];
+                      if (!slide) {
+                        return (
+                          <div className="rounded-la-xl border border-dashed border-white/15 bg-black/40 p-6 text-center font-la-mono text-[0.75rem] text-la-text-muted">
+                            Nenhum slide estruturado para este carrossel ainda.
+                          </div>
+                        );
+                      }
                       return (
                         <div className="flex aspect-[4/5] w-full max-w-[24rem] flex-col justify-between rounded-la-xl border-2 border-la-gold/65 bg-gradient-to-b from-[#0C111E] via-[#080B12] to-[#05070B] p-7 shadow-[0_24px_60px_rgba(0,0,0,0.9)]">
                           <div className="flex items-center justify-between border-b border-white/10 pb-3 font-la-mono text-[0.625rem] text-la-gold-light">
@@ -2628,7 +2492,14 @@ export function RoteirosEditorialModule(props: RoteirosEditorialModuleProps) {
                       const slide =
                         currentScript.carouselSlides[
                           activeCarouselSlideIndex
-                        ] ?? currentScript.carouselSlides[0]!;
+                        ] ?? currentScript.carouselSlides[0];
+                      if (!slide) {
+                        return (
+                          <div className="rounded-la-xl border border-dashed border-white/15 bg-black/40 p-6 text-center font-la-mono text-[0.75rem] text-la-text-muted">
+                            Nenhum slide estruturado para este carrossel ainda.
+                          </div>
+                        );
+                      }
                       return (
                         <div className="rounded-la-xl border border-white/10 bg-black/50 p-5">
                           <span className="font-la-mono text-[0.6875rem] font-bold uppercase text-la-gold-light">
@@ -2765,7 +2636,14 @@ export function RoteirosEditorialModule(props: RoteirosEditorialModuleProps) {
                     const activePeriodObj =
                       currentScript.storyPeriods.find(
                         (p) => p.period === activeStoryPeriodTab
-                      ) ?? currentScript.storyPeriods[0]!;
+                      ) ?? currentScript.storyPeriods[0];
+                    if (!activePeriodObj) {
+                      return (
+                        <div className="rounded-la-xl border border-dashed border-white/15 bg-black/40 p-6 text-center font-la-mono text-[0.75rem] text-la-text-muted">
+                          Nenhuma sequência de Stories gerada para este roteiro ainda.
+                        </div>
+                      );
+                    }
 
                     return (
                       <div className="grid grid-cols-1 gap-4 lg:grid-cols-5">
@@ -3610,9 +3488,17 @@ export function RoteirosEditorialModule(props: RoteirosEditorialModuleProps) {
                   </button>
                   <button
                     type="submit"
-                    className="rounded-la-md bg-la-gold px-5 py-2 font-la-sans text-[0.8125rem] font-semibold text-la-text-inverse"
+                    disabled={isSubmittingScript}
+                    className="inline-flex items-center gap-2 rounded-la-md bg-la-gold px-5 py-2 font-la-sans text-[0.8125rem] font-semibold text-la-text-inverse disabled:cursor-not-allowed disabled:opacity-60"
                   >
-                    Gerar Pacote Completo e Abrir Studio
+                    {isSubmittingScript ? (
+                      <>
+                        <RefreshCw className="h-4 w-4 animate-spin" />
+                        <span>Gerando Pacote Completo...</span>
+                      </>
+                    ) : (
+                      <span>Gerar Pacote Completo e Abrir Studio</span>
+                    )}
                   </button>
                 </div>
               </form>

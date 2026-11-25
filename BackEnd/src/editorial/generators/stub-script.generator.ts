@@ -240,12 +240,53 @@ const BLOCKS_BY_FORMAT: Record<ContentFormat, BlockTemplate[]> = {
   ],
 };
 
+const FORMAT_SLUG_MAP: Record<ContentFormat, string> = {
+  reel: 'short_video',
+  long_video: 'long_video',
+  carousel: 'carousel',
+  static_post: 'static_post',
+  live: 'live',
+  stories_sequence: 'stories_sequence',
+};
+
+const SLOT_FORMAT_MAP: Record<ContentFormat, string> = {
+  reel: 'reel_curto',
+  long_video: 'video_longo',
+  carousel: 'carrossel',
+  static_post: 'post_estatico',
+  live: 'live_semanal',
+  stories_sequence: 'sequencia_stories',
+};
+
+const DURATION_MAP: Record<ContentFormat, string> = {
+  reel: '45s a 60s (~140 palavras)',
+  long_video: '10 a 15 min (~1.800 palavras)',
+  live: '45 a 60 min (Ao Vivo)',
+  carousel: '10 Lâminas (Proporção 4:5)',
+  static_post: 'Peça Única + Legenda',
+  stories_sequence: '4 Blocos/dia (20 stories)',
+};
+
 @Injectable()
 export class StubScriptGenerator extends ScriptGenerator {
   async generate(context: IScriptGenerationContext): Promise<IScriptContent> {
+    // TODO(LLM): Substituir geração por templates determinísticos por chamada à LLM especializada
+    // usando o contexto completo do Projeto, Base Estratégica (ROMA/ICP/Tom de Voz), BrandStory e Briefing.
+    // Input: IScriptGenerationContext
+    // Output esperado: IScriptContent (blocos, slides de carrossel, 4 sequências de stories, legenda, SEO, títulos e prompts de imagem).
+
     const theme = context.themeTitle || 'Estratégia e Conteúdo';
     const mode = context.mode;
     const format = context.format;
+    const niche = context.niche || 'Estratégia';
+    const subniche = context.subniche || niche;
+    const editorialPillar =
+      context.editorialPillar || '03. Mecanismo Único da Oferta (MUV em Ação)';
+    const strategicObjective =
+      context.strategicObjective || 'Elevar consciência e converter';
+    const icpPainOrObjection =
+      context.icpPainOrObjection ||
+      'Falta de previsibilidade e direção estratégica na rotina';
 
     const templates = BLOCKS_BY_FORMAT[format] || BLOCKS_BY_FORMAT.reel;
 
@@ -258,20 +299,70 @@ export class StubScriptGenerator extends ScriptGenerator {
       timeRange: tpl.timeRange,
     }));
 
-    const caption = `🔥 ${theme}\n\nVocê já parou para analisar como isso impacta sua esteira de resultados? No conteúdo de hoje, abordamos exatamente os pontos cegos que a maioria ignora.\n\n👇 Me conta nos comentários: qual é o seu maior desafio nisso hoje?\n\n#estrategia #conteudo #altaire #crescimento`;
+    const scriptBlocks = blocks.map((b, idx) => ({
+      id: `blk-${format}-${idx + 1}`,
+      timecodeOrStage: b.timeRange
+        ? `${b.timeRange} · ${b.title}`
+        : b.title || `Bloco ${idx + 1}`,
+      psychologicalRole: `Cumprir etapa ${b.type} para ${strategicObjective}`,
+      visualAndAudioDirection: b.visualDirection || '',
+      wordForWordSpeech: b.content,
+      connectionBulletLine: `• ${b.title}: ${b.content}`,
+    }));
+
+    const captionOutdoorHook = `${theme.toUpperCase()} — O ponto cego que separa operações previsíveis de quem vive no improviso em ${subniche}.`;
+    const captionBody = `Você já parou para analisar como ${theme} impacta sua esteira de resultados? No conteúdo de hoje, abordamos o pilar "${editorialPillar}" para transformar "${icpPainOrObjection}" em execução previsível.`;
+    const captionCta = `Me conta nos comentários: qual é o seu maior desafio em ${subniche} hoje?`;
+    const caption = `🔥 ${theme}\n\n${captionBody}\n\n👇 ${captionCta}\n\n#estrategia #conteudo #altaire #crescimento`;
 
     const titles: ITitleSuggestion[] = [
+      { title: `Como dominar ${theme} sem perder tempo`, hookType: 'metodo' },
+      { title: `O maior erro que cometem em ${theme}`, hookType: 'erro' },
+      { title: `O que ninguém te conta sobre ${theme}`, hookType: 'bastidor' },
+    ];
+
+    const titleVariations = [
       {
-        title: `Como dominar ${theme} sem perder tempo`,
-        hookType: 'metodo',
+        id: 'ttl-1',
+        hookCategory: 'Erro Invisível',
+        titleText: theme,
+        estimatedCtrBadge: 'CTR Alto • Principal',
+        isSelected: true,
       },
       {
-        title: `O maior erro que cometem em ${theme}`,
-        hookType: 'erro',
+        id: 'ttl-2',
+        hookCategory: 'Contraste Direto',
+        titleText: `Por que 90% trava em ${subniche} (e o protocolo para ter previsibilidade)`,
+        estimatedCtrBadge: 'Retenção Forte',
+        isSelected: false,
       },
       {
-        title: `O que ninguém te conta sobre ${theme}`,
-        hookType: 'bastidor',
+        id: 'ttl-3',
+        hookCategory: 'Mecanismo Único (MUV)',
+        titleText: `A Engenharia por trás de uma operação de ${subniche} enxuta e lucrativa`,
+        estimatedCtrBadge: 'Autoridade Premium',
+        isSelected: false,
+      },
+      {
+        id: 'ttl-4',
+        hookCategory: 'Anti-Clichê',
+        titleText: `Pare de seguir o padrão comum de ${niche}: faça este ajuste antes`,
+        estimatedCtrBadge: 'Quebra de Padrão',
+        isSelected: false,
+      },
+      {
+        id: 'ttl-5',
+        hookCategory: 'Quebra de Objeção',
+        titleText: `Como dominar ${theme} em menos de 1 hora por semana`,
+        estimatedCtrBadge: 'Foco em Rotina',
+        isSelected: false,
+      },
+      {
+        id: 'ttl-6',
+        hookCategory: 'Estudo de Caso / Prova',
+        titleText: `Por dentro do nosso sistema de ${subniche}: o que mudou a conversão`,
+        estimatedCtrBadge: 'Bastidor Real',
+        isSelected: false,
       },
     ];
 
@@ -289,6 +380,69 @@ export class StubScriptGenerator extends ScriptGenerator {
       },
     ];
 
+    const imagePrompts = thumbnailPrompts.map((tp, idx) => ({
+      id: `img-${idx + 1}`,
+      targetPiece:
+        idx === 0
+          ? 'Thumbnail Principal / Capa de Alto CTR'
+          : 'Capa Secundária Dark/Gold',
+      visualConceptPT: tp.description || 'Composição editorial Dark/Gold',
+      promptEnglish: tp.promptEn,
+      textOverlaySuggestion: theme.slice(0, 48).toUpperCase(),
+    }));
+
+    const carouselSlides = Array.from({ length: 10 }, (_, idx) => ({
+      slideNumber: idx + 1,
+      roleLabel: `Slide ${String(idx + 1).padStart(2, '0')}`,
+      headline:
+        idx === 0
+          ? theme
+          : idx === 9
+            ? 'Salve este post para aplicar na sua semana.'
+            : `Etapa ${idx + 1}: Aprofundamento em ${subniche}`,
+      bodyLineBreakCopy:
+        blocks[idx % blocks.length]?.content ||
+        `Desenvolvimento estrutural sobre ${theme}.`,
+      visualDesignNote:
+        'Fundo #080B12, tipografia clara e destaque em Ouro (#D4AF37).',
+      imagePromptEN: `Minimalist dark obsidian slide #080B12 with gold accents for ${subniche} --ar 4:5`,
+    }));
+
+    const buildStoryCards = (period: string) =>
+      [1, 2, 3, 4, 5].map((num) => ({
+        cardNumber: num,
+        cardType:
+          num === 2 || num === 4
+            ? 'video_fala'
+            : num === 3
+              ? 'bastidor_prova'
+              : 'texto_sobre_foto',
+        intentionLabel: `Card ${num} (${period})`,
+        wordForWordScript: `Foco de ${subniche} (${period} · Card ${num}): ${theme}. Superando "${icpPainOrObjection}".`,
+        connectionBullet: `• Card ${num} (${period}): desenvolver "${theme}" conectando a ${editorialPillar}.`,
+        mirrorCaptionNoSound: `Resumo na tela: ${theme} (${period}).`,
+        instagramSticker:
+          num === 1
+            ? 'Enquete: Você aplica isso hoje? [Sim / Ainda travo]'
+            : num === 5
+              ? `Caixa de Perguntas: Qual sua dúvida sobre ${subniche}?`
+              : 'Sem sticker',
+        visualBrandingNote:
+          'Contraste Dark-First e legenda centralizada para leitura sem som.',
+      }));
+
+    const storyPeriods = (['Manhã', 'Almoço', 'Tarde', 'Noite'] as const).map(
+      (period, idx) => ({
+        period,
+        suggestedTime: ['08:30', '12:30', '16:30', '20:30'][idx],
+        narrativeTheme: `${period} — ${theme}`,
+        cards: buildStoryCards(period),
+      }),
+    );
+
+    const qualified =
+      format === 'long_video' || format === 'carousel' || format === 'live';
+
     return {
       blocks,
       caption,
@@ -298,11 +452,11 @@ export class StubScriptGenerator extends ScriptGenerator {
         {
           type: 'pdf_checklist',
           title: `Checklist Prático: ${theme}`,
-          promise: 'Guia de bolso para validar cada etapa antes de publicar.',
+          promise: `Aplique o passo a passo de ${theme} sem esquecer nenhum ponto crítico.`,
           structure: [
-            'Passo 1: Diagnóstico',
-            'Passo 2: Execução',
-            'Passo 3: Métricas',
+            '1. Diagnóstico Inicial',
+            '2. Pontos de Atenção',
+            '3. Plano de Ação Imediato',
           ],
           status: 'pronto',
         },
@@ -310,9 +464,85 @@ export class StubScriptGenerator extends ScriptGenerator {
       explanationMaterials: [
         {
           type: 'mapa_mental',
-          title: `Estrutura Mental: ${theme}`,
-          content: `Visão geral hierárquica dos conceitos fundamentais de ${theme}.`,
+          title: `Mapa Mental: ${theme}`,
+          content: `# ${theme}\n\n- Pilar 1: Fundamentos\n- Pilar 2: Execução\n- Pilar 3: Escala`,
           status: 'pronto',
+        },
+      ],
+      formatSlug: FORMAT_SLUG_MAP[format] || 'short_video',
+      calendarSlotFormat: SLOT_FORMAT_MAP[format] || 'reel_curto',
+      speakingMode:
+        mode === 'seguranca' ? 'seguranca_palavra' : 'conexao_bullets',
+      estimatedDurationOrSize: DURATION_MAP[format] || '45s a 60s',
+      versionLabel: 'v1.0',
+      scriptBlocks,
+      connectionSevenLinesChecklist: [
+        `01. [GANCHO] Pare de tentar resolver ${subniche} no improviso.`,
+        `02. [SINTOMA] ${icpPainOrObjection}`,
+        `03. [CAUSA RAIZ] Falta de conexão com "${editorialPillar}".`,
+        `04. [VIRADA] Primeiro contexto; depois execução.`,
+        `05. [PASSO] Aplique 1 objetivo claro para ${theme}.`,
+        `06. [QUEBRA DE TRAVA] Execução enxuta sem retrabalho.`,
+        `07. [CTA] ${captionCta}`,
+      ],
+      carouselSlides,
+      storyPeriods,
+      predictiveQAs: [
+        {
+          id: 'qa-1',
+          questionFromAudience: `Como começar em ${subniche} com pouco tempo?`,
+          strategicAnswerCopy:
+            'Isole os 2 formatos de maior alavancagem da semana e siga o contexto definido.',
+          recommendedFormat: 'Vídeo com Legenda Espelho',
+          qualifiedForMaterial: true,
+        },
+      ],
+      postLiveStoriesSummary: [
+        'Story Pós-Live 01: Bastidor da mesa + enquete de maior virada de chave.',
+        'Story Pós-Live 02: Resumo de 15s da tese central com legenda espelho.',
+        'Story Pós-Live 03: Chamada direta para o Material Complementar.',
+      ],
+      captionOutdoorHook,
+      captionBody,
+      captionCta,
+      seoKeywords: [niche.toLowerCase(), subniche.toLowerCase(), 'estratégia'],
+      seoTags: ['#Altaire', '#EstrategiaEditorial'],
+      youtubeChapters: [
+        '00:00 Introdução',
+        '01:30 Diagnóstico',
+        '04:00 Método',
+        '12:00 Conclusão e CTA',
+      ],
+      titleVariations,
+      imagePrompts,
+      qualifiedForComplementaryMaterial: qualified,
+      complementaryMaterial: {
+        typeLabel:
+          format === 'long_video' ? 'Planilha Executiva XLSX' : 'Checklist PDF',
+        title: `Diagnóstico & Checklist — ${theme.slice(0, 44)}`,
+        promise: `Aplicar os critérios de ${subniche} sem perder etapas.`,
+        sectionsOutline: [
+          '1. Recapitulação do Problema Real',
+          '2. Checklist de Verificação Rápida',
+          '3. Plano de Ação Imediata',
+        ],
+      },
+      explanationMaterial: {
+        typeLabel: 'Mapa Mental da Aula',
+        title: `Mapa Mental & Diagrama — ${editorialPillar}`,
+        diagramNodes: [
+          `Nó Central: ${theme}`,
+          `Causa Raiz: ${icpPainOrObjection}`,
+          `Pilar: ${editorialPillar}`,
+        ],
+      },
+      versionHistory: [
+        {
+          versionLabel: 'v1.0 (Original)',
+          savedAt: 'Criado hoje',
+          modeUsed:
+            mode === 'seguranca' ? 'seguranca_palavra' : 'conexao_bullets',
+          summaryNote: `Gerado com contexto do projeto para ${theme}.`,
         },
       ],
     };
@@ -322,11 +552,89 @@ export class StubScriptGenerator extends ScriptGenerator {
     block: IScriptBlock,
     context?: string,
   ): Promise<IScriptBlock> {
-    const additional = context ? ` (${context})` : '';
+    // TODO(LLM): Regenerar bloco individual mantendo coerência narrativa com blocos adjacentes e tom de voz.
+    // Input: { block, context }
+    // Output esperado: IScriptBlock
+
+    const suffix = context ? ` (Foco adicional: ${context})` : '';
     return {
       ...block,
-      content: `${block.content}\n\n[Regenerado com foco aprimorado${additional}]`,
-      visualDirection: `${block.visualDirection || ''} [Alternativa visual dinâmica aplicada.]`,
+      content: `[Versão Otimizada] ${block.content}${suffix}`,
+      visualDirection: block.visualDirection
+        ? `${block.visualDirection} [Alternativa visual: Corte dinâmico]`
+        : 'Corte dinâmico com B-Roll de apoio.',
+    };
+  }
+
+  async regenerateStoryCard(context: {
+    period: 'Manhã' | 'Almoço' | 'Tarde' | 'Noite';
+    cardNumber: number;
+    currentCard: Record<string, unknown>;
+    icpPainOrObjection?: string;
+    subniche?: string;
+  }): Promise<Record<string, unknown>> {
+    // TODO(LLM): Regenerar um único card de Story preservando o encadeamento narrativo do período.
+    // Input: { period, cardNumber, currentCard, icpPainOrObjection, subniche }
+    // Output esperado: StoryCardItem atualizado
+
+    const currentScript = String(context.currentCard.wordForWordScript || '');
+    const currentMirror = String(
+      context.currentCard.mirrorCaptionNoSound || '',
+    );
+    return {
+      ...context.currentCard,
+      wordForWordScript: `${currentScript}\n\n[Ângulo Regenerado pela IA]: Conectando diretamente à superação de "${context.icpPainOrObjection || 'objeção central'}" em ${context.subniche || 'seu mercado'}.`,
+      mirrorCaptionNoSound: `${currentMirror} (Versão otimizada p/ retenção sem som)`,
+    };
+  }
+
+  async adaptScriptToProject(context: {
+    sourceScript: Record<string, unknown>;
+    targetProject: {
+      id: string;
+      name: string;
+      niche: string;
+      subniche: string;
+      currentObjective: string;
+    };
+    targetStrategicBase?: Record<string, unknown>;
+    customTitle?: string;
+    preserveComplementaryMaterial?: boolean;
+  }): Promise<Record<string, unknown>> {
+    // TODO(LLM): Reescrever gancho outdoor, blocos de roteiro, legenda e CTA adaptando
+    // o pacote de origem para a oferta, promessa ROMA, ICP e tom de voz do projeto de destino.
+    // Input: { sourceScript, targetProject, targetStrategicBase, customTitle }
+    // Output esperado: Campos adaptados do EditorialScript
+
+    const base = context.targetStrategicBase || {};
+    const offer = String(
+      base.mainProductOrOffer || context.targetProject.subniche,
+    );
+    const promise = String(
+      base.mainPromise || context.targetProject.currentObjective,
+    );
+    const sourceTitle = String(context.sourceScript.title || 'Roteiro');
+    const sourceHook = String(
+      context.sourceScript.captionOutdoorHook ||
+        context.sourceScript.caption ||
+        '',
+    );
+
+    return {
+      title:
+        context.customTitle?.trim() ||
+        `${sourceTitle} (${context.targetProject.name})`,
+      status: 'rascunho',
+      captionOutdoorHook: `[Adaptado para ${offer}] ${sourceHook}`,
+      captionBody: `[Contexto: ${context.targetProject.niche} / ${context.targetProject.subniche}] ${String(context.sourceScript.captionBody || '')}`,
+      captionCta: `CTA alinhado à promessa: "${promise}"`,
+      caption: `[Adaptado para ${context.targetProject.name}]\n\n${String(context.sourceScript.caption || '')}`,
+      complementaryMaterial: context.preserveComplementaryMaterial
+        ? context.sourceScript.complementaryMaterial
+        : undefined,
+      complementaryMaterials: context.preserveComplementaryMaterial
+        ? context.sourceScript.complementaryMaterials
+        : [],
     };
   }
 }

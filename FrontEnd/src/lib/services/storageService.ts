@@ -1,4 +1,4 @@
-import axios from "axios";
+import axios from 'axios';
 import imageCompression from 'browser-image-compression';
 
 const localClient = axios.create({ baseURL: '/api' });
@@ -33,7 +33,19 @@ localClient.interceptors.request.use(
   (error) => Promise.reject(error),
 );
 
-export async function uploadFileToR2(file: File, brandId?: string): Promise<string> {
+export async function uploadAssetToR2(
+  file: File,
+  metadataOrBrandId?: Record<string, unknown> | string,
+): Promise<{ fileUrl: string; asset?: any }> {
+  const metadata =
+    typeof metadataOrBrandId === 'string'
+      ? { brandId: metadataOrBrandId }
+      : metadataOrBrandId || {};
+  const brandId =
+    typeof metadata.brandId === 'string' && metadata.brandId
+      ? metadata.brandId
+      : undefined;
+
   try {
     let fileToUpload = file;
 
@@ -43,15 +55,12 @@ export async function uploadFileToR2(file: File, brandId?: string): Promise<stri
         maxWidthOrHeight: 1920,
         useWebWorker: true,
       };
-
-      console.log(`Comprimindo imagem... Tamanho original: ${(file.size / 1024 / 1024).toFixed(2)} MB`);
       fileToUpload = await imageCompression(file, options);
-      console.log(`Imagem comprimida! Novo tamanho: ${(fileToUpload.size / 1024 / 1024).toFixed(2)} MB`);
     }
 
     const authResponse = await localClient.post('/storage/presigned-url', {
       fileName: fileToUpload.name,
-      fileType: fileToUpload.type,
+      fileType: fileToUpload.type || 'application/octet-stream',
       sizeBytes: fileToUpload.size,
       ...(brandId ? { brandId } : {}),
     });
@@ -60,22 +69,24 @@ export async function uploadFileToR2(file: File, brandId?: string): Promise<stri
 
     await axios.put(uploadUrl, fileToUpload, {
       headers: {
-        'Content-Type': fileToUpload.type,
+        'Content-Type': fileToUpload.type || 'application/octet-stream',
       },
     });
 
-    await localClient.post('/storage/confirm-upload', {
-      fileUrl: fileUrl,
+    const confirmRes = await localClient.post('/storage/confirm-upload', {
+      fileUrl,
       fileName: fileToUpload.name,
-      mimeType: fileToUpload.type,
+      mimeType: fileToUpload.type || 'application/octet-stream',
       sizeBytes: fileToUpload.size,
-      ...(brandId ? { brandId } : {}),
+      ...metadata,
     });
 
-    return fileUrl;
-
+    return {
+      fileUrl,
+      asset: confirmRes.data?.data ?? confirmRes.data,
+    };
   } catch (error: unknown) {
-    console.error("Erro no serviço central de upload:", error);
+    console.error('Erro no serviço central de upload:', error);
 
     if (
       axios.isAxiosError<{ message?: string }>(error) &&
@@ -83,6 +94,42 @@ export async function uploadFileToR2(file: File, brandId?: string): Promise<stri
     ) {
       throw new Error(error.response.data.message);
     }
-    throw new Error("Falha ao processar o upload do arquivo.");
+    throw new Error('Falha ao processar o upload do arquivo.');
   }
 }
+
+export async function uploadFileToR2(
+  file: File,
+  metadataOrBrandId?: Record<string, unknown> | string,
+): Promise<string> {
+  const { fileUrl } = await uploadAssetToR2(file, metadataOrBrandId);
+  return fileUrl;
+}
+
+export const storageService = {
+  getAssets: async (
+    brandId?: string,
+  ): Promise<{ storageUsed: number; assets: any[] }> => {
+    const response = await localClient.get('/storage/assets', {
+      params: brandId ? { brandId } : undefined,
+    });
+    return response.data?.data ?? response.data ?? { storageUsed: 0, assets: [] };
+  },
+
+  createAsset: async (data: Record<string, unknown>) => {
+    const response = await localClient.post('/storage/assets', data);
+    return response.data?.data ?? response.data;
+  },
+
+  updateAsset: async (id: string, data: Record<string, unknown>) => {
+    const response = await localClient.patch(`/storage/assets/${id}`, data);
+    return response.data?.data ?? response.data;
+  },
+
+  deleteAsset: async (id: string) => {
+    const response = await localClient.delete(`/storage/assets/${id}`);
+    return response.data?.data ?? response.data;
+  },
+
+  uploadAssetWithFile: uploadAssetToR2,
+};

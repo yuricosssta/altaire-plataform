@@ -1,3 +1,7 @@
+import { BrandAssetCategory } from '../../dto/storage.interface';
+
+export { BrandAssetCategory };
+
 export interface IFileAsset {
   _id: string;
   organizationId: string;
@@ -8,6 +12,17 @@ export interface IFileAsset {
   fileUrl: string;
   mimeType: string;
   sizeBytes: number;
+  title?: string;
+  category?: BrandAssetCategory;
+  projectScope?: string;
+  formatLabel?: string;
+  dimensionsOrSpec?: string;
+  description?: string;
+  aiUsageDirective?: string;
+  hexPreview?: string;
+  cssToken?: string;
+  tags?: string[];
+  isFavorite?: boolean;
   createdAt?: Date;
   updatedAt?: Date;
 }
@@ -21,6 +36,34 @@ export interface ICreateFileAsset {
   fileUrl: string;
   mimeType: string;
   sizeBytes: number;
+  title?: string;
+  category?: BrandAssetCategory;
+  projectScope?: string;
+  formatLabel?: string;
+  dimensionsOrSpec?: string;
+  description?: string;
+  aiUsageDirective?: string;
+  hexPreview?: string;
+  cssToken?: string;
+  tags?: string[];
+  isFavorite?: boolean;
+}
+
+export interface IUpdateFileAsset {
+  brandId?: string | null;
+  title?: string;
+  category?: BrandAssetCategory;
+  projectScope?: string;
+  formatLabel?: string;
+  dimensionsOrSpec?: string;
+  description?: string;
+  aiUsageDirective?: string;
+  hexPreview?: string;
+  cssToken?: string;
+  tags?: string[];
+  isFavorite?: boolean;
+  fileName?: string;
+  fileUrl?: string;
 }
 
 export interface IFileAssetFilter {

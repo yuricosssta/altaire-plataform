@@ -1,5 +1,5 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
-import { Document, Types } from 'mongoose';
+import { Document, SchemaTypes, Types } from 'mongoose';
 
 export type EditorialCalendarDocument = EditorialCalendar & Document;
 
@@ -35,6 +35,9 @@ class ProductionCapacitySubDoc {
 
   @Prop({ required: true, default: 0 })
   storySequencesPerDay: number;
+
+  @Prop({ default: 5 })
+  storiesPerSequence?: number;
 }
 
 class CalendarItemSubDoc {
@@ -125,6 +128,9 @@ class CalendarDaySubDoc {
 }
 
 class ReviewSuggestionSubDoc {
+  @Prop()
+  id?: string;
+
   @Prop({ required: true })
   type: string;
 
@@ -136,6 +142,15 @@ class ReviewSuggestionSubDoc {
 
   @Prop({ required: true })
   impact: string;
+
+  @Prop()
+  reason?: string;
+
+  @Prop()
+  actionLabel?: string;
+
+  @Prop({ default: false })
+  applied?: boolean;
 }
 
 @Schema({ timestamps: true })
@@ -160,11 +175,29 @@ export class EditorialCalendar {
   @Prop({ required: true, type: CalendarPeriodSubDoc })
   period: CalendarPeriodSubDoc;
 
+  @Prop()
+  periodLabel?: string;
+
+  @Prop()
+  periodStart?: string;
+
+  @Prop()
+  periodEnd?: string;
+
+  @Prop()
+  mainObjective?: string;
+
+  @Prop()
+  linkedLineName?: string;
+
   @Prop({ required: true, type: [String] })
   platforms: string[];
 
   @Prop({ required: true, type: ProductionCapacitySubDoc })
   capacity: ProductionCapacitySubDoc;
+
+  @Prop({ type: SchemaTypes.Mixed })
+  weeklyCapacity?: Record<string, number>;
 
   @Prop({ required: true })
   objective: string;
@@ -174,6 +207,9 @@ export class EditorialCalendar {
 
   @Prop({ type: [CalendarDaySubDoc], default: [] })
   days: CalendarDaySubDoc[];
+
+  @Prop({ type: [SchemaTypes.Mixed], default: [] })
+  slots: Record<string, unknown>[];
 
   @Prop({ type: [ReviewSuggestionSubDoc], default: [] })
   reviewSuggestions: ReviewSuggestionSubDoc[];

@@ -26,14 +26,51 @@ export class FileAsset {
   @Prop({ required: true })
   fileName: string;
 
-  @Prop({ required: true })
+  @Prop({ default: '' })
   fileUrl: string;
 
-  @Prop({ required: true })
+  @Prop({ default: 'application/octet-stream' })
   mimeType: string;
 
-  @Prop({ required: true })
+  @Prop({ default: 0 })
   sizeBytes: number;
+
+  @Prop()
+  title?: string;
+
+  @Prop({
+    type: String,
+    enum: ['logos', 'paleta', 'fotos', 'templates', 'broll', 'guias'],
+    default: 'guias',
+  })
+  category?: string;
+
+  @Prop({ default: 'Acervo Global da Marca' })
+  projectScope?: string;
+
+  @Prop()
+  formatLabel?: string;
+
+  @Prop()
+  dimensionsOrSpec?: string;
+
+  @Prop()
+  description?: string;
+
+  @Prop()
+  aiUsageDirective?: string;
+
+  @Prop()
+  hexPreview?: string;
+
+  @Prop()
+  cssToken?: string;
+
+  @Prop({ type: [String], default: [] })
+  tags?: string[];
+
+  @Prop({ default: false })
+  isFavorite?: boolean;
 }
 
 export const FileAssetSchema = SchemaFactory.createForClass(FileAsset);

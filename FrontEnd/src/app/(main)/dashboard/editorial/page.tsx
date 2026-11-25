@@ -247,6 +247,7 @@ export default function CentralEstrategicaPage() {
     projects,
     activityEvents,
     refreshProjects,
+    createProject,
     updateProject,
     duplicateProject,
     toggleArchiveProject,
@@ -412,7 +413,9 @@ export default function CentralEstrategicaPage() {
   };
 
   /* Conclusão do Ponto C: Cria o projeto via BFF vinculado à Marca e redireciona para a Linha Editorial */
-  const handleCreateProjectSubmit = async (event: FormEvent<HTMLFormElement>) => {
+  const handleCreateProjectSubmit = async (
+    event: FormEvent<HTMLFormElement>,
+  ) => {
     event.preventDefault();
     setCreateError(null);
 
@@ -421,23 +424,30 @@ export default function CentralEstrategicaPage() {
 
     if (!trimmedName || !newBrandId || !trimmedNiche) {
       setCreateError(
-        "Informe obrigatoriamente o Nome do Projeto, a Marca vinculada e o Nicho principal."
+        "Informe obrigatoriamente o Nome do Projeto, a Marca vinculada e o Nicho principal.",
       );
       return;
     }
 
+    const brandObj = brands.find((b) => b._id === newBrandId);
+
     try {
       setIsCreatingProject(true);
-      const created = await editorialService.createProject({
+      const created = await createProject({
         name: trimmedName,
         brandId: newBrandId,
+        brandOrClientName:
+          brandObj?.name || currentCompany?.name || workspaceName,
         niche: trimmedNiche,
         subniche: newSubniche.trim() || "Geral",
-        currentObjective: newObjective,
+        operationTypeLabel: newOpType,
+        currentObjectiveLabel: newObjective,
+        currentPhaseLabel: newPhase.trim() || "Estruturação Inicial",
       });
 
-      await refreshProjects();
-      toast.success(`Projeto "${created.name}" criado com sucesso.`);
+      toast.success(
+        `Projeto "${created?.name || trimmedName}" criado com sucesso.`,
+      );
       setIsCreateModalOpen(false);
       setNewName("");
       setNewNiche("");
@@ -451,7 +461,7 @@ export default function CentralEstrategicaPage() {
         err?.response?.data?.error?.message ||
         err?.response?.data?.message ||
         err?.message ||
-        "Erro ao criar projeto editorial.";
+        "Não foi possível criar o projeto agora. Tente novamente em instantes.";
       setCreateError(msg);
       toast.error(msg);
     } finally {
@@ -472,11 +482,11 @@ export default function CentralEstrategicaPage() {
     setEditStatus(project.status);
   };
 
-  const handleSaveEditedProject = (event: FormEvent<HTMLFormElement>) => {
+  const handleSaveEditedProject = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (!editingProject || !editName.trim()) return;
 
-    updateProject({
+    await updateProject({
       id: editingProject.id,
       name: editName.trim(),
       brandOrClientName: editBrand.trim(),
@@ -502,11 +512,11 @@ export default function CentralEstrategicaPage() {
     setCopyScripts(false);
   };
 
-  const handleConfirmDuplicate = (event: FormEvent<HTMLFormElement>) => {
+  const handleConfirmDuplicate = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (!duplicatingProject || !dupName.trim()) return;
 
-    duplicateProject({
+    await duplicateProject({
       sourceProjectId: duplicatingProject.id,
       newName: dupName.trim(),
       copyStrategicBase,
@@ -519,9 +529,9 @@ export default function CentralEstrategicaPage() {
     setDuplicatingProject(null);
   };
 
-  const handleConfirmArchiveToggle = () => {
+  const handleConfirmArchiveToggle = async () => {
     if (!archivingProject) return;
-    toggleArchiveProject(archivingProject.id);
+    await toggleArchiveProject(archivingProject.id);
     setArchivingProject(null);
   };
 

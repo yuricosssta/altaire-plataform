@@ -20,10 +20,12 @@ import {
   calendarPatchSchema,
   calendarItemUpdateSchema,
   calendarDuplicateSchema,
+  createCalendarSlotSchema,
   CalendarSetupInput,
   CalendarPatchInput,
   CalendarItemUpdateInput,
   CalendarDuplicateInput,
+  CreateCalendarSlotInput,
 } from '../validations/editorial-calendar.zod';
 
 @UseGuards(AuthGuard)
@@ -56,7 +58,7 @@ export class EditorialCalendarController {
   ) {
     return this.calendarService.update(
       calendarId,
-      data as IUpdateEditorialCalendar,
+      data as unknown as IUpdateEditorialCalendar,
     );
   }
 
@@ -74,6 +76,15 @@ export class EditorialCalendarController {
     return this.calendarService.duplicate(calendarId, data);
   }
 
+  @Post('calendars/:calendarId/slots')
+  async addSlot(
+    @Param('calendarId') calendarId: string,
+    @Body(new ZodValidationPipe(createCalendarSlotSchema))
+    data: CreateCalendarSlotInput,
+  ) {
+    return this.calendarService.addSlot(calendarId, data);
+  }
+
   @Patch('calendars/:calendarId/items/:itemId')
   async updateItem(
     @Param('calendarId') calendarId: string,
@@ -81,11 +92,24 @@ export class EditorialCalendarController {
     @Body(new ZodValidationPipe(calendarItemUpdateSchema))
     data: CalendarItemUpdateInput,
   ) {
-    return this.calendarService.updateItem(calendarId, itemId, data);
+    return this.calendarService.updateItem(calendarId, itemId, data as any);
+  }
+
+  @Delete('calendars/:calendarId/items/:itemId')
+  async deleteItem(
+    @Param('calendarId') calendarId: string,
+    @Param('itemId') itemId: string,
+  ) {
+    return this.calendarService.deleteItem(calendarId, itemId);
   }
 
   @Get('calendars/:calendarId/review')
   async getReview(@Param('calendarId') calendarId: string) {
+    return this.calendarService.getReview(calendarId);
+  }
+
+  @Post('calendars/:calendarId/review')
+  async generateReview(@Param('calendarId') calendarId: string) {
     return this.calendarService.getReview(calendarId);
   }
 }

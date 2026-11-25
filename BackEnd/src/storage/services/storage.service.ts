@@ -19,6 +19,8 @@ import {
 } from '../../company/services/company-access.service';
 import { BrandRepository } from '../../brand/repositories/brand.repository';
 import { isClientOrExternalRole } from '../../shared/utils/org-role.util';
+import { IFileAsset as IDtoFileAsset } from '../dto/storage.interface';
+import { IUpdateFileAsset } from '../schemas/models/file-asset.interface';
 
 const OBJECT_ID_REGEX = /^[0-9a-fA-F]{24}$/;
 
@@ -44,8 +46,8 @@ export class StorageService {
       region: 'auto',
       endpoint: process.env.R2_ENDPOINT,
       credentials: {
-        accessKeyId: process.env.R2_ACCESS_KEY_ID,
-        secretAccessKey: process.env.R2_SECRET_ACCESS_KEY,
+        accessKeyId: process.env.R2_ACCESS_KEY_ID || '',
+        secretAccessKey: process.env.R2_SECRET_ACCESS_KEY || '',
       },
     });
   }
@@ -110,7 +112,7 @@ export class StorageService {
     const limit =
       this.LIMITS[company.plan as keyof typeof this.LIMITS] || this.LIMITS.FREE;
 
-    if (company.storageUsed + sizeBytes > limit) {
+    if ((company.storageUsed || 0) + sizeBytes > limit) {
       throw new ForbiddenException(
         `LIMITE DE ARMAZENAMENTO EXCEDIDO: Seu plano permite até ${limit / (1024 * 1024)}MB. Faça upgrade para liberar mais espaço.`,
       );
@@ -155,7 +157,7 @@ export class StorageService {
       mimeType: string;
       sizeBytes: number;
       brandId?: string;
-    },
+    } & Partial<IDtoFileAsset>,
   ) {
     const validBrandId = await this.validateBrandScopeIfProvided(
       companyId,
@@ -170,6 +172,7 @@ export class StorageService {
     }
 
     const userId = String(user?.sub || user?.id || '');
+    const sizeBytes = Number(payload.sizeBytes) || 0;
     const newAsset = await this.fileAssetRepo.create({
       organizationId: company.organizationId,
       companyId: company._id,
@@ -178,12 +181,150 @@ export class StorageService {
       fileName: payload.fileName,
       fileUrl: payload.fileUrl,
       mimeType: payload.mimeType,
-      sizeBytes: payload.sizeBytes,
+      sizeBytes,
+      title: payload.title || payload.fileName,
+      category: payload.category || 'guias',
+      projectScope: payload.projectScope || 'Acervo Global da Marca',
+      formatLabel: payload.formatLabel,
+      dimensionsOrSpec: payload.dimensionsOrSpec,
+      description: payload.description,
+      aiUsageDirective: payload.aiUsageDirective,
+      hexPreview: payload.hexPreview,
+      cssToken: payload.cssToken,
+      tags: Array.isArray(payload.tags) ? payload.tags : [],
+      isFavorite: Boolean(payload.isFavorite),
     });
 
-    await this.companyRepo.incrementStorageUsed(company._id, payload.sizeBytes);
+    if (sizeBytes > 0) {
+      await this.companyRepo.incrementStorageUsed(company._id, sizeBytes);
+    }
 
     return newAsset;
+  }
+
+  async createBrandAsset(
+    companyId: string,
+    user: AuthUserPayload,
+    data: Partial<IDtoFileAsset>,
+  ) {
+    const validBrandId = await this.validateBrandScopeIfProvided(
+      companyId,
+      data.brandId,
+      user,
+      true,
+    );
+
+    const company = await this.companyRepo.findById(companyId);
+    if (!company) {
+      throw new NotFoundException('Empresa não encontrada.');
+    }
+
+    const userId = String(user?.sub || user?.id || '');
+    const sizeBytes = Number(data.sizeBytes) || 0;
+    const newAsset = await this.fileAssetRepo.create({
+      organizationId: company.organizationId,
+      companyId: company._id,
+      brandId: validBrandId,
+      uploadedBy: userId,
+      fileName: data.fileName || data.title || 'brand-asset',
+      fileUrl: data.fileUrl || '',
+      mimeType: data.mimeType || 'application/x-brand-asset',
+      sizeBytes,
+      title: data.title || data.fileName || 'Novo Recurso da Marca',
+      category: data.category || 'guias',
+      projectScope: data.projectScope || 'Acervo Global da Marca',
+      formatLabel: data.formatLabel,
+      dimensionsOrSpec: data.dimensionsOrSpec,
+      description: data.description,
+      aiUsageDirective: data.aiUsageDirective,
+      hexPreview: data.hexPreview,
+      cssToken: data.cssToken,
+      tags: Array.isArray(data.tags) ? data.tags : [],
+      isFavorite: Boolean(data.isFavorite),
+    });
+
+    if (sizeBytes > 0) {
+      await this.companyRepo.incrementStorageUsed(company._id, sizeBytes);
+    }
+
+    return newAsset;
+  }
+
+  async updateBrandAsset(
+    companyId: string,
+    assetId: string,
+    user: AuthUserPayload,
+    data: Partial<IDtoFileAsset>,
+  ) {
+    const ctx = await this.companyAccessService.resolveCompanyContext(
+      user,
+      companyId,
+    );
+
+    if (isClientOrExternalRole(ctx.userRole)) {
+      throw new ForbiddenException(
+        'Usuários clientes ou externos não têm permissão para editar ativos.',
+      );
+    }
+
+    const existing = await this.fileAssetRepo.findByIdInCompany(
+      ctx.companyId,
+      assetId,
+    );
+    if (!existing) {
+      throw new NotFoundException(
+        'Arquivo ou ativo de marca não encontrado ou sem permissão para editar.',
+      );
+    }
+
+    if (!ctx.isCompanyManager && String(existing.uploadedBy) !== ctx.userId) {
+      throw new ForbiddenException(
+        'Sem permissão para editar um ativo criado por outro usuário.',
+      );
+    }
+
+    const allowedKeys: (keyof IUpdateFileAsset)[] = [
+      'title',
+      'category',
+      'projectScope',
+      'formatLabel',
+      'dimensionsOrSpec',
+      'description',
+      'aiUsageDirective',
+      'hexPreview',
+      'cssToken',
+      'tags',
+      'isFavorite',
+      'fileName',
+      'fileUrl',
+    ];
+    const updateSet: IUpdateFileAsset = {};
+    for (const key of allowedKeys) {
+      if ((data as any)[key] !== undefined) {
+        (updateSet as any)[key] = (data as any)[key];
+      }
+    }
+
+    if (data.brandId !== undefined) {
+      updateSet.brandId = await this.validateBrandScopeIfProvided(
+        ctx.companyId,
+        data.brandId,
+        user,
+        true,
+      );
+    }
+
+    const updated = await this.fileAssetRepo.updateByIdInCompany(
+      ctx.companyId,
+      assetId,
+      updateSet,
+    );
+    if (!updated) {
+      throw new NotFoundException(
+        'Arquivo ou ativo de marca não encontrado ou sem permissão para editar.',
+      );
+    }
+    return updated;
   }
 
   async getCompanyAssets(
@@ -246,11 +387,7 @@ export class StorageService {
     };
   }
 
-  async deleteAsset(
-    companyId: string,
-    assetId: string,
-    user: AuthUserPayload,
-  ) {
+  async deleteAsset(companyId: string, assetId: string, user: AuthUserPayload) {
     const ctx = await this.companyAccessService.resolveCompanyContext(
       user,
       companyId,
@@ -279,27 +416,33 @@ export class StorageService {
       );
     }
 
-    const fileKey = asset.fileUrl.replace(`${this.publicDomain}/`, '');
+    if (asset.fileUrl && asset.fileUrl.startsWith('http') && this.bucketName) {
+      const fileKey = this.publicDomain
+        ? asset.fileUrl.replace(`${this.publicDomain}/`, '')
+        : asset.fileUrl;
 
-    try {
-      await (this.s3Client as any).send(
-        new DeleteObjectCommand({
-          Bucket: this.bucketName,
-          Key: fileKey,
-        }),
-      );
-    } catch (error) {
-      console.error('Erro ao deletar arquivo no R2:', error);
-      throw new InternalServerErrorException(
-        'Falha ao excluir o arquivo físico na nuvem.',
-      );
+      try {
+        await (this.s3Client as any).send(
+          new DeleteObjectCommand({
+            Bucket: this.bucketName,
+            Key: fileKey,
+          }),
+        );
+      } catch (error) {
+        console.error('Erro ao deletar arquivo no R2:', error);
+        throw new InternalServerErrorException(
+          'Falha ao excluir o arquivo físico na nuvem.',
+        );
+      }
     }
 
     await this.fileAssetRepo.deleteById(asset._id);
-    await this.companyRepo.incrementStorageUsed(
-      ctx.companyId,
-      -Math.abs(asset.sizeBytes),
-    );
+    if ((Number(asset.sizeBytes) || 0) > 0) {
+      await this.companyRepo.incrementStorageUsed(
+        ctx.companyId,
+        -Math.abs(asset.sizeBytes),
+      );
+    }
 
     return { message: 'Arquivo excluído e espaço liberado com sucesso.' };
   }

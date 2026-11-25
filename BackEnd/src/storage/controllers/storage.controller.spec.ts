@@ -16,6 +16,8 @@ describe('StorageController', () => {
       getCompanyAssets: jest
         .fn()
         .mockResolvedValue({ storageUsed: 0, assets: [] }),
+      createBrandAsset: jest.fn(),
+      updateBrandAsset: jest.fn(),
       deleteAsset: jest.fn(),
     };
 

@@ -1,32 +1,25 @@
 //src/components/dashboard/ActivityLog.tsx
 "use client";
 
-import Image from "next/image";
 import React, { useState, useEffect } from "react";
-import { Plus, Edit2, MessageSquare, AlertCircle, FileText, Loader2 } from "lucide-react";
+import Link from "next/link";
+import { Edit2, FileText, Loader2, Sparkles } from "lucide-react";
 import { useSelector } from "react-redux";
-import axios from "axios";
 import { RootState } from "@/lib/redux/store";
-import { selectCurrentOrg } from "@/lib/redux/slices/organizationSlice";
+import { editorialService } from "@/lib/services/editorialService";
 
-interface TimelineEvent {
-  _id: string;
-  type: "DOCUMENT" | "COMMENT" | "STATUS_CHANGE" | "REPORT";
-  description: string;
-  createdAt: string;
-  authorId?: {
-    name: string;
-    avatarUrl?: string;
-  };
-  projectId?: {
-    title: string;
-    referenceCode?: string;
-  };
+interface EditorialTimelineItem {
+  id: string;
+  projectId?: string;
+  projectName: string;
+  label: string;
+  resourceHref?: string;
+  occurredAt: string;
 }
 
-// Função nativa para "Há X minutos/horas"
 function getRelativeTime(dateString: string) {
   const date = new Date(dateString);
+  if (Number.isNaN(date.getTime())) return "Recentemente";
   const now = new Date();
   const diffInSeconds = Math.floor((now.getTime() - date.getTime()) / 1000);
 
@@ -37,53 +30,59 @@ function getRelativeTime(dateString: string) {
   return new Intl.DateTimeFormat("pt-BR", { day: "2-digit", month: "short" }).format(date);
 }
 
-// Mapeamento visual dinâmico do Back-end para o Front-end
-const getEventConfig = (type: string) => {
-  switch (type) {
-    case "DOCUMENT":
-      return { icon: <Plus className="w-3.5 h-3.5 text-emerald-500" />, actionText: "abriu a demanda" };
-    case "COMMENT":
-      return { icon: <MessageSquare className="w-3.5 h-3.5 text-blue-500" />, actionText: "emitiu parecer em" };
-    case "STATUS_CHANGE":
-      return { icon: <Edit2 className="w-3.5 h-3.5 text-amber-500" />, actionText: "atualizou o status de" };
-    case "REPORT":
-      return { icon: <FileText className="w-3.5 h-3.5 text-purple-500" />, actionText: "gerou relatório de" };
-    default:
-      return { icon: <AlertCircle className="w-3.5 h-3.5 text-muted-foreground" />, actionText: "interagiu com" };
+const getEventIcon = (label: string) => {
+  const lower = label.toLowerCase();
+  if (lower.includes("tema") || lower.includes("calend")) {
+    return <Sparkles className="w-3.5 h-3.5 text-amber-400" />;
   }
+  if (lower.includes("roteiro")) {
+    return <FileText className="w-3.5 h-3.5 text-purple-400" />;
+  }
+  return <Edit2 className="w-3.5 h-3.5 text-emerald-400" />;
 };
 
 export function ActivityLog() {
-  const [events, setEvents] = useState<TimelineEvent[]>([]);
+  const [events, setEvents] = useState<EditorialTimelineItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
-  const currentOrg = useSelector(selectCurrentOrg);
   const token = useSelector((state: RootState) => state.auth.token);
 
-  const orgId = typeof currentOrg?.organizationId === "object"
-    ? (currentOrg.organizationId as any)._id
-    : currentOrg?.organizationId;
-
   useEffect(() => {
+    let cancelled = false;
     const fetchTimeline = async () => {
-      if (!orgId || !token) return;
+      if (!token) {
+        setIsLoading(false);
+        return;
+      }
       try {
         setIsLoading(true);
-        // Bate na rota nova que criamos no passo 1
-        const response = await axios.get(
-          `${process.env.NEXT_PUBLIC_API_BASE_URL}/organizations/${orgId}/projects/timeline`,
-          { headers: { Authorization: `Bearer ${token}` } }
-        );
-        setEvents(response.data);
-      } catch (error) {
-        console.error("Erro ao carregar log de atividades:", error);
+        const list = await editorialService.listActivity(undefined, 30);
+        if (cancelled) return;
+        const mapped: EditorialTimelineItem[] = Array.isArray(list)
+          ? list.map((item: any) => ({
+              id: String(item.id || item._id || Math.random()),
+              projectId: item.projectId ? String(item.projectId) : undefined,
+              projectName: String(item.projectName || "Projeto Editorial"),
+              label: String(item.label || "Atualização editorial"),
+              resourceHref: item.resourceHref ? String(item.resourceHref) : undefined,
+              occurredAt: String(
+                item.occurredAt || item.createdAt || new Date().toISOString()
+              ),
+            }))
+          : [];
+        setEvents(mapped);
+      } catch {
+        if (!cancelled) setEvents([]);
       } finally {
-        setIsLoading(false);
+        if (!cancelled) setIsLoading(false);
       }
     };
 
-    fetchTimeline();
-  }, [orgId, token]);
+    void fetchTimeline();
+    return () => {
+      cancelled = true;
+    };
+  }, [token]);
 
   return (
     <div className="flex flex-col w-full h-full">
@@ -92,7 +91,7 @@ export function ActivityLog() {
           Atividades Recentes
         </h2>
         <p className="text-sm text-muted-foreground">
-          Monitoramento em tempo real do canteiro.
+          Monitoramento da operação editorial em tempo real.
         </p>
       </div>
 
@@ -104,48 +103,45 @@ export function ActivityLog() {
           </div>
         ) : events.length === 0 ? (
           <div className="flex-1 flex flex-col items-center justify-center min-h-[300px] p-6 text-center">
-            <p className="text-sm text-muted-foreground">Nenhuma atividade registrada ainda nesta construtora.</p>
+            <p className="text-sm text-muted-foreground">
+              Nenhuma atividade editorial registrada ainda neste workspace.
+            </p>
           </div>
         ) : (
           <div className="flex-1 overflow-y-auto p-0">
             <ul className="divide-y divide-border">
               {events.map((event) => {
-                const authorName = event.authorId?.name || "Sistema";
-                const initials = authorName.split(" ").map((n) => n[0]).join("").substring(0, 2).toUpperCase();
-                const config = getEventConfig(event.type);
-                const projectTitle = event.projectId?.title || "Demanda Excluída";
-                const projectCode = event.projectId?.referenceCode ? `[${event.projectId.referenceCode}]` : "";
-
+                const initials = event.projectName.slice(0, 2).toUpperCase();
                 return (
-                  <li key={event._id} className="flex items-start gap-4 p-4 hover:bg-muted/30 transition-colors">
-                    
-                    {/* Avatar do Usuário */}
+                  <li key={event.id} className="flex items-start gap-4 p-4 hover:bg-muted/30 transition-colors">
                     <div className="relative flex-shrink-0 mt-0.5">
                       <div className="flex h-9 w-9 items-center justify-center rounded-full bg-accent text-accent-foreground font-semibold text-xs border border-border">
-                        {event.authorId?.avatarUrl ? (
-                          <Image src={event.authorId.avatarUrl} alt={authorName} width={36} height={36} className="h-full w-full rounded-full object-cover" />
-                        ) : initials}
+                        {initials}
                       </div>
                       <div className="absolute -bottom-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-background border border-border shadow-sm">
-                        {config.icon}
+                        {getEventIcon(event.label)}
                       </div>
                     </div>
 
-                    {/* Descrição do Evento */}
                     <div className="flex flex-col flex-1 min-w-0">
                       <p className="text-sm text-foreground leading-snug">
-                        <span className="font-semibold">{authorName}</span>{" "}
-                        <span className="text-muted-foreground">{config.actionText}</span>{" "}
-                        <span className="font-medium">{projectCode} {projectTitle}</span>
+                        <span className="font-semibold">{event.projectName}</span>{" "}
+                        <span className="text-muted-foreground">— {event.label}</span>
                       </p>
-                      <p className="text-xs text-muted-foreground mt-1 truncate">
-                        &ldquo;{event.description}&rdquo;
-                      </p>
-                      <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground mt-1.5 block">
-                        {getRelativeTime(event.createdAt)}
-                      </span>
+                      <div className="mt-1.5 flex items-center gap-3">
+                        <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                          {getRelativeTime(event.occurredAt)}
+                        </span>
+                        {event.resourceHref ? (
+                          <Link
+                            href={event.resourceHref}
+                            className="text-[11px] font-medium text-primary hover:underline"
+                          >
+                            Abrir →
+                          </Link>
+                        ) : null}
+                      </div>
                     </div>
-                    
                   </li>
                 );
               })}

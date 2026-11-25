@@ -55,13 +55,21 @@ export class EditorialVersionMongooseRepository implements EditorialVersionRepos
   }
 
   async create(data: ICreateEditorialVersion): Promise<IEditorialVersion> {
-    const mapped = {
+    const mapped: Record<string, unknown> = {
       projectId: new (Types.ObjectId as any)(data.projectId),
       versionNumber: data.versionNumber,
       name: data.name,
-      status: 'active',
-      createdBy: new (Types.ObjectId as any)(data.createdBy),
+      status: data.status || 'active',
+      createdBy: (Types.ObjectId as any).isValid(data.createdBy)
+        ? new (Types.ObjectId as any)(data.createdBy)
+        : new (Types.ObjectId as any)(),
     };
+    if (data.phaseTag !== undefined) mapped.phaseTag = data.phaseTag;
+    if (data.reviewReason !== undefined)
+      mapped.reviewReason = data.reviewReason;
+    if (data.strategicBase !== undefined)
+      mapped.strategicBase = data.strategicBase;
+
     const doc = new this.versionModel(mapped);
     const saved = await doc.save();
     return saved.toObject() as unknown as IEditorialVersion;
@@ -71,9 +79,15 @@ export class EditorialVersionMongooseRepository implements EditorialVersionRepos
     id: string,
     data: IUpdateEditorialVersion,
   ): Promise<IEditorialVersion | null> {
+    if (!(Types.ObjectId as any).isValid(id)) return null;
     const set: Record<string, unknown> = {};
     if (data.name !== undefined) set['name'] = data.name;
     if (data.status !== undefined) set['status'] = data.status;
+    if (data.phaseTag !== undefined) set['phaseTag'] = data.phaseTag;
+    if (data.reviewReason !== undefined)
+      set['reviewReason'] = data.reviewReason;
+    if (data.strategicBase !== undefined)
+      set['strategicBase'] = data.strategicBase;
 
     const updated = await this.versionModel
       .findOneAndUpdate(
@@ -84,6 +98,29 @@ export class EditorialVersionMongooseRepository implements EditorialVersionRepos
       .lean()
       .exec();
     return updated as unknown as IEditorialVersion | null;
+  }
+
+  async archiveOthers(
+    projectId: string,
+    activeVersionId: string,
+  ): Promise<void> {
+    if (
+      !(Types.ObjectId as any).isValid(projectId) ||
+      !(Types.ObjectId as any).isValid(activeVersionId)
+    ) {
+      return;
+    }
+    await this.versionModel
+      .updateMany(
+        {
+          projectId: new (Types.ObjectId as any)(projectId),
+          _id: { $ne: new (Types.ObjectId as any)(activeVersionId) },
+          status: 'active',
+          isActive: { $ne: false },
+        },
+        { $set: { status: 'archived' } },
+      )
+      .exec();
   }
 
   async softDelete(id: string): Promise<IEditorialVersion | null> {

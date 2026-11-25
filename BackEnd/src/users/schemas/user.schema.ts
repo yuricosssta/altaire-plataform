@@ -1,8 +1,8 @@
 // src/users/schemas/user.schema.ts
 
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
-import { Document, Types } from 'mongoose';
-import { UserRoleType, UserRule } from './models/user.interface';
+import { Document, SchemaTypes, Types } from 'mongoose';
+import { UserRoleType, UserRule, IUserPreferences } from './models/user.interface';
 
 @Schema({ timestamps: true })
 export class User extends Document {
@@ -57,6 +57,18 @@ export class User extends Document {
 
   @Prop({ required: false })
   avatarUrl?: string;
+
+  @Prop({ required: false })
+  displayRole?: string;
+
+  @Prop({ required: false })
+  editorialBio?: string;
+
+  @Prop({ required: false, default: false })
+  twoFactorEnabled?: boolean;
+
+  @Prop({ type: SchemaTypes.Mixed, required: false, default: {} })
+  preferences?: IUserPreferences;
 
   @Prop({ required: false })
   resetPasswordToken: string;

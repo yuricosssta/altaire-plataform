@@ -35,17 +35,15 @@ describe('EditorialBrandStoryService', () => {
         if (bId === brandId) return Promise.resolve(mockBrandStory);
         return Promise.resolve(null);
       }),
-      upsertByBrand: jest
-        .fn()
-        .mockImplementation((bId, cId, data, updatedBy) =>
-          Promise.resolve({
-            ...mockBrandStory,
-            ...data,
-            brandId: bId,
-            companyId: cId,
-            userId: updatedBy,
-          }),
-        ),
+      upsertByBrand: jest.fn().mockImplementation((bId, cId, data, updatedBy) =>
+        Promise.resolve({
+          ...mockBrandStory,
+          ...data,
+          brandId: bId,
+          companyId: cId,
+          userId: updatedBy,
+        }),
+      ),
     };
 
     const module: TestingModule = await Test.createTestingModule({
@@ -71,7 +69,10 @@ describe('EditorialBrandStoryService', () => {
   });
 
   it('deve retornar BrandStory vazia estruturada se não existir para a marca', async () => {
-    const result = await service.getByBrand('507f1f77bcf86cd799439099', companyId);
+    const result = await service.getByBrand(
+      '507f1f77bcf86cd799439099',
+      companyId,
+    );
     expect(result.originStory).toBe('');
     expect(result.keyTurnarounds).toEqual([]);
     expect(result.usableStories).toEqual([]);

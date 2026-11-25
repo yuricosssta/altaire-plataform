@@ -20,6 +20,7 @@ export abstract class EditorialProjectRepository {
     companyId: string,
     projectIds: string[],
   ): Promise<string[]>;
+  abstract findByIds(ids: string[]): Promise<IEditorialProject[]>;
   abstract create(data: ICreateEditorialProject): Promise<IEditorialProject>;
   abstract update(
     id: string,

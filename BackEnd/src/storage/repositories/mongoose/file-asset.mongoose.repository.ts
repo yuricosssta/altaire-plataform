@@ -6,6 +6,7 @@ import {
   ICreateFileAsset,
   IFileAsset,
   IFileAssetFilter,
+  IUpdateFileAsset,
 } from '../../schemas/models/file-asset.interface';
 import { FileAsset, FileAssetDocument } from '../../schemas/file-asset.schema';
 
@@ -42,6 +43,17 @@ export class FileAssetMongooseRepository implements FileAssetRepository {
       fileUrl: data.fileUrl,
       mimeType: data.mimeType,
       sizeBytes: data.sizeBytes,
+      title: data.title || data.fileName,
+      category: data.category || 'guias',
+      projectScope: data.projectScope || 'Acervo Global da Marca',
+      formatLabel: data.formatLabel,
+      dimensionsOrSpec: data.dimensionsOrSpec,
+      description: data.description,
+      aiUsageDirective: data.aiUsageDirective,
+      hexPreview: data.hexPreview,
+      cssToken: data.cssToken,
+      tags: Array.isArray(data.tags) ? data.tags : [],
+      isFavorite: Boolean(data.isFavorite),
     });
     const saved = await doc.save();
     return normalizeAsset(saved.toObject());
@@ -102,6 +114,40 @@ export class FileAssetMongooseRepository implements FileAssetRepository {
         _id: toObjId(assetId),
         companyId: toObjId(companyId),
       })
+      .lean()
+      .exec();
+    return doc ? normalizeAsset(doc) : null;
+  }
+
+  async updateByIdInCompany(
+    companyId: string,
+    assetId: string,
+    data: IUpdateFileAsset,
+  ): Promise<IFileAsset | null> {
+    if (
+      !(Types.ObjectId as any).isValid(companyId) ||
+      !(Types.ObjectId as any).isValid(assetId)
+    ) {
+      return null;
+    }
+
+    const updateSet: Record<string, any> = { ...data };
+    if (data.brandId !== undefined) {
+      updateSet.brandId =
+        data.brandId && (Types.ObjectId as any).isValid(data.brandId)
+          ? toObjId(data.brandId)
+          : null;
+    }
+
+    const doc = await this.fileAssetModel
+      .findOneAndUpdate(
+        {
+          _id: toObjId(assetId),
+          companyId: toObjId(companyId),
+        },
+        { $set: updateSet },
+        { new: true },
+      )
       .lean()
       .exec();
     return doc ? normalizeAsset(doc) : null;

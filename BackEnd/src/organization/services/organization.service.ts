@@ -788,4 +788,45 @@ export class OrganizationService {
     await this.functionRepo.softDelete(functionId);
     return { message: 'Função removida com sucesso.' };
   }
+
+  async updateOrganizationProfile(
+    orgId: string,
+    actorId: string,
+    data: { name?: string; acronym?: string; billingDocument?: string },
+    isActorAdmin = false,
+  ) {
+    const org = (Types.ObjectId as any).isValid(orgId)
+      ? await this.orgModel.findById(orgId).exec()
+      : await this.orgModel.findOne({ slug: orgId || 'altaire' }).exec();
+
+    if (!org) {
+      throw new NotFoundException('Organização não encontrada.');
+    }
+
+    if (!isActorAdmin) {
+      const actorMember = await this.memberModel.findOne({
+        organizationId: org._id,
+        userId: new (Types.ObjectId as any)(String(actorId)),
+        role: { $in: ['ADMIN', 'OWNER'] },
+      });
+      if (!actorMember) {
+        throw new ForbiddenException(
+          'Apenas administradores podem alterar os dados da organização.',
+        );
+      }
+    }
+
+    const updateSet: Record<string, unknown> = {};
+    if (data.name !== undefined) updateSet.name = data.name;
+    if (data.acronym !== undefined) updateSet.acronym = data.acronym;
+    if (data.billingDocument !== undefined)
+      updateSet.billingDocument = data.billingDocument;
+
+    const updated = await this.orgModel
+      .findByIdAndUpdate(org._id, { $set: updateSet }, { new: true })
+      .lean()
+      .exec();
+
+    return updated;
+  }
 }

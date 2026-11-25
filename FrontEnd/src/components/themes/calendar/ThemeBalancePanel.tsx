@@ -6,7 +6,7 @@ import { AlertTriangle, BarChart3, Loader2, RefreshCw, Save, Scale, SlidersHoriz
 import { toast } from 'sonner';
 import type { CalendarThemeVersion, RebalanceResult, Theme } from '@/lib/dto/themes.schema';
 import type { EditorialCalendar } from '@/lib/dto/editorial.schema';
-import { computeBalanceFromAssignments } from '@/lib/mocks/themes.mock';
+import { computeBalanceFromAssignments } from '@/lib/utils/theme-balance';
 import { JOURNEY_META, SIMULATE_PRESETS } from '@/lib/constants/themes';
 import { RETINA_META } from '@/lib/constants/calendar';
 import { themesService } from '@/lib/services/themesService';

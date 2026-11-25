@@ -9,7 +9,7 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { scriptsService } from '@/lib/services/scriptsService';
-import { FORMAT_LABELS, FORMAT_DESCRIPTIONS, FORMAT_ICONS, FORMAT_ROUTE } from '@/lib/mocks/scripts.mock';
+import { FORMAT_LABELS, FORMAT_DESCRIPTIONS, FORMAT_ICONS, FORMAT_ROUTE } from '@/lib/constants/script-formats';
 import type { Script, ScriptFormat, ScriptStatus } from '@/lib/dto/editorial.schema';
 
 const ALL_FORMATS: ScriptFormat[] = ['reel', 'long_video', 'carousel', 'static_post', 'live', 'stories_sequence'];
@@ -29,9 +29,11 @@ const ICON_MAP: Record<string, typeof Video> = {
 
 const STATUS_BADGE: Record<ScriptStatus, { label: string; color: string }> = {
   rascunho: { label: 'Rascunho', color: 'bg-zinc-400/20 text-zinc-400' },
+  in_production: { label: 'Em Produção', color: 'bg-sky-500/20 text-sky-400' },
   pronto: { label: 'Pronto', color: 'bg-primary/20 text-primary' },
   publicado: { label: 'Publicado', color: 'bg-emerald-500/20 text-emerald-500' },
   teste_ab: { label: 'Teste A/B', color: 'bg-amber-500/20 text-amber-500' },
+  arquivado: { label: 'Arquivado', color: 'bg-zinc-600/20 text-zinc-500' },
 };
 
 function FormatCard({ format, scripts, projectId }: { format: ScriptFormat; scripts: Script[]; projectId: string }) {

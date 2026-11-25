@@ -16,6 +16,8 @@ import {
   ReviewSuggestion,
 } from '@/lib/dto/editorial.schema';
 
+export type { ProjectCardDTO };
+
 const localClient = axios.create({ baseURL: '/api' });
 
 // Interceptor para plugar os cabeçalhos da organização nas chamadas ao BFF
@@ -68,6 +70,7 @@ function toCalendarItem(item: any): CalendarItem {
 function toCalendar(calendar: any): EditorialCalendar {
   return {
     ...calendar,
+    id: calendar.id || calendar._id,
     createdAt: calendar.createdAt ? new Date(calendar.createdAt) : undefined,
     updatedAt: calendar.updatedAt ? new Date(calendar.updatedAt) : undefined,
     period: calendar.period
@@ -194,6 +197,176 @@ export const editorialService = {
 
   getCalendarReview: async (calendarId: string): Promise<ReviewSuggestion[]> => {
     const response = await localClient.get(`/editorial/calendars/${calendarId}/review`);
+    return response.data;
+  },
+
+  generateCalendarReview: async (
+    calendarId: string,
+  ): Promise<ReviewSuggestion[]> => {
+    const response = await localClient.post(
+      `/editorial/calendars/${calendarId}/review`,
+      {},
+    );
+    return response.data;
+  },
+
+  getProject: async (projectId: string): Promise<ProjectCardDTO> => {
+    const response = await localClient.get(`/editorial/projects/${projectId}`);
+    return {
+      ...response.data,
+      id: response.data.id || response.data._id,
+      updatedAt: response.data.updatedAt
+        ? new Date(response.data.updatedAt)
+        : undefined,
+    };
+  },
+
+  updateProject: async (
+    projectId: string,
+    data: Partial<ProjectCardDTO> & Record<string, unknown>,
+  ): Promise<ProjectCardDTO> => {
+    const response = await localClient.patch(
+      `/editorial/projects/${projectId}`,
+      data,
+    );
+    return {
+      ...response.data,
+      id: response.data.id || response.data._id,
+      updatedAt: response.data.updatedAt
+        ? new Date(response.data.updatedAt)
+        : undefined,
+    };
+  },
+
+  duplicateProject: async (
+    projectId: string,
+    data?: {
+      name?: string;
+      newName?: string;
+      brandOrClientName?: string;
+      includeActiveLine?: boolean;
+    },
+  ): Promise<ProjectCardDTO> => {
+    const response = await localClient.post(
+      `/editorial/projects/${projectId}/duplicate`,
+      data || {},
+    );
+    return {
+      ...response.data,
+      id: response.data.id || response.data._id,
+      updatedAt: response.data.updatedAt
+        ? new Date(response.data.updatedAt)
+        : undefined,
+    };
+  },
+
+  deleteProject: async (projectId: string): Promise<void> => {
+    await localClient.delete(`/editorial/projects/${projectId}`);
+  },
+
+  extractIcp: async (
+    projectId: string,
+    data: { rawText: string; niche?: string; brandOrClientName?: string },
+  ): Promise<any> => {
+    const response = await localClient.post(
+      `/editorial/projects/${projectId}/extract-icp`,
+      data,
+    );
+    return response.data;
+  },
+
+  createVersion: async (
+    projectId: string,
+    data: {
+      name: string;
+      status?: 'active' | 'draft' | 'review_recommended' | 'archived';
+      phaseTag?: string;
+      reviewReason?: string;
+      strategicBase?: Record<string, unknown>;
+      duplicateFromVersionId?: string;
+    },
+  ): Promise<EditorialVersionDTO> => {
+    const response = await localClient.post(
+      `/editorial/projects/${projectId}/versions`,
+      data,
+    );
+    return toVersion(response.data);
+  },
+
+  deleteVersion: async (versionId: string): Promise<void> => {
+    await localClient.delete(`/editorial/versions/${versionId}`);
+  },
+
+  updateMapa: async (
+    versionId: string,
+    patch: Partial<EditorialMapaDTO>,
+  ): Promise<EditorialMapaDTO> => {
+    const response = await localClient.patch(
+      `/editorial/versions/${versionId}/mapa`,
+      patch,
+    );
+    return response.data;
+  },
+
+  addCalendarSlot: async (
+    calendarId: string,
+    slot: Record<string, unknown>,
+  ): Promise<EditorialCalendar> => {
+    const response = await localClient.post(
+      `/editorial/calendars/${calendarId}/slots`,
+      slot,
+    );
+    return toCalendar(response.data);
+  },
+
+  deleteCalendarItem: async (
+    calendarId: string,
+    itemId: string,
+  ): Promise<EditorialCalendar> => {
+    const response = await localClient.delete(
+      `/editorial/calendars/${calendarId}/items/${itemId}`,
+    );
+    return toCalendar(response.data);
+  },
+
+  getWorkspaceOverview: async (brandId?: string): Promise<any> => {
+    const response = await localClient.get('/editorial/workspace', {
+      params: brandId ? { brandId } : undefined,
+    });
+    return response.data;
+  },
+
+  listTasks: async (projectId?: string): Promise<any[]> => {
+    const response = await localClient.get('/editorial/workspace/tasks', {
+      params: projectId ? { projectId } : undefined,
+    });
+    return response.data;
+  },
+
+  createTask: async (data: Record<string, unknown>): Promise<any> => {
+    const response = await localClient.post('/editorial/workspace/tasks', data);
+    return response.data;
+  },
+
+  updateTask: async (
+    taskId: string,
+    data: Record<string, unknown>,
+  ): Promise<any> => {
+    const response = await localClient.patch(
+      `/editorial/workspace/tasks/${taskId}`,
+      data,
+    );
+    return response.data;
+  },
+
+  deleteTask: async (taskId: string): Promise<void> => {
+    await localClient.delete(`/editorial/workspace/tasks/${taskId}`);
+  },
+
+  listActivity: async (projectId?: string, limit = 30): Promise<any[]> => {
+    const response = await localClient.get('/editorial/workspace/activity', {
+      params: { ...(projectId ? { projectId } : {}), limit },
+    });
     return response.data;
   },
 };
