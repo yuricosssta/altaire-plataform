@@ -9,6 +9,12 @@ export const userRoleEnum = z.enum([
   'EXTERNAL',
 ]);
 
+export const userPlanEnum = z.enum(['FREE', 'PRO', 'ENTERPRISE']);
+
+export const updateUserPlanSchema = z.object({
+  plan: userPlanEnum,
+});
+
 export const createUserSchema = z.object({
   email: z.string().email('E-mail inválido'),
   name: z.string().min(1, 'Nome é obrigatório'),
@@ -65,5 +71,6 @@ export const oauthUserSchema = z.object({
 
 export type CreateUser = z.infer<typeof createUserSchema>;
 export type UpdateUser = z.infer<typeof updateUserSchema>;
+export type UpdateUserPlan = z.infer<typeof updateUserPlanSchema>;
 export type LoginUser = z.infer<typeof loginUserSchema>;
 export type OAuthUser = z.infer<typeof oauthUserSchema>;

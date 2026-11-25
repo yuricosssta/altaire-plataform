@@ -1,4 +1,5 @@
 import axios from 'axios';
+import type { IUser, UserPlanType } from '@/types/user';
 
 const localClient = axios.create({ baseURL: '/api' });
 
@@ -72,4 +73,17 @@ export const apiChangePassword = async (passwords: Record<string, unknown>) => {
     const axiosError = error as { response?: { data?: Record<string, unknown> } };
     throw axiosError.response?.data || { message: 'Erro ao alterar a senha' };
   }
+};
+
+export const apiListAllUsersAdmin = async (): Promise<IUser[]> => {
+  const response = await localClient.get('/users');
+  return response.data;
+};
+
+export const apiUpdateUserPlanAdmin = async (
+  userId: string,
+  plan: UserPlanType,
+): Promise<IUser> => {
+  const response = await localClient.patch(`/users/${userId}/plan`, { plan });
+  return response.data;
 };

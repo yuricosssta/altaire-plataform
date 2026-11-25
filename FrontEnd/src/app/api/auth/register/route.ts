@@ -8,7 +8,7 @@ import {
   fetchUserEditorialProjects,
   registerBackendUser,
 } from "@/lib/auth/userProvision";
-import type { AuthResponse, UserSession } from "@/types/auth";
+import type { AuthResponse, SubscriptionTier, UserSession } from "@/types/auth";
 
 export async function POST(request: Request) {
   try {
@@ -62,12 +62,15 @@ export async function POST(request: Request) {
     const activeProject = userProjects[0] ?? null;
     const hasActiveProject = Boolean(activeProject);
 
+    const userPlan = provisioned.plan || "FREE";
+
     const userSession: UserSession = {
       id: provisioned.id,
       email: provisioned.email,
       fullName: provisioned.fullName,
       role: provisioned.role,
-      tier: "free",
+      plan: userPlan,
+      tier: userPlan.toLowerCase() as SubscriptionTier,
       hasActiveProject,
       activeProjectContext: activeProject,
       createdAt: new Date().toISOString(),

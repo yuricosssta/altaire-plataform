@@ -7,12 +7,14 @@ import {
   getAuthTokenFromRequest,
   verifyInternalToken,
 } from "@/lib/auth/token.service";
+import { getBackendApiUrl } from "@/lib/api/serverUtils";
 import {
   fetchUserEditorialProjects,
+  normalizeUserPlan,
   resolveAltaireRoleByEmail,
   upsertOAuthBackendUser,
 } from "@/lib/auth/userProvision";
-import type { UserSession } from "@/types/auth";
+import type { SubscriptionTier, UserSession } from "@/types/auth";
 
 export async function GET(request: Request) {
   try {
@@ -74,10 +76,32 @@ export async function GET(request: Request) {
       );
     }
 
+    let liveProfile: { role?: string; plan?: string; name?: string } | null = null;
+    try {
+      const profileRes = await fetch(`${getBackendApiUrl()}/users/profile`, {
+        method: "GET",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          Accept: "application/json",
+        },
+        cache: "no-store",
+      });
+      if (profileRes.ok) {
+        liveProfile = (await profileRes.json()) as {
+          role?: string;
+          plan?: string;
+          name?: string;
+        };
+      }
+    } catch {
+      /* Segue com claims do token caso o backend esteja temporariamente indisponível */
+    }
+
     const resolvedRole = resolveAltaireRoleByEmail(
       payload.email,
-      payload.role,
+      liveProfile?.role || payload.role,
     );
+    const resolvedPlan = normalizeUserPlan(liveProfile?.plan);
     const allowedProjects = Array.isArray(payload.allowedProjects)
       ? payload.allowedProjects.map(String)
       : [];
@@ -96,11 +120,12 @@ export async function GET(request: Request) {
     const session: UserSession = {
       id: payload.sub,
       email: payload.email,
-      fullName: payload.name || payload.email.split("@")[0],
+      fullName: liveProfile?.name || payload.name || payload.email.split("@")[0],
       role: resolvedRole,
+      plan: resolvedPlan,
       allowedProjects,
       permissions,
-      tier: "pro",
+      tier: resolvedPlan.toLowerCase() as SubscriptionTier,
       hasActiveProject: Boolean(activeProject),
       activeProjectContext: activeProject,
       createdAt: new Date().toISOString(),

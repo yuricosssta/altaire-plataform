@@ -37,6 +37,7 @@ import {
 import {
   isAltaireOwnerOrAdmin,
   isClientOrExternalRole,
+  isProUserPlan,
   resolveAltaireRoleByEmail,
 } from '../../shared/utils/org-role.util';
 
@@ -120,13 +121,14 @@ export class CompanyService {
       user?.email,
     );
 
-    const isAdmin = isAltaireOwnerOrAdmin(user?.email, user?.role);
+    const { isAltaireAdmin, isProOrAdmin } =
+      await this.companyAccessService.resolveUserPlanAndProStatus(user);
     const memberships = await this.companyMemberRepo.findActiveByUser(userId);
     const membershipByCompanyId = new Map(
       memberships.map((m) => [String(m.companyId), m]),
     );
 
-    if (isAdmin) {
+    if (isAltaireAdmin) {
       const allCompanies = await this.companyRepo.findAllActive();
       return allCompanies.map((company) => {
         const membership = membershipByCompanyId.get(String(company._id));
@@ -157,7 +159,7 @@ export class CompanyService {
       const isCreator = String(company.createdBy) === userId;
       return {
         ...company,
-        isCompanyManager: isCreator,
+        isCompanyManager: isCreator && isProOrAdmin,
         membership: membership
           ? {
               functionId: membership.functionId || null,
@@ -189,6 +191,18 @@ export class CompanyService {
       );
     }
 
+    const { plan, isProOrAdmin } =
+      await this.companyAccessService.resolveUserPlanAndProStatus(user);
+
+    if (!isProOrAdmin) {
+      throw new ForbiddenException(
+        'Apenas usuários com plano PRO ativo podem criar empresas.',
+      );
+    }
+
+    const inheritedPlan: CompanyPlan =
+      plan === 'ENTERPRISE' ? 'ENTERPRISE' : 'PRO';
+
     const altaireOrg =
       await this.organizationService.getCanonicalAltaireOrganization(userId);
 
@@ -208,7 +222,7 @@ export class CompanyService {
       slug,
       acronym: data.acronym,
       cnpj: data.cnpj,
-      plan: 'FREE',
+      plan: inheritedPlan,
       createdBy: userId,
     });
 
@@ -344,6 +358,18 @@ export class CompanyService {
     );
     this.companyAccessService.assertCanManageCompany(ctx);
 
+    const extraCompanyIds = Array.from(
+      new Set((data.additionalCompanyIds || []).map(String)),
+    ).filter((id) => id !== String(companyId));
+
+    for (const extraId of extraCompanyIds) {
+      const extraCtx = await this.companyAccessService.resolveCompanyContext(
+        user,
+        extraId,
+      );
+      this.companyAccessService.assertCanManageCompany(extraCtx);
+    }
+
     const validBrandIds = await this.validateBrandsInCompany(
       companyId,
       data.brandIds,
@@ -357,17 +383,16 @@ export class CompanyService {
     const requestedRole = data.role || 'MEMBER';
 
     if (!targetUser) {
-      const password = data.password || crypto.randomBytes(24).toString('hex');
       const nameFromEmail = data.email.split('@')[0];
-      targetUser = await this.usersService.createUser({
+      targetUser = await this.usersService.createPreRegisteredUser({
         name: data.name || nameFromEmail,
         email: data.email,
-        password,
+        password: data.password,
         role: requestedRole,
         allowedProjects: [],
         permissions: data.permissions || [],
         invitedBy: ctx.userId,
-      } as any);
+      });
     } else {
       const existingGlobalRole = resolveAltaireRoleByEmail(
         targetUser.email,
@@ -376,6 +401,7 @@ export class CompanyService {
       if (
         existingGlobalRole !== 'OWNER' &&
         existingGlobalRole !== 'ADMIN' &&
+        !isProUserPlan(targetUser.plan) &&
         requestedRole !== existingGlobalRole
       ) {
         await this.usersService.updateUser(
@@ -391,31 +417,66 @@ export class CompanyService {
       targetUser.email || data.email,
     );
 
-    const existingMember = await this.companyMemberRepo.findByCompanyAndUser(
+    const existingPrimary = await this.companyMemberRepo.findByCompanyAndUser(
       companyId,
       targetUserId,
     );
-    if (existingMember) {
+    if (existingPrimary && extraCompanyIds.length === 0) {
       throw new BadRequestException(
         'Este usuário já está vinculado a esta empresa.',
       );
     }
 
-    const membership = await this.companyMemberRepo.upsertActive({
-      companyId,
-      userId: targetUserId,
-      functionId: resolvedFnId ?? null,
-      brandIds: validBrandIds,
-      allowedProjects: (data.allowedProjects || []).filter((pid) =>
-        OBJECT_ID_REGEX.test(pid),
-      ),
-      permissions: data.permissions || [],
-      invitedBy: ctx.userId,
-    });
+    const linkedCompanyIds: string[] = [];
+    let primaryMembership: any = existingPrimary || null;
+
+    if (!existingPrimary) {
+      primaryMembership = await this.companyMemberRepo.upsertActive({
+        companyId,
+        userId: targetUserId,
+        functionId: resolvedFnId ?? null,
+        brandIds: validBrandIds,
+        allowedProjects: (data.allowedProjects || []).filter((pid) =>
+          OBJECT_ID_REGEX.test(pid),
+        ),
+        permissions: data.permissions || [],
+        invitedBy: ctx.userId,
+      });
+      linkedCompanyIds.push(String(companyId));
+    }
+
+    for (const extraId of extraCompanyIds) {
+      const existingExtra = await this.companyMemberRepo.findByCompanyAndUser(
+        extraId,
+        targetUserId,
+      );
+      if (!existingExtra) {
+        await this.companyMemberRepo.upsertActive({
+          companyId: extraId,
+          userId: targetUserId,
+          functionId: null,
+          brandIds: [],
+          allowedProjects: [],
+          permissions: data.permissions || [],
+          invitedBy: ctx.userId,
+        });
+        linkedCompanyIds.push(extraId);
+      }
+    }
+
+    if (linkedCompanyIds.length === 0) {
+      throw new BadRequestException(
+        'Este usuário já está vinculado a todas as empresas selecionadas.',
+      );
+    }
 
     return {
-      message: 'Membro adicionado à empresa com sucesso.',
-      membership,
+      message:
+        linkedCompanyIds.length > 1
+          ? `Usuário vinculado a ${linkedCompanyIds.length} empresas com sucesso.`
+          : 'Membro adicionado à empresa com sucesso.',
+      membership: primaryMembership,
+      linkedCompanyIds,
     };
   }
 

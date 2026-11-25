@@ -29,7 +29,6 @@ import {
   selectCompanyStatus,
   selectCurrentCompany,
 } from "@/lib/redux/slices/companySlice";
-import { CompanyOnboardingModal } from "@/components/company/CompanyOnboardingModal";
 import { AppDispatch, RootState } from "@/lib/redux/store";
 
 const SIDEBAR_COLLAPSED_STORAGE_KEY = "la-sidebar-collapsed";
@@ -44,6 +43,8 @@ function MainDashboardShellInner({
   const router = useRouter();
   const dispatch = useDispatch<AppDispatch>();
   const authUser = useSelector((state: RootState) => state.auth?.user);
+  const userProfile = useSelector((state: RootState) => state.user?.profile);
+  const userStatus = useSelector((state: RootState) => state.user?.status);
   const isAuthenticated = useSelector(selectIsAuthenticated);
   const currentOrg = useSelector(selectCurrentOrg);
   const companies = useSelector(selectAllCompanies);
@@ -58,6 +59,25 @@ function MainDashboardShellInner({
   const isClientRole = normalizedRole === "client";
   const isExternalRole = normalizedRole === "external";
   const isRestrictedRole = isClientRole || isExternalRole;
+  const isAltaireAdmin =
+    normalizedRole === "owner" ||
+    normalizedRole === "admin" ||
+    Boolean((userProfile as Record<string, unknown> | null)?.isAdmin);
+
+  const hasCompanies = companies.length > 0;
+  const isNoCompanyPage =
+    pathname === "/sem-empresa" || pathname.startsWith("/sem-empresa/");
+  const isMasterAdminPage = pathname.startsWith("/dashboard/master-admin");
+  const mustBlockWithoutCompany =
+    companyStatus === "succeeded" &&
+    !hasCompanies &&
+    !(isAltaireAdmin && isMasterAdminPage);
+
+  useEffect(() => {
+    if (isAuthenticated && userStatus === "idle") {
+      dispatch(fetchUserProfile());
+    }
+  }, [isAuthenticated, userStatus, dispatch]);
 
   useEffect(() => {
     if (isAuthenticated && companyStatus === "idle") {
@@ -77,12 +97,28 @@ function MainDashboardShellInner({
   }, [currentCompany?._id, dispatch]);
 
   useEffect(() => {
-    if (isClientRole && !pathname.startsWith("/dashboard/cliente")) {
-      router.replace("/dashboard/cliente");
-    } else if (isExternalRole && !pathname.startsWith("/dashboard/externo")) {
-      router.replace("/dashboard/externo");
+    if (mustBlockWithoutCompany && !isNoCompanyPage) {
+      router.replace("/sem-empresa");
+      return;
     }
-  }, [isClientRole, isExternalRole, pathname, router]);
+
+    if (companyStatus === "succeeded" && hasCompanies && !isNoCompanyPage) {
+      if (isClientRole && !pathname.startsWith("/dashboard/cliente")) {
+        router.replace("/dashboard/cliente");
+      } else if (isExternalRole && !pathname.startsWith("/dashboard/externo")) {
+        router.replace("/dashboard/externo");
+      }
+    }
+  }, [
+    mustBlockWithoutCompany,
+    isNoCompanyPage,
+    companyStatus,
+    hasCompanies,
+    isClientRole,
+    isExternalRole,
+    pathname,
+    router,
+  ]);
 
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState<boolean>(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState<boolean>(false);
@@ -136,6 +172,14 @@ function MainDashboardShellInner({
       /* Ignora bloqueio de storage */
     }
   };
+
+  if (isNoCompanyPage) {
+    return <>{children}</>;
+  }
+
+  if (mustBlockWithoutCompany) {
+    return null;
+  }
 
   return (
     <div
@@ -244,14 +288,6 @@ function MainDashboardShellInner({
           {children}
         </main>
       </div>
-
-      <CompanyOnboardingModal
-        open={
-          !isRestrictedRole &&
-          companyStatus === "succeeded" &&
-          companies.length === 0
-        }
-      />
     </div>
   );
 }

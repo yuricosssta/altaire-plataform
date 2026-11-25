@@ -1,4 +1,8 @@
 // BackEnd/src/users/schemas/models/user.interface.ts
+import type { UserPlanType } from '../../../shared/utils/org-role.util';
+
+export type { UserPlanType };
+
 export enum UserRule {
   Admin, // 0
   Organization, // 1
@@ -29,6 +33,8 @@ export interface IUser {
   isAdmin: boolean;
   rule: UserRule;
   role?: UserRoleType;
+  plan?: UserPlanType;
+  preRegistered?: boolean;
   allowedProjects?: string[];
   permissions?: string[];
   invitedBy?: string;

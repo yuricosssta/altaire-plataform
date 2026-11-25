@@ -3,11 +3,13 @@ import { ForbiddenException, NotFoundException } from '@nestjs/common';
 import { CompanyAccessService } from './company-access.service';
 import { CompanyRepository } from '../repositories/company.repository';
 import { CompanyMemberRepository } from '../repositories/company-member.repository';
+import { UsersService } from '../../users/services/user.service';
 
 describe('CompanyAccessService', () => {
   let service: CompanyAccessService;
   let companyRepo: Partial<CompanyRepository>;
   let memberRepo: Partial<CompanyMemberRepository>;
+  let usersService: Partial<UsersService>;
 
   const orgId = '507f1f77bcf86cd799439001';
   const companyId = '507f1f77bcf86cd799439010';
@@ -37,19 +39,36 @@ describe('CompanyAccessService', () => {
     memberRepo = {
       findByCompanyAndUser: jest.fn().mockResolvedValue(null),
     };
+    usersService = {
+      findById: jest.fn().mockImplementation(async (id: string) => ({
+        _id: id,
+        email:
+          id === creatorId ? 'creator@altaire.com' : 'user@altaire.com',
+        role: 'MEMBER',
+        plan: id === creatorId ? 'PRO' : 'FREE',
+      })) as any,
+    };
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         CompanyAccessService,
         { provide: CompanyRepository, useValue: companyRepo },
         { provide: CompanyMemberRepository, useValue: memberRepo },
+        { provide: UsersService, useValue: usersService },
       ],
     }).compile();
 
     service = module.get<CompanyAccessService>(CompanyAccessService);
   });
 
-  it('should grant full manager access to Altaire OWNER/ADMIN even without CompanyMember', async () => {
+  it('should grant full manager access to Altaire OWNER/ADMIN even without CompanyMember or PRO plan', async () => {
+    usersService.findById = jest.fn().mockResolvedValue({
+      _id: outsiderId,
+      email: 'admin@altaire.com',
+      role: 'ADMIN',
+      plan: 'FREE',
+    }) as any;
+
     const ctx = await service.resolveCompanyContext(
       { sub: outsiderId, role: 'ADMIN', email: 'admin@altaire.com' },
       companyId,
@@ -60,7 +79,7 @@ describe('CompanyAccessService', () => {
     expect(ctx.allowedBrandIds).toBeNull();
   });
 
-  it('should grant full manager access to company creator', async () => {
+  it('should grant full manager access to company creator with PRO plan', async () => {
     const ctx = await service.resolveCompanyContext(
       { sub: creatorId, role: 'MEMBER' },
       companyId,
@@ -69,6 +88,28 @@ describe('CompanyAccessService', () => {
     expect(ctx.isCompanyCreator).toBe(true);
     expect(ctx.isCompanyManager).toBe(true);
     expect(ctx.allowedBrandIds).toBeNull();
+  });
+
+  it('should revoke management when company creator is downgraded to FREE while keeping read access', async () => {
+    usersService.findById = jest.fn().mockResolvedValue({
+      _id: creatorId,
+      email: 'creator@altaire.com',
+      role: 'MEMBER',
+      plan: 'FREE',
+    }) as any;
+
+    const ctx = await service.resolveCompanyContext(
+      { sub: creatorId, role: 'MEMBER' },
+      companyId,
+    );
+
+    expect(ctx.isCompanyCreator).toBe(true);
+    expect(ctx.isCompanyManager).toBe(false);
+    expect(ctx.allowedBrandIds).toBeNull();
+    expect(() => service.assertCanManageCompany(ctx)).toThrow(
+      ForbiddenException,
+    );
+    expect(() => service.assertCanAccessBrand(ctx, brandId)).not.toThrow();
   });
 
   it('should deny access to MEMBER not linked to company', async () => {

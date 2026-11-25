@@ -20,6 +20,7 @@ import {
 import { toast } from "sonner";
 import { ConfirmActionDialog } from "@/components/ui/ConfirmActionDialog";
 import {
+  selectAllCompanies,
   selectCompanyBrands,
   selectCurrentCompany,
 } from "@/lib/redux/slices/companySlice";
@@ -55,6 +56,7 @@ function extractErrorMessage(error: any, fallback: string): string {
 }
 
 export function OrganizationPeople() {
+  const allCompanies = useSelector(selectAllCompanies);
   const currentCompany = useSelector(selectCurrentCompany);
   const brands = useSelector(selectCompanyBrands);
   const token = useSelector((state: RootState) => state.auth.token);
@@ -63,6 +65,13 @@ export function OrganizationPeople() {
 
   const companyId = currentCompany?._id;
   const canManageCompany = Boolean(currentCompany?.isCompanyManager);
+  const otherManagedCompanies = useMemo(
+    () =>
+      allCompanies.filter(
+        (c) => c.isCompanyManager && String(c._id) !== String(companyId)
+      ),
+    [allCompanies, companyId]
+  );
 
   const [members, setMembers] = useState<ICompanyMember[]>([]);
   const [companyFunctions, setCompanyFunctions] = useState<ICompanyFunction[]>([]);
@@ -78,6 +87,7 @@ export function OrganizationPeople() {
     brandIds: string[];
     allowedProjects: string[];
     functionId: string;
+    additionalCompanyIds: string[];
   }>({
     name: "",
     email: "",
@@ -86,6 +96,7 @@ export function OrganizationPeople() {
     brandIds: [],
     allowedProjects: [],
     functionId: "",
+    additionalCompanyIds: [],
   });
 
   const [editingMember, setEditingMember] = useState<ICompanyMember | null>(null);
@@ -151,6 +162,16 @@ export function OrganizationPeople() {
   }, [companyId]);
 
   useEffect(() => {
+    setFormData((prev) => ({
+      ...prev,
+      brandIds: [],
+      allowedProjects: [],
+      functionId: "",
+      additionalCompanyIds: [],
+    }));
+  }, [companyId]);
+
+  useEffect(() => {
     if (token && companyId) {
       void fetchMembers();
       void fetchCompanyFunctions();
@@ -179,7 +200,7 @@ export function OrganizationPeople() {
     if (!formData.name || !formData.email || !companyId) return;
     try {
       setIsSubmitting(true);
-      await apiAddCompanyMember(companyId, {
+      const res = await apiAddCompanyMember(companyId, {
         name: formData.name.trim(),
         email: formData.email.trim(),
         ...(formData.password.trim()
@@ -192,6 +213,7 @@ export function OrganizationPeople() {
             ? formData.allowedProjects
             : [],
         functionId: formData.functionId || null,
+        additionalCompanyIds: formData.additionalCompanyIds,
       });
 
       setFormData({
@@ -202,9 +224,10 @@ export function OrganizationPeople() {
         brandIds: [],
         allowedProjects: [],
         functionId: "",
+        additionalCompanyIds: [],
       });
       await fetchMembers();
-      toast.success("Membro adicionado à empresa com sucesso!");
+      toast.success(res?.message || "Membro adicionado à empresa com sucesso!");
     } catch (error: any) {
       toast.error(extractErrorMessage(error, "Erro ao adicionar membro."));
     } finally {
@@ -356,9 +379,9 @@ export function OrganizationPeople() {
               Gestão restrita em {currentCompany.name}
             </h2>
             <p className="mt-1 text-sm text-muted-foreground">
-              Apenas o criador da empresa ou administradores da organização
-              Altaire podem adicionar membros, atribuir marcas e gerenciar o
-              catálogo de funções.
+              Apenas o criador da empresa com plano PRO ativo ou administradores
+              da organização Altaire podem pré-cadastrar usuários, atribuir
+              marcas e gerenciar o catálogo de funções.
             </p>
           </div>
         </div>
@@ -407,13 +430,15 @@ export function OrganizationPeople() {
       <div className="space-y-4 rounded-md border border-border bg-card p-5 shadow-sm">
         <div>
           <h3 className="flex items-center gap-2 text-sm font-semibold">
-            <UserPlus className="h-4 w-4 text-primary" /> Adicionar Usuário à
-            Empresa
+            <UserPlus className="h-4 w-4 text-primary" /> Pré-cadastrar ou
+            Vincular Usuário
           </h3>
           <p className="mt-1 text-xs text-muted-foreground">
-            Se o e-mail já existir na Altaire, o usuário será vinculado com suas
-            permissões nesta empresa. OWNER e ADMIN são exclusivos da organização
-            Altaire.
+            Recurso exclusivo de gestores PRO e administradores. Se o e-mail já
+            possuir cadastro externo, ele será vinculado imediatamente; caso
+            contrário, a senha provisória é opcional (o usuário pode entrar com
+            a senha informada ou concluir o cadastro em /cadastro ou Google
+            usando o mesmo e-mail).
           </p>
         </div>
 
@@ -581,6 +606,48 @@ export function OrganizationPeople() {
                       }`}
                     >
                       {proj.name}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          ) : null}
+
+          {otherManagedCompanies.length > 0 ? (
+            <div className="border-t border-border pt-3">
+              <label className="mb-2 flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
+                <Building2 className="h-3.5 w-3.5 text-primary" />
+                Empresas vinculadas neste cadastro (
+                {1 + formData.additionalCompanyIds.length}):
+              </label>
+              <div className="flex flex-wrap gap-2">
+                <span className="inline-flex min-h-[2.75rem] items-center rounded-md border border-primary bg-primary/15 px-3.5 py-2 text-xs font-semibold text-primary">
+                  {currentCompany.name} (Ativa)
+                </span>
+                {otherManagedCompanies.map((company) => {
+                  const selected = formData.additionalCompanyIds.includes(
+                    company._id
+                  );
+                  return (
+                    <button
+                      key={company._id}
+                      type="button"
+                      onClick={() =>
+                        setFormData((prev) => ({
+                          ...prev,
+                          additionalCompanyIds: toggleInList(
+                            prev.additionalCompanyIds,
+                            company._id
+                          ),
+                        }))
+                      }
+                      className={`min-h-[2.75rem] rounded-md border px-3.5 py-2 text-xs font-medium transition-colors ${
+                        selected
+                          ? "border-primary bg-primary/15 text-primary"
+                          : "border-border bg-background text-muted-foreground hover:text-foreground"
+                      }`}
+                    >
+                      {company.name}
                     </button>
                   );
                 })}

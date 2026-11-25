@@ -37,6 +37,7 @@ export const WORKSPACE_ROUTES = {
   configuracoesAlternativa: "/dashboard/configuracoes",
   portalCliente: "/dashboard/cliente",
   portalExterno: "/dashboard/externo",
+  semEmpresa: "/sem-empresa",
   configuracoesTab: (
     tab: "perfil" | "plano" | "preferencias" | "membros"
   ) => `/dashboard/settings?tab=${tab}`,
@@ -162,6 +163,7 @@ export const ROUTES = {
   configuracoesAlternativa: WORKSPACE_ROUTES.configuracoesAlternativa,
   portalCliente: WORKSPACE_ROUTES.portalCliente,
   portalExterno: WORKSPACE_ROUTES.portalExterno,
+  semEmpresa: WORKSPACE_ROUTES.semEmpresa,
 } as const;
 
 /* -------------------------------------------------------------------------- */
@@ -391,6 +393,7 @@ export const NOINDEX_ROUTES = [
   WORKSPACE_ROUTES.assetsArquivos,
   WORKSPACE_ROUTES.configuracoes,
   WORKSPACE_ROUTES.configuracoesAlternativa,
+  WORKSPACE_ROUTES.semEmpresa,
   LEGACY_ROUTES.signup,
   LEGACY_ROUTES.dashboard,
 ] as const;

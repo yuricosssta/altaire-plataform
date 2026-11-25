@@ -6,11 +6,14 @@ import {
 } from '@nestjs/common';
 import { CompanyRepository } from '../repositories/company.repository';
 import { CompanyMemberRepository } from '../repositories/company-member.repository';
+import { UsersService } from '../../users/services/user.service';
 import { ICompanyContext } from '../schemas/models/company-member.interface';
 import {
   AltaireOrgRole,
+  UserPlanType,
   isAltaireOwnerOrAdmin,
   isClientOrExternalRole,
+  isProUserPlan,
   resolveAltaireRoleByEmail,
 } from '../../shared/utils/org-role.util';
 
@@ -23,12 +26,63 @@ export interface AuthUserPayload {
   role?: string;
 }
 
+export interface ResolvedUserPlanStatus {
+  userId: string;
+  userRole: AltaireOrgRole;
+  plan: UserPlanType;
+  isAltaireAdmin: boolean;
+  isProOrAdmin: boolean;
+}
+
 @Injectable()
 export class CompanyAccessService {
   constructor(
     private readonly companyRepo: CompanyRepository,
     private readonly companyMemberRepo: CompanyMemberRepository,
+    private readonly usersService: UsersService,
   ) {}
+
+  async resolveUserPlanAndProStatus(
+    user: AuthUserPayload | string | undefined,
+  ): Promise<ResolvedUserPlanStatus> {
+    const userId =
+      typeof user === 'string' ? user : String(user?.sub || user?.id || '');
+    if (!userId || !OBJECT_ID_REGEX.test(userId)) {
+      throw new ForbiddenException('Usuário autenticado inválido.');
+    }
+
+    const userEmail = typeof user === 'string' ? undefined : user?.email;
+    const rawRole = typeof user === 'string' ? undefined : user?.role;
+    const dbUser = await this.usersService.findById(userId).catch(() => null);
+
+    const effectiveEmail = userEmail || dbUser?.email;
+    const effectiveRawRole = rawRole || dbUser?.role;
+    const isAltaireAdmin = isAltaireOwnerOrAdmin(
+      effectiveEmail,
+      effectiveRawRole,
+    );
+    const resolvedEnvRole = resolveAltaireRoleByEmail(
+      effectiveEmail,
+      effectiveRawRole,
+    );
+    const userRole: AltaireOrgRole = isAltaireAdmin
+      ? effectiveRawRole?.trim().toUpperCase() === 'OWNER' ||
+        resolvedEnvRole === 'OWNER'
+        ? 'OWNER'
+        : 'ADMIN'
+      : resolvedEnvRole;
+
+    const plan: UserPlanType = (dbUser?.plan as UserPlanType) || 'FREE';
+    const isProOrAdmin = isAltaireAdmin || isProUserPlan(plan);
+
+    return {
+      userId,
+      userRole,
+      plan,
+      isAltaireAdmin,
+      isProOrAdmin,
+    };
+  }
 
   async resolveCompanyContext(
     user: AuthUserPayload | string | undefined,
@@ -38,21 +92,8 @@ export class CompanyAccessService {
       throw new BadRequestException('ID da empresa inválido ou não fornecido.');
     }
 
-    const userId =
-      typeof user === 'string' ? user : String(user?.sub || user?.id || '');
-    if (!userId || !OBJECT_ID_REGEX.test(userId)) {
-      throw new ForbiddenException('Usuário autenticado inválido.');
-    }
-
-    const userEmail = typeof user === 'string' ? undefined : user?.email;
-    const rawRole = typeof user === 'string' ? undefined : user?.role;
-    const isAltaireAdmin = isAltaireOwnerOrAdmin(userEmail, rawRole);
-    const resolvedEnvRole = resolveAltaireRoleByEmail(userEmail, rawRole);
-    const userRole: AltaireOrgRole = isAltaireAdmin
-      ? rawRole?.trim().toUpperCase() === 'OWNER' || resolvedEnvRole === 'OWNER'
-        ? 'OWNER'
-        : 'ADMIN'
-      : resolvedEnvRole;
+    const { userId, userRole, isAltaireAdmin, isProOrAdmin } =
+      await this.resolveUserPlanAndProStatus(user);
 
     const company = await this.companyRepo.findById(String(companyId));
     if (!company) {
@@ -61,7 +102,7 @@ export class CompanyAccessService {
 
     const isCompanyCreator = String(company.createdBy) === userId;
 
-    if (isAltaireAdmin || isCompanyCreator) {
+    if (isAltaireAdmin || (isCompanyCreator && isProOrAdmin)) {
       return {
         companyId: String(company._id),
         organizationId: String(company.organizationId),
@@ -70,6 +111,20 @@ export class CompanyAccessService {
         isAltaireAdmin,
         isCompanyCreator,
         isCompanyManager: true,
+        allowedBrandIds: null,
+        allowedProjectIds: null,
+      };
+    }
+
+    if (isCompanyCreator) {
+      return {
+        companyId: String(company._id),
+        organizationId: String(company.organizationId),
+        userId,
+        userRole,
+        isAltaireAdmin: false,
+        isCompanyCreator: true,
+        isCompanyManager: false,
         allowedBrandIds: null,
         allowedProjectIds: null,
       };
@@ -114,13 +169,13 @@ export class CompanyAccessService {
   assertCanManageCompany(ctx: ICompanyContext): void {
     if (!ctx.isCompanyManager) {
       throw new ForbiddenException(
-        'Apenas o criador da empresa ou administradores da Altaire podem realizar esta ação.',
+        'Apenas o criador da empresa com plano PRO ativo ou administradores da Altaire podem realizar esta ação.',
       );
     }
   }
 
   assertCanAccessBrand(ctx: ICompanyContext, brandId: string): void {
-    if (ctx.isCompanyManager) {
+    if (ctx.isCompanyManager || ctx.allowedBrandIds === null) {
       return;
     }
 

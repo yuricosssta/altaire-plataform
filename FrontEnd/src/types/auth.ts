@@ -6,7 +6,14 @@ export type UserRole =
   | "member"
   | "client"
   | "external";
-export type SubscriptionTier = "free" | "individual" | "pro" | "agency";
+export type SubscriptionTier =
+  | "free"
+  | "individual"
+  | "pro"
+  | "agency"
+  | "enterprise";
+
+export type UserPlanType = "FREE" | "PRO" | "ENTERPRISE";
 
 export interface ActiveProjectContext {
   id: string;
@@ -21,6 +28,7 @@ export interface UserSession {
   email: string;
   fullName: string;
   role: UserRole;
+  plan?: UserPlanType;
   allowedProjects?: string[];
   permissions?: string[];
   invitedBy?: string;
