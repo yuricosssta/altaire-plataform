@@ -38,7 +38,7 @@ export const updateCompanySchema = z.object({
     .max(4)
     .transform((v) => v.toUpperCase())
     .optional(),
-  cnpj: z.string().trim().max(20).optional(),
+  cnpj: z.string().trim().max(20).nullable().optional(),
   status: z.enum(['active', 'inactive', 'suspended']).optional(),
 });
 

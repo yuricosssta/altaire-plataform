@@ -22,6 +22,14 @@ import {
   fetchMyOrganizations,
   selectCurrentOrg,
 } from "@/lib/redux/slices/organizationSlice";
+import {
+  fetchCompanyBrands,
+  fetchMyCompanies,
+  selectAllCompanies,
+  selectCompanyStatus,
+  selectCurrentCompany,
+} from "@/lib/redux/slices/companySlice";
+import { CompanyOnboardingModal } from "@/components/company/CompanyOnboardingModal";
 import { AppDispatch, RootState } from "@/lib/redux/store";
 
 const SIDEBAR_COLLAPSED_STORAGE_KEY = "la-sidebar-collapsed";
@@ -34,8 +42,13 @@ function MainDashboardShellInner({
 }) {
   const pathname = usePathname() || "/dashboard";
   const router = useRouter();
+  const dispatch = useDispatch<AppDispatch>();
   const authUser = useSelector((state: RootState) => state.auth?.user);
+  const isAuthenticated = useSelector(selectIsAuthenticated);
   const currentOrg = useSelector(selectCurrentOrg);
+  const companies = useSelector(selectAllCompanies);
+  const currentCompany = useSelector(selectCurrentCompany);
+  const companyStatus = useSelector(selectCompanyStatus);
   const { workspaceName, userFullName, userEmail, topPriorityProject } =
     useEditorialWorkspace();
 
@@ -45,6 +58,23 @@ function MainDashboardShellInner({
   const isClientRole = normalizedRole === "client";
   const isExternalRole = normalizedRole === "external";
   const isRestrictedRole = isClientRole || isExternalRole;
+
+  useEffect(() => {
+    if (isAuthenticated && companyStatus === "idle") {
+      dispatch(fetchMyCompanies());
+    }
+  }, [isAuthenticated, companyStatus, dispatch]);
+
+  useEffect(() => {
+    if (currentCompany?._id) {
+      dispatch(fetchCompanyBrands(currentCompany._id));
+      try {
+        document.cookie = `active_company_id=${currentCompany._id}; path=/; SameSite=Lax`;
+      } catch {
+        /* Ignora bloqueio de cookie */
+      }
+    }
+  }, [currentCompany?._id, dispatch]);
 
   useEffect(() => {
     if (isClientRole && !pathname.startsWith("/dashboard/cliente")) {
@@ -214,6 +244,14 @@ function MainDashboardShellInner({
           {children}
         </main>
       </div>
+
+      <CompanyOnboardingModal
+        open={
+          !isRestrictedRole &&
+          companyStatus === "succeeded" &&
+          companies.length === 0
+        }
+      />
     </div>
   );
 }
@@ -254,6 +292,7 @@ export default function MainDashboardLayout({
             if (!hadValidToken) {
               dispatch(fetchUserProfile());
               dispatch(fetchMyOrganizations());
+              dispatch(fetchMyCompanies());
             }
             if (active) setIsCheckingAuth(false);
             return;
@@ -273,6 +312,7 @@ export default function MainDashboardLayout({
         if (updatedToken) {
           dispatch(fetchUserProfile());
           dispatch(fetchMyOrganizations());
+          dispatch(fetchMyCompanies());
           if (active) setIsCheckingAuth(false);
           return;
         }

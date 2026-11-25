@@ -12,6 +12,13 @@ import {
 } from "react";
 import { useSelector } from "react-redux";
 import { RootState } from "@/lib/redux/store";
+import { selectIsAuthenticated } from "@/lib/redux/slices/authSlice";
+import {
+  selectCompanyBrands,
+  selectCurrentCompany,
+  selectSelectedBrandId,
+} from "@/lib/redux/slices/companySlice";
+import { editorialService } from "@/lib/services/editorialService";
 
 export type ProjectStatus = "active" | "in_setup" | "in_review" | "archived";
 
@@ -25,6 +32,8 @@ export type ProjectActivityLogItem = {
 
 export type EditorialProjectModel = {
   readonly id: string;
+  readonly companyId?: string;
+  readonly brandId?: string;
   readonly name: string;
   readonly brandOrClientName: string;
   readonly niche: string;
@@ -133,6 +142,7 @@ export type DerivedPanelState =
 
 type CreateProjectInput = {
   readonly name: string;
+  readonly brandId?: string;
   readonly brandOrClientName: string;
   readonly niche: string;
   readonly subniche: string;
@@ -186,6 +196,8 @@ type EditorialWorkspaceContextValue = {
   readonly activityEvents: readonly ProjectActivityLogItem[];
   readonly derivedPanelState: DerivedPanelState;
   readonly topPriorityProject: EditorialProjectModel | null;
+  readonly isLoadingProjects: boolean;
+  readonly refreshProjects: () => Promise<void>;
   readonly createProject: (input: CreateProjectInput) => EditorialProjectModel;
   readonly updateProject: (input: UpdateProjectInput) => void;
   readonly duplicateProject: (
@@ -534,7 +546,11 @@ export function EditorialWorkspaceProvider({
   readonly children: ReactNode;
 }) {
   const authUser = useSelector((state: RootState) => state.auth?.user);
+  const isAuthenticated = useSelector(selectIsAuthenticated);
   const userProfile = useSelector((state: RootState) => state.user?.profile);
+  const currentCompany = useSelector(selectCurrentCompany);
+  const brands = useSelector(selectCompanyBrands);
+  const selectedBrandId = useSelector(selectSelectedBrandId);
   const [workspaceName, setWorkspaceName] = useState<string>("Roberto Zane");
   const [userFullName, setUserFullName] = useState<string>("Roberto Zane");
   const [userEmail, setUserEmail] = useState<string>(
@@ -542,6 +558,7 @@ export function EditorialWorkspaceProvider({
   );
   const [projects, setProjects] =
     useState<readonly EditorialProjectModel[]>(DEFAULT_PROJECTS);
+  const [isLoadingProjects, setIsLoadingProjects] = useState<boolean>(false);
   const [rawTodaySlots, setRawTodaySlots] =
     useState<readonly TodaySlotModel[]>(DEFAULT_TODAY_SLOTS);
   const [rawUpcomingSlots] = useState<readonly Upcoming48hSlotModel[]>(
@@ -609,14 +626,105 @@ export function EditorialWorkspaceProvider({
   useEffect(() => {
     const resolvedName = userProfile?.name || authUser?.name;
     const resolvedEmail = userProfile?.email || authUser?.email;
-    if (resolvedName) {
+    if (currentCompany?.name) {
+      setWorkspaceName(currentCompany.name);
+    } else if (resolvedName) {
       setWorkspaceName(resolvedName);
+    }
+    if (resolvedName) {
       setUserFullName(resolvedName);
     }
     if (resolvedEmail) {
       setUserEmail(resolvedEmail);
     }
-  }, [authUser?.email, authUser?.name, userProfile?.email, userProfile?.name]);
+  }, [
+    authUser?.email,
+    authUser?.name,
+    currentCompany?.name,
+    userProfile?.email,
+    userProfile?.name,
+  ]);
+
+  const refreshProjects = useCallback(async () => {
+    if (!isAuthenticated || !currentCompany?._id) {
+      setProjects([]);
+      return;
+    }
+
+    try {
+      setIsLoadingProjects(true);
+      const list = await editorialService.listProjects(
+        selectedBrandId || undefined
+      );
+      const brandMap = new Map(brands.map((b) => [b._id, b.name]));
+
+      const mapped: EditorialProjectModel[] = (list || []).map((dto) => {
+        const hasLine = dto.editorialLineStatus === "active";
+        const hasCal = dto.calendarStatus === "active";
+        const brandName =
+          (dto.brandId && brandMap.get(dto.brandId)) || currentCompany.name;
+        const status: ProjectStatus =
+          dto.editorialLineStatus === "archived"
+            ? "archived"
+            : hasLine && hasCal
+              ? "active"
+              : "in_setup";
+
+        return {
+          id: dto.id,
+          companyId: dto.companyId || currentCompany._id,
+          brandId: dto.brandId,
+          name: dto.name,
+          brandOrClientName: brandName,
+          niche: dto.niche,
+          subniche: dto.subniche,
+          operationTypeLabel: "Orgânico",
+          currentObjectiveLabel: dto.currentObjective,
+          currentPhaseLabel: hasLine
+            ? "Operação Estratégica"
+            : "Estruturação Inicial",
+          status,
+          hasActiveLineEditorial: hasLine,
+          lineEditorialStatus: hasLine
+            ? "Linha Editorial ativa"
+            : "Pendente — criar Linha Editorial",
+          hasActiveCalendar: hasCal,
+          calendarStatus: hasCal
+            ? "Calendário ativo"
+            : "Aguardando Linha Editorial",
+          themesCount: 0,
+          allocatedThemesCount: 0,
+          approvedScriptsCount: 0,
+          draftScriptsCount: 0,
+          nextActionLabel: hasLine
+            ? hasCal
+              ? "Gerar temas e roteiros"
+              : "Criar Calendário Editorial"
+            : "Construir Linha Editorial",
+          nextActionReason: hasLine
+            ? "Base estratégica pronta para planejamento e produção."
+            : "Preencha a Base Estratégica na Função 01 para liberar o calendário.",
+          updatedAtLabel: dto.updatedAt
+            ? new Date(dto.updatedAt).toLocaleDateString("pt-BR")
+            : "Recente",
+        };
+      });
+
+      setProjects(mapped);
+    } catch {
+      /* Mantém lista atual se falhar temporariamente */
+    } finally {
+      setIsLoadingProjects(false);
+    }
+  }, [isAuthenticated, currentCompany?._id, currentCompany?.name, selectedBrandId, brands]);
+
+  useEffect(() => {
+    if (isAuthenticated && currentCompany?._id) {
+      void refreshProjects();
+    } else if (isAuthenticated && !currentCompany) {
+      setProjects([]);
+    }
+  }, [isAuthenticated, currentCompany, refreshProjects]);
 
   useEffect(() => {
     if (!isHydrated) return;
@@ -1100,6 +1208,8 @@ export function EditorialWorkspaceProvider({
       activityEvents,
       derivedPanelState,
       topPriorityProject,
+      isLoadingProjects,
+      refreshProjects,
       createProject,
       updateProject,
       duplicateProject,
@@ -1123,6 +1233,8 @@ export function EditorialWorkspaceProvider({
       activityEvents,
       derivedPanelState,
       topPriorityProject,
+      isLoadingProjects,
+      refreshProjects,
       createProject,
       updateProject,
       duplicateProject,

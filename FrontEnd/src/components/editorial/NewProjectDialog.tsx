@@ -3,6 +3,7 @@
 
 import { useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form';
+import { useSelector } from 'react-redux';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Loader2, Plus } from 'lucide-react';
 import { toast } from 'sonner';
@@ -17,6 +18,10 @@ import {
 } from '@/components/ui/dialog';
 import { ProjectCreateSchema, ProjectCreateDTO } from '@/lib/dto/editorial.schema';
 import { editorialService } from '@/lib/services/editorialService';
+import {
+  selectCompanyBrands,
+  selectSelectedBrandId,
+} from '@/lib/redux/slices/companySlice';
 
 interface NewProjectDialogProps {
   onCreated: (project: any) => void;
@@ -25,6 +30,8 @@ interface NewProjectDialogProps {
 
 export function NewProjectDialog({ onCreated, autoOpen = false }: NewProjectDialogProps) {
   const [open, setOpen] = useState(false);
+  const brands = useSelector(selectCompanyBrands);
+  const selectedBrandId = useSelector(selectSelectedBrandId);
 
   useEffect(() => {
     if (autoOpen) {
@@ -36,11 +43,22 @@ export function NewProjectDialog({ onCreated, autoOpen = false }: NewProjectDial
     register,
     handleSubmit,
     reset,
+    setValue,
     formState: { errors, isSubmitting },
   } = useForm<ProjectCreateDTO>({
     resolver: zodResolver(ProjectCreateSchema),
     mode: 'onChange',
+    defaultValues: {
+      brandId: selectedBrandId || brands[0]?._id || '',
+    },
   });
+
+  useEffect(() => {
+    const defaultBrand = selectedBrandId || brands[0]?._id || '';
+    if (defaultBrand) {
+      setValue('brandId', defaultBrand, { shouldValidate: true });
+    }
+  }, [open, brands, selectedBrandId, setValue]);
 
   const onSubmit = async (data: ProjectCreateDTO) => {
     try {
@@ -80,6 +98,29 @@ export function NewProjectDialog({ onCreated, autoOpen = false }: NewProjectDial
         </DialogHeader>
 
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
+          <div className="space-y-2">
+            <label className="font-sans text-sm font-bold text-foreground">
+              Marca Vinculada *
+            </label>
+            {brands.length === 0 ? (
+              <p className="rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-xs text-destructive">
+                Cadastre ou solicite acesso a uma marca nesta empresa antes de criar um projeto.
+              </p>
+            ) : (
+              <select
+                {...register('brandId')}
+                className="w-full rounded-md border border-border bg-background px-4 py-2 font-sans text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+              >
+                {brands.map((brand) => (
+                  <option key={brand._id} value={brand._id}>
+                    {brand.name}
+                  </option>
+                ))}
+              </select>
+            )}
+            {errors.brandId && <p className="text-xs text-destructive">{errors.brandId.message}</p>}
+          </div>
+
           <div className="space-y-2">
             <label className="font-sans text-sm font-bold text-foreground">
               Nome do Projeto
@@ -130,7 +171,7 @@ export function NewProjectDialog({ onCreated, autoOpen = false }: NewProjectDial
           <DialogFooter>
             <button
               type="submit"
-              disabled={isSubmitting}
+              disabled={isSubmitting || brands.length === 0}
               className="flex items-center gap-2 rounded-md bg-primary px-6 py-2 font-sans text-sm font-bold text-primary-foreground transition-opacity hover:opacity-90 disabled:opacity-50"
             >
               {isSubmitting ? (

@@ -87,17 +87,29 @@ export class CompanyMongooseRepository implements CompanyRepository {
   async update(id: string, data: IUpdateCompany): Promise<ICompany | null> {
     if (!(Types.ObjectId as any).isValid(id)) return null;
     const set: Record<string, unknown> = {};
+    const unset: Record<string, 1> = {};
     if (data.name !== undefined) set.name = data.name.trim();
     if (data.acronym !== undefined)
       set.acronym = data.acronym.trim().toUpperCase();
-    if (data.cnpj !== undefined) set.cnpj = data.cnpj.trim();
+    if (data.cnpj !== undefined) {
+      const trimmedCnpj = data.cnpj === null ? '' : data.cnpj.trim();
+      if (trimmedCnpj === '') {
+        unset.cnpj = 1;
+      } else {
+        set.cnpj = trimmedCnpj;
+      }
+    }
     if (data.status !== undefined) set.status = data.status;
     if (data.plan !== undefined) set.plan = data.plan;
+
+    const updateOp: Record<string, unknown> = {};
+    if (Object.keys(set).length > 0) updateOp.$set = set;
+    if (Object.keys(unset).length > 0) updateOp.$unset = unset;
 
     const updated = await this.companyModel
       .findOneAndUpdate(
         { _id: toObjId(id), isActive: { $ne: false } },
-        { $set: set },
+        updateOp,
         { new: true },
       )
       .lean()

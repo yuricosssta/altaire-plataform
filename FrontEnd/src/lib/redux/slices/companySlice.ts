@@ -2,7 +2,7 @@ import { createAsyncThunk, createSlice, PayloadAction } from '@reduxjs/toolkit';
 import { RootState } from '../store';
 import { apiFetchMyCompanies } from '@/lib/services/companyService';
 import { apiListCompanyBrands } from '@/lib/services/brandService';
-import { IBrand, ICompanySettings, ICompanyWithAccess } from '@/types/company';
+import { IBrand, ICompany, ICompanySettings, ICompanyWithAccess } from '@/types/company';
 
 interface CompanyState {
   list: ICompanyWithAccess[];
@@ -100,6 +100,36 @@ const companySlice = createSlice({
       }
     },
 
+    updateCompanyInList(
+      state,
+      action: PayloadAction<Partial<ICompany> & { _id: string }>,
+    ) {
+      const idx = state.list.findIndex((c) => c._id === action.payload._id);
+      if (idx !== -1) {
+        state.list[idx] = { ...state.list[idx], ...action.payload };
+      }
+      if (state.currentCompany?._id === action.payload._id) {
+        state.currentCompany = { ...state.currentCompany, ...action.payload };
+      }
+    },
+
+    removeCompanyFromList(state, action: PayloadAction<string>) {
+      state.list = state.list.filter((c) => c._id !== action.payload);
+      if (state.currentCompany?._id === action.payload) {
+        state.currentCompany = state.list[0] || null;
+        state.selectedBrandId = null;
+        state.brands = [];
+        state.brandsStatus = 'idle';
+        if (typeof window !== 'undefined') {
+          if (state.currentCompany) {
+            window.localStorage.setItem('last_company_id', state.currentCompany._id);
+          } else {
+            window.localStorage.removeItem('last_company_id');
+          }
+        }
+      }
+    },
+
     addBrand(state, action: PayloadAction<IBrand>) {
       state.brands.push(action.payload);
     },
@@ -185,6 +215,8 @@ export const {
   setSelectedBrandId,
   addCompany,
   updateCurrentCompanySettings,
+  updateCompanyInList,
+  removeCompanyFromList,
   addBrand,
   updateBrandInList,
   removeBrandFromList,

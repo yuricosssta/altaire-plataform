@@ -37,7 +37,7 @@ export interface ICreateCompany {
 export interface IUpdateCompany {
   name?: string;
   acronym?: string;
-  cnpj?: string;
+  cnpj?: string | null;
   status?: CompanyStatus;
   plan?: CompanyPlan;
 }
