@@ -20,6 +20,8 @@ export interface IEditorialProject {
   nextActionReason?: string;
   createdBy: string;
   orgId: string;
+  companyId: string;
+  brandId: string;
   isActive: boolean;
   createdAt?: Date;
   updatedAt?: Date;
@@ -47,6 +49,8 @@ export interface ICreateEditorialProject {
   nextActionLabel?: string;
   nextActionReason?: string;
   createdBy: string;
+  companyId: string;
+  brandId: string;
   orgId?: string;
 }
 

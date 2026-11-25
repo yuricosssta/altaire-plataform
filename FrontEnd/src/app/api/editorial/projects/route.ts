@@ -1,36 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { proxyEditorialRequest } from '@/app/api/editorial/_proxy';
-import { ProjectCardSchema, ProjectCreateSchema } from '@/lib/dto/editorial.schema';
+import { ProjectCreateSchema } from '@/lib/dto/editorial.schema';
 import { error, ERROR_CODES } from '@/lib/api/response';
 import { getAuthTokenFromRequest, verifyInternalToken } from '@/lib/auth/token.service';
 
 export async function GET(request: NextRequest) {
-  const result = await proxyEditorialRequest(request, '/projects');
+  const brandId = request.nextUrl.searchParams.get('brandId');
+  const query = brandId ? `?brandId=${encodeURIComponent(brandId)}` : '';
+  const result = await proxyEditorialRequest(request, `/projects${query}`);
 
   if ('ok' in result) {
-    const token = await getAuthTokenFromRequest(request);
-    const payload = token ? await verifyInternalToken(token) : null;
-    const rawList = (result.data as any[]) || [];
-
-    const role = String(payload?.role || 'member').toLowerCase();
-    const isClientOrExternal = role === 'client' || role === 'external';
-    const allowedSet = new Set(
-      Array.isArray(payload?.allowedProjects)
-        ? payload.allowedProjects.map(String)
-        : [],
-    );
-
-    const filtered = payload?.sub
-      ? rawList.filter((p: any) => {
-          const pid = String(p.id || p._id || '');
-          if (isClientOrExternal) {
-            return allowedSet.has(pid);
-          }
-          return !p.createdBy || String(p.createdBy) === String(payload.sub);
-        })
-      : rawList;
-
-    const projects = filtered.map((p: any) => ({
+    const rawList = Array.isArray(result.data) ? (result.data as any[]) : [];
+    const projects = rawList.map((p: any) => ({
       ...p,
       id: p.id || p._id,
       updatedAt: p.updatedAt ? new Date(p.updatedAt) : undefined,
@@ -38,7 +19,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json(projects);
   }
 
-  return NextResponse.json(result, { status: 502 });
+  return NextResponse.json(result, { status: result.status });
 }
 
 export async function POST(request: NextRequest) {
@@ -79,5 +60,5 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  return NextResponse.json(result, { status: 502 });
+  return NextResponse.json(result, { status: result.status });
 }

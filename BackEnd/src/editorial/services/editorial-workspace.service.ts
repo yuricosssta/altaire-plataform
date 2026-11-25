@@ -39,6 +39,8 @@ export interface OperationalAlert {
   actionHref: string;
 }
 
+import { AuthUserPayload } from '../../company/services/company-access.service';
+
 @Injectable()
 export class EditorialWorkspaceService {
   constructor(
@@ -51,14 +53,29 @@ export class EditorialWorkspaceService {
   ) {}
 
   async getOverview(
-    orgId: string,
-    userId?: string,
-    allowedProjectIds?: string[],
+    companyId: string | undefined,
+    user: AuthUserPayload,
+    brandId?: string,
   ) {
+    const userId =
+      typeof user === 'string' ? user : String(user?.sub || user?.id || '');
+
+    if (!companyId) {
+      return {
+        projects: [],
+        todaySlots: [],
+        upcoming48hSlots: [],
+        operationalAlerts: [],
+        aiSuggestions: [],
+        tasks: [],
+        recentActivity: [],
+      };
+    }
+
     const projects = await this.projectService.findAll(
-      orgId,
-      Array.isArray(allowedProjectIds) ? undefined : userId,
-      allowedProjectIds,
+      companyId,
+      user,
+      brandId,
     );
 
     const projectIds = projects
@@ -67,8 +84,8 @@ export class EditorialWorkspaceService {
 
     const [calendars, tasks, recentActivity] = await Promise.all([
       this.calendarRepository.findAllByProjects(projectIds),
-      this.taskRepository.findAll(orgId, userId),
-      this.activityRepository.findRecent(orgId, userId, undefined, 25),
+      this.taskRepository.findAll('altaire', userId),
+      this.activityRepository.findRecent('altaire', userId, undefined, 25),
     ]);
 
     const projectById = new Map(

@@ -27,6 +27,7 @@ localClient.interceptors.request.use(
     const state = store.getState();
     const token = state.auth?.token;
     const currentOrg = state.organizations?.currentOrganization;
+    const currentCompany = state.companies?.currentCompany;
 
     if (token) {
       config.headers['Authorization'] = `Bearer ${token}`;
@@ -40,6 +41,10 @@ localClient.interceptors.request.use(
 
       config.headers['x-org-id'] = orgId;
       config.headers['x-org-role'] = currentOrg.role;
+    }
+
+    if (currentCompany?._id) {
+      config.headers['x-company-id'] = currentCompany._id;
     }
     return config;
   },
@@ -90,8 +95,10 @@ function toCalendar(calendar: any): EditorialCalendar {
 }
 
 export const editorialService = {
-  listProjects: async (): Promise<ProjectCardDTO[]> => {
-    const response = await localClient.get('/editorial/projects');
+  listProjects: async (brandId?: string): Promise<ProjectCardDTO[]> => {
+    const response = await localClient.get('/editorial/projects', {
+      params: brandId ? { brandId } : undefined,
+    });
     return response.data.map((project: any) => ({
       ...project,
       id: project.id || project._id,
@@ -322,8 +329,10 @@ export const editorialService = {
     return toCalendar(response.data);
   },
 
-  getWorkspaceOverview: async (): Promise<any> => {
-    const response = await localClient.get('/editorial/workspace');
+  getWorkspaceOverview: async (brandId?: string): Promise<any> => {
+    const response = await localClient.get('/editorial/workspace', {
+      params: brandId ? { brandId } : undefined,
+    });
     return response.data;
   },
 

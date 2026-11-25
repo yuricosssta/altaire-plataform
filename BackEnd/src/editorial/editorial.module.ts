@@ -1,5 +1,7 @@
-import { Module } from '@nestjs/common';
+import { Module, forwardRef } from '@nestjs/common';
 import { MongooseModule } from '@nestjs/mongoose';
+import { CompanyModule } from '../company/company.module';
+import { BrandModule } from '../brand/brand.module';
 import {
   EditorialProject,
   EditorialProjectSchema,
@@ -97,6 +99,8 @@ import { EditorialWorkspaceController } from './controllers/editorial-workspace.
 
 @Module({
   imports: [
+    forwardRef(() => CompanyModule),
+    forwardRef(() => BrandModule),
     MongooseModule.forFeature([
       { name: EditorialProject.name, schema: EditorialProjectSchema },
       { name: EditorialVersion.name, schema: EditorialVersionSchema },
@@ -204,6 +208,7 @@ import { EditorialWorkspaceController } from './controllers/editorial-workspace.
   ],
   exports: [
     EditorialProjectService,
+    EditorialProjectRepository,
     EditorialVersionService,
     EditorialCalendarService,
     EditorialThemeService,

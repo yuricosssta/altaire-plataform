@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import {
   getBackendApiUrl,
   getBffAuthHeader,
+  getBffCompanyHeaders,
   getBffOrgHeaders,
 } from '@/lib/api/serverUtils';
 import { success, error, ERROR_CODES } from '@/lib/api/response';
@@ -16,10 +17,12 @@ export async function PATCH(
     const backendUrl = getBackendApiUrl();
     const authHeader = await getBffAuthHeader(request);
     const orgHeaders = getBffOrgHeaders(request);
+    const companyHeaders = await getBffCompanyHeaders(request);
 
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
       ...orgHeaders,
+      ...companyHeaders,
     };
     if (authHeader) headers['Authorization'] = authHeader;
 
@@ -59,8 +62,9 @@ export async function DELETE(
     const backendUrl = getBackendApiUrl();
     const authHeader = await getBffAuthHeader(request);
     const orgHeaders = getBffOrgHeaders(request);
+    const companyHeaders = await getBffCompanyHeaders(request);
 
-    const headers: Record<string, string> = { ...orgHeaders };
+    const headers: Record<string, string> = { ...orgHeaders, ...companyHeaders };
     if (authHeader) headers['Authorization'] = authHeader;
 
     const response = await fetch(`${backendUrl}/storage/assets/${id}`, {

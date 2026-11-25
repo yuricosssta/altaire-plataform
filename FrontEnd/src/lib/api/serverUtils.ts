@@ -72,10 +72,22 @@ export async function getBffAuthHeader(request: Request) {
 export function getBffOrgHeaders(request: Request) {
   const reqOrgId = request.headers.get('x-org-id');
   const reqOrgRole = request.headers.get('x-org-role');
+  const reqCompanyId = request.headers.get('x-company-id');
   return {
     'x-org-id': reqOrgId || 'altaire',
     'x-org-role': reqOrgRole || 'member',
+    ...(reqCompanyId ? { 'x-company-id': reqCompanyId } : {}),
     orgId: reqOrgId || 'altaire',
     orgRole: reqOrgRole || 'member',
   };
+}
+
+export async function getBffCompanyHeaders(request: Request): Promise<Record<string, string>> {
+  const headerCompanyId = request.headers.get('x-company-id');
+  if (headerCompanyId) {
+    return { 'x-company-id': headerCompanyId };
+  }
+  const cookieStore = await cookies();
+  const cookieCompanyId = cookieStore.get('active_company_id')?.value;
+  return cookieCompanyId ? { 'x-company-id': cookieCompanyId } : {};
 }

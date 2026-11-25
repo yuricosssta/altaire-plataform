@@ -23,8 +23,14 @@ export class EditorialBrandStory {
   @Prop({ required: true, default: 'altaire' })
   organizationId: string;
 
-  @Prop({ required: true, type: Types.ObjectId, ref: 'User' })
-  userId: Types.ObjectId;
+  @Prop({ required: true, type: Types.ObjectId, ref: 'Company', index: true })
+  companyId: Types.ObjectId;
+
+  @Prop({ required: true, type: Types.ObjectId, ref: 'Brand' })
+  brandId: Types.ObjectId;
+
+  @Prop({ required: false, type: Types.ObjectId, ref: 'User' })
+  userId?: Types.ObjectId;
 
   @Prop({ required: true, default: '' })
   originStory: string;
@@ -51,7 +57,4 @@ export class EditorialBrandStory {
 export const EditorialBrandStorySchema =
   SchemaFactory.createForClass(EditorialBrandStory);
 
-EditorialBrandStorySchema.index(
-  { userId: 1, organizationId: 1 },
-  { unique: true },
-);
+EditorialBrandStorySchema.index({ brandId: 1 }, { unique: true });

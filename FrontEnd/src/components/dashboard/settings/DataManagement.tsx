@@ -8,6 +8,11 @@ import {
   Trash2, AlertTriangle, Save, Loader2, X
 } from "lucide-react";
 import Papa from "papaparse";
+import { useSelector } from "react-redux";
+import {
+  selectCompanyBrands,
+  selectSelectedBrandId,
+} from "@/lib/redux/slices/companySlice";
 import { editorialService } from "@/lib/services/editorialService";
 import { scriptsService } from "@/lib/services/scriptsService";
 
@@ -22,6 +27,9 @@ interface ImportRow {
 
 export function DataManagement() {
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const brands = useSelector(selectCompanyBrands);
+  const selectedBrandId = useSelector(selectSelectedBrandId);
+  const targetBrandId = selectedBrandId || brands[0]?._id || "";
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [mounted, setMounted] = useState(false);
@@ -166,11 +174,17 @@ export function DataManagement() {
       return;
     }
 
+    if (!targetBrandId) {
+      alert("Cadastre ou selecione uma marca na empresa ativa antes de importar projetos.");
+      return;
+    }
+
     try {
       setIsSubmitting(true);
       for (const row of draftRows) {
         await editorialService.createProject({
           name: row.name,
+          brandId: targetBrandId,
           niche: row.niche,
           subniche: row.subniche,
           currentObjective: row.currentObjective,

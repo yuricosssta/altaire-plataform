@@ -6,9 +6,14 @@ describe('EditorialBrandStoryService', () => {
   let service: EditorialBrandStoryService;
   let brandStoryRepository: Partial<EditorialBrandStoryRepository>;
 
+  const companyId = '507f1f77bcf86cd799439010';
+  const brandId = '507f1f77bcf86cd799439020';
+
   const mockBrandStory = {
     organizationId: 'altaire',
-    userId: 'user-123',
+    companyId,
+    brandId,
+    userId: '507f1f77bcf86cd799439012',
     originStory: 'Minha história de origem',
     keyTurnarounds: ['Primeira virada'],
     failures: ['Primeira falha'],
@@ -26,16 +31,17 @@ describe('EditorialBrandStoryService', () => {
 
   beforeEach(async () => {
     brandStoryRepository = {
-      findByUserId: jest.fn().mockImplementation((userId) => {
-        if (userId === 'user-123') return Promise.resolve(mockBrandStory);
+      findByBrandId: jest.fn().mockImplementation((bId) => {
+        if (bId === brandId) return Promise.resolve(mockBrandStory);
         return Promise.resolve(null);
       }),
-      upsert: jest.fn().mockImplementation((userId, orgId, data) =>
+      upsertByBrand: jest.fn().mockImplementation((bId, cId, data, updatedBy) =>
         Promise.resolve({
           ...mockBrandStory,
           ...data,
-          userId,
-          organizationId: orgId,
+          brandId: bId,
+          companyId: cId,
+          userId: updatedBy,
         }),
       ),
     };
@@ -55,23 +61,37 @@ describe('EditorialBrandStoryService', () => {
     );
   });
 
-  it('deve retornar a BrandStory existente do usuário', async () => {
-    const result = await service.get('user-123');
+  it('deve retornar a BrandStory existente da marca', async () => {
+    const result = await service.getByBrand(brandId, companyId);
     expect(result.originStory).toBe('Minha história de origem');
+    expect(result.brandId).toBe(brandId);
     expect(result.usableStories).toHaveLength(1);
   });
 
-  it('deve retornar BrandStory vazia estruturada se não existir para o usuário', async () => {
-    const result = await service.get('user-novo');
+  it('deve retornar BrandStory vazia estruturada se não existir para a marca', async () => {
+    const result = await service.getByBrand(
+      '507f1f77bcf86cd799439099',
+      companyId,
+    );
     expect(result.originStory).toBe('');
     expect(result.keyTurnarounds).toEqual([]);
     expect(result.usableStories).toEqual([]);
+    expect(result.brandId).toBe('507f1f77bcf86cd799439099');
   });
 
-  it('deve fazer upsert da BrandStory do usuário', async () => {
-    const result = await service.upsert('user-123', 'altaire', {
-      originStory: 'História atualizada',
-    });
+  it('deve fazer upsert da BrandStory da marca', async () => {
+    const result = await service.upsertByBrand(
+      brandId,
+      companyId,
+      { originStory: 'História atualizada' },
+      '507f1f77bcf86cd799439012',
+    );
     expect(result.originStory).toBe('História atualizada');
+    expect(brandStoryRepository.upsertByBrand).toHaveBeenCalledWith(
+      brandId,
+      companyId,
+      { originStory: 'História atualizada' },
+      '507f1f77bcf86cd799439012',
+    );
   });
 });

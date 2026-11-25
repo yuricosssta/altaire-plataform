@@ -8,6 +8,7 @@ import { useDispatch, useSelector } from "react-redux";
 import { AnimatePresence, motion } from "motion/react";
 import {
   BookOpen,
+  Building2,
   Calendar,
   Check,
   ChevronsUpDown,
@@ -20,6 +21,7 @@ import {
   LogOut,
   PanelLeftClose,
   PanelLeftOpen,
+  Plus,
   Radar,
   Settings,
   Sparkles,
@@ -28,9 +30,16 @@ import {
 } from "lucide-react";
 import { clsx } from "clsx";
 import LogoBloco from "@/components/LogoBloco";
+import { CreateCompanyModal } from "@/components/company/CompanyOnboardingModal";
 import { ROUTES, WORKSPACE_ROUTES } from "@/lib/constants/routes";
 import { logout } from "@/lib/redux/slices/authSlice";
 import { selectCurrentOrg } from "@/lib/redux/slices/organizationSlice";
+import {
+  clearCompanyState,
+  selectAllCompanies,
+  selectCurrentCompany,
+  setCurrentCompany,
+} from "@/lib/redux/slices/companySlice";
 import { AppDispatch, RootState } from "@/lib/redux/store";
 
 export type SidebarNavItem = {
@@ -193,6 +202,8 @@ export function Sidebar({
   const router = useRouter();
   const dispatch = useDispatch<AppDispatch>();
   const currentOrg = useSelector(selectCurrentOrg);
+  const companies = useSelector(selectAllCompanies);
+  const currentCompany = useSelector(selectCurrentCompany);
   const authUser = useSelector((state: RootState) => state.auth?.user);
   const profile = useSelector((state: RootState) => state.user?.profile);
 
@@ -269,6 +280,7 @@ export function Sidebar({
   }, [isClientRole, isExternalRole]);
 
   const [isAccountMenuOpen, setIsAccountMenuOpen] = useState<boolean>(false);
+  const [isCreateCompanyOpen, setIsCreateCompanyOpen] = useState<boolean>(false);
   const [isHelpModalOpen, setIsHelpModalOpen] = useState<boolean>(false);
   const accountMenuRef = useRef<HTMLDivElement>(null);
 
@@ -299,15 +311,21 @@ export function Sidebar({
     try {
       window.localStorage.removeItem("la-session-active");
       window.localStorage.removeItem("token");
+      document.cookie = "active_company_id=; path=/; max-age=0";
     } catch {
       /* Ignora bloqueio de storage */
     }
+    dispatch(clearCompanyState());
     dispatch(logout());
     router.push(ROUTES.login);
   };
 
-  const workspaceInitial =
-    resolvedWorkspaceName.trim().charAt(0).toUpperCase() || "R";
+  const activeCompanyName = currentCompany?.name || resolvedWorkspaceName;
+  const activeCompanyBadge =
+    currentCompany?.acronym?.slice(0, 3) ||
+    activeCompanyName.trim().charAt(0).toUpperCase() ||
+    "A";
+  const canManageActiveCompany = Boolean(currentCompany?.isCompanyManager);
 
   const renderSidebarContent = (mobileMode: boolean) => {
     const collapsed = mobileMode ? false : isCollapsed;
@@ -379,14 +397,14 @@ export function Sidebar({
             )}
           </div>
 
-          {/* 2. Seletor de Conta / Workspace (Seção 2.3: Conta separada de Projeto Editorial) */}
+          {/* 2. Seletor de Empresa dentro da Organização Altaire */}
           <div ref={accountMenuRef} className="relative">
             <button
               type="button"
               onClick={() => setIsAccountMenuOpen((prev) => !prev)}
               aria-expanded={isAccountMenuOpen}
               aria-haspopup="menu"
-              title={`Workspace da Conta: ${resolvedWorkspaceName}`}
+              title={`Altaire · Empresa: ${activeCompanyName}`}
               className={clsx(
                 "group flex w-full items-center rounded-la-lg border border-white/12 bg-[#0B0F18]/90 transition-all duration-180",
                 "hover:border-la-border-gold/60 hover:bg-[#101522]",
@@ -397,17 +415,19 @@ export function Sidebar({
               )}
             >
               <div className="flex min-w-0 items-center gap-2.5">
-                <span className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-la-md border border-la-gold/60 bg-la-gold font-la-mono text-[0.8125rem] font-bold text-la-text-inverse shadow-[0_0_14px_rgba(207,169,101,0.3)]">
-                  {workspaceInitial}
+                <span className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-la-md border border-la-gold/60 bg-la-gold font-la-mono text-[0.75rem] font-bold text-la-text-inverse shadow-[0_0_14px_rgba(207,169,101,0.3)]">
+                  {activeCompanyBadge}
                 </span>
 
                 {!collapsed ? (
                   <div className="flex min-w-0 flex-col text-left">
                     <span className="truncate font-la-sans text-[0.875rem] font-semibold leading-tight text-la-text-primary">
-                      {resolvedWorkspaceName}
+                      {activeCompanyName}
                     </span>
                     <span className="truncate font-la-mono text-[0.625rem] uppercase tracking-[0.06em] text-la-gold-light">
-                      Conta / Workspace
+                      {currentCompany
+                        ? "Altaire · Empresa ativa"
+                        : "Altaire · Selecionar empresa"}
                     </span>
                   </div>
                 ) : null}
@@ -435,9 +455,14 @@ export function Sidebar({
                   )}
                 >
                   <div className="border-b border-white/10 px-3 py-2.5">
-                    <span className="block font-la-mono text-[0.5625rem] font-semibold uppercase tracking-[0.08em] text-la-gold-light">
-                      {userRoleLabel}
-                    </span>
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="block font-la-mono text-[0.5625rem] font-semibold uppercase tracking-[0.08em] text-la-gold-light">
+                        Organização Altaire
+                      </span>
+                      <span className="font-la-mono text-[0.5625rem] text-la-text-muted">
+                        {normalizedRole}
+                      </span>
+                    </div>
                     <p className="mt-0.5 truncate font-la-sans text-[0.8125rem] font-semibold text-la-text-primary">
                       {resolvedWorkspaceName}
                     </p>
@@ -446,23 +471,85 @@ export function Sidebar({
                     </p>
                   </div>
 
-                  <div className="mt-1.5 flex flex-col gap-1">
-                    <div className="flex items-center justify-between rounded-la-md border border-la-border-gold/40 bg-la-gold-faint px-2.5 py-2">
-                      <div className="flex items-center gap-2">
-                        <span className="inline-flex h-5 w-5 items-center justify-center rounded-la-xs bg-la-gold font-la-mono text-[0.625rem] font-bold text-la-text-inverse">
-                          {workspaceInitial}
-                        </span>
-                        <span className="font-la-sans text-[0.75rem] font-semibold text-la-text-primary">
-                          {resolvedWorkspaceName}
-                        </span>
-                      </div>
-                      <Check
-                        aria-hidden="true"
-                        className="h-3.5 w-3.5 text-la-gold"
-                      />
-                    </div>
+                  <div className="mt-1.5 flex max-h-48 flex-col gap-1 overflow-y-auto">
+                    <span className="px-2.5 py-1 font-la-mono text-[0.5625rem] uppercase tracking-[0.08em] text-la-text-muted">
+                      Empresas ({companies.length})
+                    </span>
 
-                    {isManager && !isRestrictedRole ? (
+                    {companies.length === 0 ? (
+                      <div className="rounded-la-md border border-white/8 bg-black/40 px-2.5 py-2 font-la-sans text-[0.75rem] text-la-text-muted">
+                        Nenhuma empresa vinculada ainda.
+                      </div>
+                    ) : (
+                      companies.map((company) => {
+                        const isSelected = currentCompany?._id === company._id;
+                        return (
+                          <button
+                            key={company._id}
+                            type="button"
+                            onClick={() => {
+                              dispatch(setCurrentCompany(company._id));
+                              setIsAccountMenuOpen(false);
+                              if (mobileMode && onCloseMobile) onCloseMobile();
+                            }}
+                            className={clsx(
+                              "flex w-full items-center justify-between gap-2 rounded-la-md border px-2.5 py-2 text-left transition-colors",
+                              isSelected
+                                ? "border-la-border-gold/40 bg-la-gold-faint"
+                                : "border-transparent hover:bg-white/[0.05]"
+                            )}
+                          >
+                            <div className="flex min-w-0 items-center gap-2">
+                              <span
+                                className={clsx(
+                                  "inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-la-xs font-la-mono text-[0.5625rem] font-bold",
+                                  isSelected
+                                    ? "bg-la-gold text-la-text-inverse"
+                                    : "bg-white/10 text-la-text-primary"
+                                )}
+                              >
+                                {company.acronym?.slice(0, 3) ||
+                                  company.name.charAt(0).toUpperCase()}
+                              </span>
+                              <div className="flex min-w-0 flex-col">
+                                <span className="truncate font-la-sans text-[0.75rem] font-semibold text-la-text-primary">
+                                  {company.name}
+                                </span>
+                                {company.isCompanyManager ? (
+                                  <span className="font-la-mono text-[0.5625rem] text-la-gold-light">
+                                    Gestor
+                                  </span>
+                                ) : null}
+                              </div>
+                            </div>
+                            {isSelected ? (
+                              <Check
+                                aria-hidden="true"
+                                className="h-3.5 w-3.5 shrink-0 text-la-gold"
+                              />
+                            ) : null}
+                          </button>
+                        );
+                      })
+                    )}
+                  </div>
+
+                  <div className="mt-1.5 flex flex-col gap-1 border-t border-white/10 pt-1.5">
+                    {!isRestrictedRole ? (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setIsAccountMenuOpen(false);
+                          setIsCreateCompanyOpen(true);
+                        }}
+                        className="flex items-center gap-2.5 rounded-la-md px-2.5 py-2 text-left font-la-sans text-[0.75rem] font-semibold text-la-gold-light transition-colors hover:bg-la-gold-faint"
+                      >
+                        <Plus aria-hidden="true" className="h-3.5 w-3.5" />
+                        <span>Nova Empresa</span>
+                      </button>
+                    ) : null}
+
+                    {(canManageActiveCompany || isManager) && !isRestrictedRole ? (
                       <Link
                         href="/dashboard/people"
                         onClick={() => {
@@ -475,7 +562,7 @@ export function Sidebar({
                           aria-hidden="true"
                           className="h-3.5 w-3.5 text-la-gold"
                         />
-                        <span>Membros & Permissões</span>
+                        <span>Membros & Funções</span>
                       </Link>
                     ) : null}
 
@@ -488,11 +575,11 @@ export function Sidebar({
                         }}
                         className="flex items-center gap-2.5 rounded-la-md px-2.5 py-2 font-la-sans text-[0.75rem] text-la-text-secondary transition-colors hover:bg-white/[0.05] hover:text-la-text-primary"
                       >
-                        <Settings
+                        <Building2
                           aria-hidden="true"
                           className="h-3.5 w-3.5 text-la-gold"
                         />
-                        <span>Configurações da Conta</span>
+                        <span>Configurações da Empresa</span>
                       </Link>
                     ) : null}
                   </div>
@@ -773,6 +860,12 @@ export function Sidebar({
           </div>
         ) : null}
       </AnimatePresence>
+
+      {/* 4. MODAL PARA CRIAR NOVA EMPRESA */}
+      <CreateCompanyModal
+        open={isCreateCompanyOpen}
+        onClose={() => setIsCreateCompanyOpen(false)}
+      />
 
       {/* 3. MODAL RÁPIDO DE AJUDA & MÉTODO LEGION ALTAIRE */}
       <AnimatePresence>

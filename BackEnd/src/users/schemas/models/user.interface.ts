@@ -7,12 +7,7 @@ export enum UserRule {
   External, // 4
 }
 
-export type UserRoleType =
-  | 'OWNER'
-  | 'ADMIN'
-  | 'MEMBER'
-  | 'CLIENT'
-  | 'EXTERNAL';
+export type UserRoleType = 'OWNER' | 'ADMIN' | 'MEMBER' | 'CLIENT' | 'EXTERNAL';
 
 export interface IUserPreferences {
   preferredStartRoute?: string;

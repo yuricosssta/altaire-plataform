@@ -1,3 +1,52 @@
+## REFINAMENTOS DE USABILIDADE E ROBUSTEZ (AUDITORIA UX BELEZURA) - 25/11/2026 ##
+Resumo Técnico — Aplicadas as correções da auditoria baseada nas Leis de Fitts, Postel e Jakob/Estética:
+
+1. Lei de Fitts — Alvos de Clique >= 44px (`min-h-[2.75rem] px-3.5 py-2`):
+   - `FrontEnd/src/app/(main)/dashboard/editorial/page.tsx`: ampliados os chips da barra de marcas (`Todas as marcas`, cada marca e botões de ação `Editar Marca`, `Excluir Marca` e `Nova Marca`).
+   - `FrontEnd/src/components/dashboard/OrganizationPeople.tsx`: ampliadas as pills de seleção de `brandIds` e `allowedProjects` (cadastro e edição) e o botão `Remover da Empresa`.
+   - `FrontEnd/src/components/dashboard/settings/StorageManagement.tsx`: ampliadas as pills de filtro de escopo por marca.
+
+2. Lei de Postel — CNPJ Flexível e Limpeza Segura com `$unset` no MongoDB:
+   - `FrontEnd/src/lib/utils.ts`: criado helper `formatCnpjInput(raw)` para entrada progressiva no formato `00.000.000/0001-00` aceitando números ou pontuação colada.
+   - `FrontEnd/src/components/company/CompanyOnboardingModal.tsx` e `FrontEnd/src/components/dashboard/OrganizationSettings.tsx`: aplicados `formatCnpjInput`, `inputMode="numeric"` e dica de formato; edição envia `cnpj: ""` ao limpar o campo.
+   - `BackEnd/src/company/validations/company.zod.ts`, `company.interface.ts` e `company.mongoose.repository.ts`: aceita `cnpj` vazio/`null` na atualização e aplica `$unset: { cnpj: 1 }` quando vazio, evitando colisão `E11000` no índice `sparse unique`.
+
+3. Lei de Jakob / Estética — Diálogo de Confirmação Padronizado (`ConfirmActionDialog`):
+   - Criado `FrontEnd/src/components/ui/ConfirmActionDialog.tsx` com base em `@/components/ui/dialog` (`z-[180]`, estado `isLoading` e variante destrutiva semântica).
+   - Substituídos os `window.confirm(...)` nativos em `dashboard/editorial/page.tsx` (excluir marca), `OrganizationPeople.tsx` (remover membro e excluir função, com modais internos ajustados para `z-40`), `StorageManagement.tsx` (excluir arquivo) e `OrganizationSettings.tsx` (excluir empresa).
+
+## HIERARQUIA ORGANIZACIONAL ALTAIRE -> EMPRESA -> MARCA -> PROJETO (FASES 1-4) - 25/11/2026 ##
+Resumo Técnico — Organização Única "Altaire", Módulos `Company` e `Brand`, Isolamento Multi-Empresa/Marca, BFF/Redux e UI/UX (Fase 4):
+
+1. Hierarquia e Governança (`BackEnd/src/organization`, `company`, `brand`):
+   - `Organization` ("Altaire", `slug: 'altaire'`) consolidada como singleton canônica via `OrganizationService.getCanonicalAltaireOrganization()`; `POST /organizations` bloqueado (`403 Forbidden`).
+   - Papéis de sistema únicos no usuário (`OWNER`, `ADMIN`, `MEMBER`, `CLIENT`, `EXTERNAL`), onde `OWNER` e `ADMIN` existem exclusivamente na organização Altaire (via `.env`).
+   - Criado módulo `CompanyModule` (`companies`, `company_members`, `company_functions`) seguindo o padrão Controller -> Service -> Repository -> Mongoose + Zod:
+     - Qualquer usuário (`OWNER`/`ADMIN`/`MEMBER`) pode criar empresas (`POST /companies`) vinculadas à Altaire; o criador (`createdBy`) é adicionado automaticamente em `CompanyMember` e tem gestão completa sobre as empresas que criou.
+     - `CompanyAccessService` / `CompanyAccessGuard`: resolve `ICompanyContext` via `x-company-id` ou `:companyId`. `OWNER`/`ADMIN` da Altaire e o criador têm acesso irrestrito na empresa; `MEMBER` convidado vê assuntos gerais da empresa e exclusivamente as marcas em `brandIds`; `CLIENT`/`EXTERNAL` ficam restritos a `allowedProjects` dentro da empresa.
+     - `CompanyFunction`: catálogo particular de cargos/funções por empresa (apenas título e descrição, sem interferir em papéis de sistema), com soft delete bloqueado se houver membros vinculados.
+   - Criado módulo `BrandModule` (`brands`):
+     - Marcas pertencem a uma `Company` (`companyId`) e possuem soft delete protegido contra exclusão caso existam `EditorialProject` ativos vinculados.
+     - Endpoints `/companies/:companyId/brands`, `/brands/:brandId` e `/brands/:brandId/brand-story`.
+
+2. Integração de Editorial, BrandStory e Storage (`BackEnd/src/editorial`, `storage`):
+   - `EditorialProject`: agora exige `companyId` e `brandId` obrigatórios; `EditorialProjectService` e `EditorialProjectController` exigem `x-company-id` e aplicam isolamento por empresa, marca (`brandIds`) e `allowedProjects`.
+   - `EditorialBrandStory`: migrado de `{ userId, organizationId }` para índice único `{ brandId: 1 }` com `companyId` obrigatório, compartilhado pela Marca.
+   - `Storage`: refatorado para Repository (`FileAssetRepository` / `FileAssetMongooseRepository`) com `companyId` obrigatório e `brandId` opcional; cota (`plan` e `storageUsed`) movida para `Company` e prefixo R2 estruturado em `${companyId}/${brandId || 'general'}/...`.
+   - CORS em `BackEnd/src/main.ts` atualizado para aceitar o header `x-company-id`.
+
+3. BFF, Redux, Services e Types (`FrontEnd`):
+   - Criados `FrontEnd/src/types/company.ts` e atualizado `editorial.schema.ts` (`brandId` em `ProjectCreateSchema` e `companyId`/`brandId` opcionais em `ProjectCardSchema`).
+   - Criadas rotas BFF em `FrontEnd/src/app/api/companies/*` e `FrontEnd/src/app/api/brands/*`; atualizados `serverUtils.ts`, `editorial/_proxy.ts`, `editorial/projects/route.ts` e `storage/*` para propagar `x-company-id`.
+   - Criados `companySlice.ts` (registrado em `store.ts`), `companyService.ts` e `brandService.ts`; atualizados `http.ts`, `editorialService.ts` e `storageService.ts` para injetar `x-company-id` da empresa selecionada.
+
+4. Interface Multi-Empresa & Marcas (Fase 4 — `FrontEnd`):
+   - Hidratação automática de empresas e marcas em `AuthInitializer.tsx` e `app/(main)/layout.tsx` (incluindo cookie `active_company_id` para BFF).
+   - Criados `CompanyOnboardingModal.tsx` (fluxo guiado em 2 passos: 1ª Empresa → 1ª Marca no 1º acesso sem empresa) + `CreateCompanyModal`, e `BrandFormModal.tsx` (criação/edição de marcas).
+   - `Sidebar.tsx`: substituído seletor de conta por **Seletor de Empresa (Altaire)** com troca de empresa ativa, botão `+ Nova Empresa` e visibilidade de `Membros & Funções` para gestores (`isCompanyManager`).
+   - `EditorialWorkspaceContext.tsx`, `dashboard/editorial/page.tsx` e `NewProjectDialog.tsx`: carregamento real por empresa/marca via `editorialService.listProjects()`, barra de filtro e CRUD de Marcas na Central Estratégica e seleção obrigatória de `brandId` na criação de projetos.
+   - `OrganizationPeople.tsx`, `StorageManagement.tsx`, `OrganizationSettings.tsx` e `BrandingSettings.tsx`: migrados para operar no contexto de `currentCompany` (membros com `brandIds[]`/`allowedProjects[]`, catálogo `CompanyFunction`, upload/filtro R2 por empresa/marca e identidade visual/exclusão protegida da empresa).
+
 ## REMOÇÃO DE MOCKS DO FRONTEND, PERSISTÊNCIA REAL VIA BFF/MONGODB E PORTAS DE LLM NO BACKEND - 18/11/2026 ##
 Resumo Técnico — Substituição Integral de Seeds Visuais, `localStorage` de Domínio e Simulações Locais por Endpoints Reais + Contratos `TODO(LLM)`:
 

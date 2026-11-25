@@ -10,6 +10,8 @@ export interface IFileAsset {
   _id?: string;
   id?: string;
   organizationId: string;
+  companyId?: string;
+  brandId?: string | null;
   uploadedBy: string;
   fileName: string;
   fileUrl: string;

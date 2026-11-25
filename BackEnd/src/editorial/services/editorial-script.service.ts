@@ -65,20 +65,17 @@ export class EditorialScriptService {
     return this.scriptRepository.findAllByProject(projectId, { format });
   }
 
-  async findAllAcrossProjects(
-    orgId: string,
-    userId?: string,
-    allowedProjectIds?: string[],
+  async findAllForProjects(
+    projects: {
+      _id?: string;
+      id?: string;
+      name?: string;
+      brandOrClientName?: string;
+    }[],
     format?: ContentFormat,
   ): Promise<
     (IEditorialScript & { projectName?: string; brandOrClientName?: string })[]
   > {
-    if (!this.projectRepository) return [];
-    const projects = await this.projectRepository.findAll(
-      orgId,
-      Array.isArray(allowedProjectIds) ? undefined : userId,
-      allowedProjectIds,
-    );
     const projectIds = projects
       .map((p) => String((p as any)._id || (p as any).id || ''))
       .filter(Boolean);
@@ -100,6 +97,22 @@ export class EditorialScriptService {
         brandOrClientName: proj?.brandOrClientName || proj?.name || 'Marca',
       };
     });
+  }
+
+  async findAllAcrossProjects(
+    companyId: string,
+    _userId?: string,
+    allowedProjectIds?: string[],
+    format?: ContentFormat,
+  ): Promise<
+    (IEditorialScript & { projectName?: string; brandOrClientName?: string })[]
+  > {
+    if (!this.projectRepository) return [];
+    const projects = await this.projectRepository.findAll({
+      companyId,
+      allowedProjectIds,
+    });
+    return this.findAllForProjects(projects, format);
   }
 
   async findById(scriptId: string): Promise<IEditorialScript> {

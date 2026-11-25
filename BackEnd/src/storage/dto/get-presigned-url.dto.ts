@@ -1,5 +1,12 @@
 //src/storage/dto/get-presigned-url.dto.ts
-import { IsString, IsNotEmpty, Matches, Min, IsNumber } from 'class-validator';
+import {
+  IsString,
+  IsNotEmpty,
+  Matches,
+  Min,
+  IsNumber,
+  IsOptional,
+} from 'class-validator';
 
 export class GetPresignedUrlDto {
   @IsString()
@@ -17,4 +24,8 @@ export class GetPresignedUrlDto {
   @IsNumber()
   @Min(1, { message: 'O arquivo não pode estar vazio.' })
   sizeBytes: number;
+
+  @IsOptional()
+  @IsString()
+  brandId?: string;
 }

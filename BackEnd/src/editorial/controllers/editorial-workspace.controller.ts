@@ -3,16 +3,17 @@ import {
   Controller,
   Delete,
   Get,
+  Headers,
   Param,
   Patch,
   Post,
   Query,
+  Req,
   UseGuards,
 } from '@nestjs/common';
 import { AuthGuard } from '../../auth/auth.guard';
 import { ZodValidationPipe } from '../../shared/pipe/zod-validation.pipe';
 import { GetUser } from '../../shared/decorators/get-user-decorator';
-import { isClientOrExternalRole } from '../../shared/utils/org-role.util';
 import { EditorialWorkspaceService } from '../services/editorial-workspace.service';
 import {
   createWorkspaceTaskSchema,
@@ -27,17 +28,12 @@ export class EditorialWorkspaceController {
   constructor(private readonly workspaceService: EditorialWorkspaceService) {}
 
   @Get()
-  async getOverview(@GetUser() user: any) {
-    const userId = typeof user === 'string' ? user : user?.sub;
-    const allowedProjects =
-      isClientOrExternalRole(user?.role) && Array.isArray(user?.allowedProjects)
-        ? user.allowedProjects.map(String)
-        : undefined;
-    return this.workspaceService.getOverview(
-      'altaire',
-      userId,
-      allowedProjects,
-    );
+  async getOverview(
+    @Headers('x-company-id') companyId: string | undefined,
+    @Query('brandId') brandId: string | undefined,
+    @Req() req: any,
+  ) {
+    return this.workspaceService.getOverview(companyId, req.user, brandId);
   }
 
   @Get('tasks')

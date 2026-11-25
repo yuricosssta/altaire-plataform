@@ -2,12 +2,15 @@ import {
   Body,
   Controller,
   Delete,
+  ForbiddenException,
   Get,
+  Headers,
   Param,
   Patch,
   Post,
   Put,
   Query,
+  Req,
   UseGuards,
 } from '@nestjs/common';
 import { AuthGuard } from '../../auth/auth.guard';
@@ -15,6 +18,8 @@ import { ZodValidationPipe } from '../../shared/pipe/zod-validation.pipe';
 import { GetUser } from '../../shared/decorators/get-user-decorator';
 import { EditorialScriptService } from '../services/editorial-script.service';
 import { EditorialBrandStoryService } from '../services/editorial-brand-story.service';
+import { EditorialProjectService } from '../services/editorial-project.service';
+import { isClientOrExternalRole } from '../../shared/utils/org-role.util';
 import {
   adaptPublicationSchema,
   AdaptPublicationInput,
@@ -33,7 +38,6 @@ import {
   updateScriptSchema,
   UpdateScriptInput,
 } from '../validations/editorial-script.zod';
-import { isClientOrExternalRole } from '../../shared/utils/org-role.util';
 import {
   upsertBrandStorySchema,
   UpsertBrandStoryInput,
@@ -46,24 +50,23 @@ export class EditorialScriptController {
   constructor(
     private readonly scriptService: EditorialScriptService,
     private readonly brandStoryService: EditorialBrandStoryService,
+    private readonly projectService: EditorialProjectService,
   ) {}
 
   @Get('publications')
   async listPublications(
-    @GetUser() user: any,
+    @Headers('x-company-id') companyId?: string,
     @Query('format') format?: ContentFormat,
+    @Query('brandId') brandId?: string,
+    @Req() req?: any,
   ) {
-    const userId = typeof user === 'string' ? user : user?.sub;
-    const allowedProjects =
-      isClientOrExternalRole(user?.role) && Array.isArray(user?.allowedProjects)
-        ? user.allowedProjects.map(String)
-        : undefined;
-    return this.scriptService.findAllAcrossProjects(
-      'altaire',
-      userId,
-      allowedProjects,
-      format,
+    if (!companyId) return [];
+    const projects = await this.projectService.findAll(
+      companyId,
+      req?.user,
+      brandId,
     );
+    return this.scriptService.findAllForProjects(projects, format);
   }
 
   @Post('publications/:scriptId/adapt')
@@ -113,21 +116,34 @@ export class EditorialScriptController {
   }
 
   @Get('projects/:projectId/scripts/brand-story')
-  async getBrandStory(
-    @Param('projectId') _projectId: string,
-    @GetUser() userId: string,
-  ) {
-    return this.brandStoryService.get(userId);
+  async getBrandStory(@Param('projectId') projectId: string, @Req() req: any) {
+    const project = await this.projectService.findById(projectId, req.user);
+    return this.brandStoryService.getByBrand(
+      String(project.brandId),
+      String(project.companyId),
+    );
   }
 
   @Put('projects/:projectId/scripts/brand-story')
   async updateBrandStory(
-    @Param('projectId') _projectId: string,
+    @Param('projectId') projectId: string,
     @Body(new ZodValidationPipe(upsertBrandStorySchema))
     data: UpsertBrandStoryInput,
-    @GetUser() userId: string,
+    @Req() req: any,
   ) {
-    return this.brandStoryService.upsert(userId, 'altaire', data as any);
+    if (isClientOrExternalRole(req.user?.role)) {
+      throw new ForbiddenException(
+        'Usuários clientes ou externos não podem editar o BrandStory da marca.',
+      );
+    }
+    const project = await this.projectService.findById(projectId, req.user);
+    const userId = String(req.user?.sub || req.user?.id || '');
+    return this.brandStoryService.upsertByBrand(
+      String(project.brandId),
+      String(project.companyId),
+      data as any,
+      userId,
+    );
   }
 
   // --- Rotas parametrizadas por :scriptId ---

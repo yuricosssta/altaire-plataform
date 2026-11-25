@@ -1,8 +1,11 @@
 import {
+  BadRequestException,
   ForbiddenException,
+  Inject,
   Injectable,
   NotFoundException,
   Optional,
+  forwardRef,
 } from '@nestjs/common';
 import { EditorialProjectRepository } from '../repositories/editorial-project.repository';
 import { EditorialVersionRepository } from '../repositories/editorial-version.repository';
@@ -16,11 +19,23 @@ import {
   IEditorialProject,
   IUpdateEditorialProject,
 } from '../schemas/models/editorial-project.interface';
+import {
+  CompanyAccessService,
+  AuthUserPayload,
+} from '../../company/services/company-access.service';
+import { BrandRepository } from '../../brand/repositories/brand.repository';
+import { isClientOrExternalRole } from '../../shared/utils/org-role.util';
+
+const OBJECT_ID_REGEX = /^[0-9a-fA-F]{24}$/;
 
 @Injectable()
 export class EditorialProjectService {
   constructor(
     private readonly projectRepository: EditorialProjectRepository,
+    @Inject(forwardRef(() => CompanyAccessService))
+    private readonly companyAccessService: CompanyAccessService,
+    @Inject(forwardRef(() => BrandRepository))
+    private readonly brandRepository: BrandRepository,
     @Optional()
     private readonly versionRepository?: EditorialVersionRepository,
     @Optional()
@@ -98,24 +113,63 @@ export class EditorialProjectService {
   }
 
   async findAll(
-    orgId: string,
-    createdBy?: string,
-    allowedProjectIds?: string[],
+    companyId: string,
+    user: AuthUserPayload,
+    requestedBrandId?: string,
   ): Promise<IEditorialProject[]> {
-    let projects: IEditorialProject[];
-    if (Array.isArray(allowedProjectIds)) {
-      if (allowedProjectIds.length === 0) {
+    const ctx = await this.companyAccessService.resolveCompanyContext(
+      user,
+      companyId,
+    );
+
+    if (requestedBrandId) {
+      if (!OBJECT_ID_REGEX.test(requestedBrandId)) {
+        throw new BadRequestException('ID da marca inválido.');
+      }
+      const brand = await this.brandRepository.findById(requestedBrandId);
+      if (!brand || String(brand.companyId) !== String(ctx.companyId)) {
+        throw new NotFoundException('Marca não encontrada nesta empresa.');
+      }
+    }
+
+    let projects: IEditorialProject[] = [];
+
+    if (isClientOrExternalRole(ctx.userRole)) {
+      const allowedProjects = ctx.allowedProjectIds || [];
+      if (allowedProjects.length === 0) {
         return [];
       }
-      projects = await this.projectRepository.findAll(
-        orgId,
-        undefined,
-        allowedProjectIds,
-      );
-    } else if (createdBy) {
-      projects = await this.projectRepository.findAll(orgId, createdBy);
+      projects = await this.projectRepository.findAll({
+        companyId: ctx.companyId,
+        allowedProjectIds: allowedProjects,
+        ...(requestedBrandId ? { brandIds: [requestedBrandId] } : {}),
+      });
+    } else if (ctx.isCompanyManager) {
+      projects = await this.projectRepository.findAll({
+        companyId: ctx.companyId,
+        ...(requestedBrandId ? { brandIds: [requestedBrandId] } : {}),
+      });
     } else {
-      projects = await this.projectRepository.findAll(orgId);
+      const allowedBrands = ctx.allowedBrandIds || [];
+      if (requestedBrandId) {
+        if (!allowedBrands.includes(String(requestedBrandId))) {
+          throw new ForbiddenException(
+            'Acesso negado: você não está vinculado a esta marca.',
+          );
+        }
+        projects = await this.projectRepository.findAll({
+          companyId: ctx.companyId,
+          brandIds: [requestedBrandId],
+        });
+      } else {
+        if (allowedBrands.length === 0) {
+          return [];
+        }
+        projects = await this.projectRepository.findAll({
+          companyId: ctx.companyId,
+          brandIds: allowedBrands,
+        });
+      }
     }
 
     if (
@@ -130,16 +184,21 @@ export class EditorialProjectService {
     return Promise.all(projects.map((p) => this.enrichProject(p)));
   }
 
-  async findById(id: string, userId?: string, allowedProjectIds?: string[]) {
+  async findById(id: string, user: AuthUserPayload) {
     const project = await this.projectRepository.findById(id);
-    if (!project)
+    if (!project) {
       throw new NotFoundException('Projeto editorial não encontrado.');
+    }
 
-    if (Array.isArray(allowedProjectIds)) {
-      const projectIdStr = String(
-        (project as any)._id || (project as any).id || id,
-      );
-      if (!allowedProjectIds.map(String).includes(projectIdStr)) {
+    const ctx = await this.companyAccessService.resolveCompanyContext(
+      user,
+      String(project.companyId),
+    );
+
+    if (isClientOrExternalRole(ctx.userRole)) {
+      const allowed = (ctx.allowedProjectIds || []).map(String);
+      const projectIdStr = String(project._id || project.id || id);
+      if (!allowed.includes(projectIdStr)) {
         throw new ForbiddenException(
           'Acesso negado: você não possui permissão para visualizar este projeto.',
         );
@@ -147,42 +206,94 @@ export class EditorialProjectService {
       return this.enrichProject(project);
     }
 
-    if (
-      userId &&
-      project.createdBy &&
-      String(project.createdBy) !== String(userId)
-    ) {
-      throw new ForbiddenException(
-        'Acesso negado: este projeto pertence a outro usuário.',
+    if (!ctx.isCompanyManager) {
+      this.companyAccessService.assertCanAccessBrand(
+        ctx,
+        String(project.brandId),
       );
     }
+
     return this.enrichProject(project);
   }
 
-  async create(data: ICreateEditorialProject) {
-    const created = await this.projectRepository.create(data);
+  async create(
+    companyId: string,
+    data: Omit<ICreateEditorialProject, 'companyId' | 'createdBy'>,
+    user: AuthUserPayload,
+  ) {
+    const ctx = await this.companyAccessService.resolveCompanyContext(
+      user,
+      companyId,
+    );
+
+    if (isClientOrExternalRole(ctx.userRole)) {
+      throw new ForbiddenException(
+        'Usuários clientes ou externos não têm permissão para criar projetos.',
+      );
+    }
+
+    const brand = await this.brandRepository.findById(data.brandId);
+    if (!brand || String(brand.companyId) !== String(ctx.companyId)) {
+      throw new BadRequestException(
+        'Marca não encontrada ou não pertence à empresa selecionada.',
+      );
+    }
+
+    if (!ctx.isCompanyManager) {
+      this.companyAccessService.assertCanAccessBrand(ctx, String(brand._id));
+    }
+
+    const created = await this.projectRepository.create({
+      ...data,
+      brandOrClientName: data.brandOrClientName || brand.name,
+      companyId: ctx.companyId,
+      brandId: String(brand._id),
+      createdBy: ctx.userId,
+      orgId: 'altaire',
+    });
+
     return this.enrichProject(created);
   }
 
-  async update(id: string, data: IUpdateEditorialProject) {
+  async update(
+    id: string,
+    data: IUpdateEditorialProject,
+    user: AuthUserPayload,
+  ) {
+    if (isClientOrExternalRole(user?.role)) {
+      throw new ForbiddenException(
+        'Usuários clientes ou externos não têm permissão para editar configurações do projeto.',
+      );
+    }
+
+    await this.findById(id, user);
+
     const project = await this.projectRepository.update(id, data);
-    if (!project)
+    if (!project) {
       throw new NotFoundException('Projeto editorial não encontrado.');
+    }
     return this.enrichProject(project);
   }
 
   async duplicate(
     id: string,
-    userId: string,
+    user: AuthUserPayload,
     options?: Partial<IDuplicateEditorialProjectInput> & {
       name?: string;
       brandOrClientName?: string;
       includeActiveLine?: boolean;
     },
   ): Promise<IEditorialProject> {
-    const original = await this.projectRepository.findById(id);
-    if (!original)
-      throw new NotFoundException('Projeto editorial não encontrado.');
+    if (isClientOrExternalRole(user?.role)) {
+      throw new ForbiddenException(
+        'Usuários clientes ou externos não têm permissão para duplicar projetos.',
+      );
+    }
+
+    const original = await this.findById(id, user);
+    const userId = String(
+      typeof user === 'string' ? user : user?.sub || user?.id || '',
+    );
 
     const duplicatedName =
       options?.newName || options?.name || `${original.name} (Cópia)`;
@@ -200,6 +311,8 @@ export class EditorialProjectService {
       nextActionLabel: 'Revisar Linha Editorial importada',
       nextActionReason: `Projeto duplicado a partir de ${original.name}.`,
       createdBy: userId,
+      companyId: String(original.companyId),
+      brandId: String(original.brandId),
       orgId: original.orgId || 'altaire',
     });
 
@@ -251,10 +364,19 @@ export class EditorialProjectService {
     return this.enrichProject(refreshed || created);
   }
 
-  async delete(id: string) {
+  async delete(id: string, user: AuthUserPayload) {
+    if (isClientOrExternalRole(user?.role)) {
+      throw new ForbiddenException(
+        'Usuários clientes ou externos não têm permissão para excluir projetos.',
+      );
+    }
+
+    await this.findById(id, user);
+
     const project = await this.projectRepository.softDelete(id);
-    if (!project)
+    if (!project) {
       throw new NotFoundException('Projeto editorial não encontrado.');
+    }
     return { message: 'Projeto editorial removido com sucesso.' };
   }
 }

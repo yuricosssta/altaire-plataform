@@ -1,10 +1,13 @@
 import { z } from 'zod';
 
+const objectIdRegex = /^[0-9a-fA-F]{24}$/;
+
 export const createProjectSchema = z.object({
   name: z.string().min(2, 'O nome do projeto é obrigatório.'),
   niche: z.string().min(2, 'O nicho é obrigatório.'),
   subniche: z.string().min(2, 'O subnicho é obrigatório.'),
   currentObjective: z.string().min(2, 'Defina o objetivo atual do projeto.'),
+  brandId: z.string().regex(objectIdRegex, 'ID da marca inválido.'),
   brandOrClientName: z.string().optional(),
   operationTypeLabel: z.string().optional(),
   currentPhaseLabel: z.string().optional(),
@@ -45,7 +48,7 @@ export const duplicateProjectSchema = z.object({
 });
 
 export const projectIdSchema = z.object({
-  id: z.string().regex(/^[0-9a-fA-F]{24}$/, 'ID de projeto inválido.'),
+  id: z.string().regex(objectIdRegex, 'ID de projeto inválido.'),
 });
 
 export type CreateProject = z.infer<typeof createProjectSchema>;

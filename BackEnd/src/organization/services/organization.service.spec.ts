@@ -81,6 +81,12 @@ describe('OrganizationService', () => {
     expect(service).toBeDefined();
   });
 
+  it('should block creation of new organizations because Altaire is unique', async () => {
+    await expect(
+      service.create({ name: 'Outra', acronym: 'OTR' } as any, adminId),
+    ).rejects.toThrow(ForbiddenException);
+  });
+
   describe('Organization Functions Catalog', () => {
     it('listFunctions should return all org functions when requester is OWNER/ADMIN', async () => {
       const result = await service.listFunctions(orgId, adminId, true);

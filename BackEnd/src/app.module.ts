@@ -11,6 +11,8 @@ import { OrganizationModule } from './organization/organization.module';
 import { StorageModule } from './storage/storage.module';
 import { SharedModule } from './shared/shared.module';
 import { EditorialModule } from './editorial/editorial.module';
+import { CompanyModule } from './company/company.module';
+import { BrandModule } from './brand/brand.module';
 
 @Module({
   imports: [
@@ -30,6 +32,8 @@ import { EditorialModule } from './editorial/editorial.module';
     AuthModule,
     EditorialModule,
     OrganizationModule,
+    CompanyModule,
+    BrandModule,
     StorageModule,
     SharedModule,
   ],

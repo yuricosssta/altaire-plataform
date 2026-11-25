@@ -9,6 +9,7 @@ localClient.interceptors.request.use(
     const state = store.getState();
     const token = state.auth?.token;
     const currentOrg = state.organizations?.currentOrganization;
+    const currentCompany = state.companies?.currentCompany;
 
     if (token) {
       config.headers['Authorization'] = `Bearer ${token}`;
@@ -23,6 +24,10 @@ localClient.interceptors.request.use(
       config.headers['x-org-id'] = orgId;
       config.headers['x-org-role'] = currentOrg.role;
     }
+
+    if (currentCompany?._id) {
+      config.headers['x-company-id'] = currentCompany._id;
+    }
     return config;
   },
   (error) => Promise.reject(error),
@@ -30,8 +35,17 @@ localClient.interceptors.request.use(
 
 export async function uploadAssetToR2(
   file: File,
-  metadata?: Record<string, unknown>,
+  metadataOrBrandId?: Record<string, unknown> | string,
 ): Promise<{ fileUrl: string; asset?: any }> {
+  const metadata =
+    typeof metadataOrBrandId === 'string'
+      ? { brandId: metadataOrBrandId }
+      : metadataOrBrandId || {};
+  const brandId =
+    typeof metadata.brandId === 'string' && metadata.brandId
+      ? metadata.brandId
+      : undefined;
+
   try {
     let fileToUpload = file;
 
@@ -48,6 +62,7 @@ export async function uploadAssetToR2(
       fileName: fileToUpload.name,
       fileType: fileToUpload.type || 'application/octet-stream',
       sizeBytes: fileToUpload.size,
+      ...(brandId ? { brandId } : {}),
     });
 
     const { uploadUrl, fileUrl } = authResponse.data.data;
@@ -85,15 +100,19 @@ export async function uploadAssetToR2(
 
 export async function uploadFileToR2(
   file: File,
-  metadata?: Record<string, unknown>,
+  metadataOrBrandId?: Record<string, unknown> | string,
 ): Promise<string> {
-  const { fileUrl } = await uploadAssetToR2(file, metadata);
+  const { fileUrl } = await uploadAssetToR2(file, metadataOrBrandId);
   return fileUrl;
 }
 
 export const storageService = {
-  getAssets: async (): Promise<{ storageUsed: number; assets: any[] }> => {
-    const response = await localClient.get('/storage/assets');
+  getAssets: async (
+    brandId?: string,
+  ): Promise<{ storageUsed: number; assets: any[] }> => {
+    const response = await localClient.get('/storage/assets', {
+      params: brandId ? { brandId } : undefined,
+    });
     return response.data?.data ?? response.data ?? { storageUsed: 0, assets: [] };
   },
 

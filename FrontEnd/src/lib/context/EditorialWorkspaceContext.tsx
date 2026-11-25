@@ -12,6 +12,12 @@ import {
 } from 'react';
 import { useSelector } from 'react-redux';
 import { RootState } from '@/lib/redux/store';
+import { selectIsAuthenticated } from '@/lib/redux/slices/authSlice';
+import {
+  selectCompanyBrands,
+  selectCurrentCompany,
+  selectSelectedBrandId,
+} from '@/lib/redux/slices/companySlice';
 import { editorialService } from '@/lib/services/editorialService';
 
 export type ProjectStatus = 'active' | 'in_setup' | 'in_review' | 'archived';
@@ -26,6 +32,8 @@ export type ProjectActivityLogItem = {
 
 export type EditorialProjectModel = {
   readonly id: string;
+  readonly companyId?: string;
+  readonly brandId?: string;
   readonly name: string;
   readonly brandOrClientName: string;
   readonly niche: string;
@@ -136,6 +144,7 @@ export type DerivedPanelState =
 
 type CreateProjectInput = {
   readonly name: string;
+  readonly brandId?: string;
   readonly brandOrClientName: string;
   readonly niche: string;
   readonly subniche: string;
@@ -171,7 +180,9 @@ type EditorialWorkspaceContextValue = {
   readonly userFullName: string;
   readonly userEmail: string;
   readonly isLoading: boolean;
+  readonly isLoadingProjects: boolean;
   readonly refreshWorkspace: () => Promise<void>;
+  readonly refreshProjects: () => Promise<void>;
   readonly projects: readonly EditorialProjectModel[];
   readonly activeOrReviewProjects: readonly EditorialProjectModel[];
   readonly todaySlots: readonly (TodaySlotModel & {
@@ -300,6 +311,8 @@ function mapApiProjectToModel(p: any): EditorialProjectModel {
 
   return {
     id,
+    companyId: p.companyId ? String(p.companyId) : undefined,
+    brandId: p.brandId ? String(p.brandId) : undefined,
     name: p.name || 'Projeto sem nome',
     brandOrClientName: p.brandOrClientName || p.name || '',
     niche: p.niche || '',
@@ -349,7 +362,11 @@ export function EditorialWorkspaceProvider({
 }) {
   const authUser = useSelector((state: RootState) => state.auth?.user);
   const authToken = useSelector((state: RootState) => state.auth?.token);
+  const isAuthenticated = useSelector(selectIsAuthenticated);
   const userProfile = useSelector((state: RootState) => state.user?.profile);
+  const currentCompany = useSelector(selectCurrentCompany);
+  const brands = useSelector(selectCompanyBrands);
+  const selectedBrandId = useSelector(selectSelectedBrandId);
 
   const [workspaceName, setWorkspaceName] = useState<string>('Meu Workspace');
   const [userFullName, setUserFullName] = useState<string>('Usuário');
@@ -377,23 +394,59 @@ export function EditorialWorkspaceProvider({
   useEffect(() => {
     const resolvedName = userProfile?.name || authUser?.name;
     const resolvedEmail = userProfile?.email || authUser?.email;
+    if (currentCompany?.name) {
+      setWorkspaceName(currentCompany.name);
+    } else if (resolvedName) {
+      setWorkspaceName(resolvedName);
+    }
     if (resolvedName) {
       setUserFullName(resolvedName);
-      setWorkspaceName(resolvedName);
     }
     if (resolvedEmail) {
       setUserEmail(resolvedEmail);
     }
-  }, [authUser, userProfile]);
+  }, [
+    authUser?.email,
+    authUser?.name,
+    currentCompany?.name,
+    userProfile?.email,
+    userProfile?.name,
+  ]);
 
   const refreshWorkspace = useCallback(async () => {
+    if (!isAuthenticated || !currentCompany?._id) {
+      setProjects([]);
+      setRawTodaySlots([]);
+      setRawUpcomingSlots([]);
+      setRawTasks([]);
+      setServerAiSuggestions([]);
+      setServerAlerts([]);
+      setActivityEvents([]);
+      setIsLoading(false);
+      return;
+    }
+
     setIsLoading(true);
     try {
-      const overview = await editorialService.getWorkspaceOverview();
+      const overview = await editorialService.getWorkspaceOverview(
+        selectedBrandId || undefined,
+      );
       if (!overview) return;
 
+      const brandMap = new Map(brands.map((b) => [b._id, b.name]));
       const mappedProjects = Array.isArray(overview.projects)
-        ? overview.projects.map(mapApiProjectToModel)
+        ? overview.projects.map((p: any) => {
+            const base = mapApiProjectToModel(p);
+            const resolvedBrandName =
+              p.brandOrClientName ||
+              (base.brandId ? brandMap.get(base.brandId) : undefined) ||
+              currentCompany.name;
+            return {
+              ...base,
+              companyId: base.companyId || currentCompany._id,
+              brandOrClientName: resolvedBrandName || base.brandOrClientName,
+            };
+          })
         : [];
       setProjects(mappedProjects);
 
@@ -500,14 +553,19 @@ export function EditorialWorkspaceProvider({
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [
+    isAuthenticated,
+    currentCompany?._id,
+    currentCompany?.name,
+    selectedBrandId,
+    brands,
+  ]);
+
+  const isLoadingProjects = isLoading;
+  const refreshProjects = refreshWorkspace;
 
   useEffect(() => {
-    if (authToken || authUser?.id || authUser?._id) {
-      void refreshWorkspace();
-    } else {
-      void refreshWorkspace();
-    }
+    void refreshWorkspace();
   }, [authToken, authUser?.id, authUser?._id, refreshWorkspace]);
 
   const activeOrReviewProjects = useMemo(
@@ -679,6 +737,7 @@ export function EditorialWorkspaceProvider({
     ): Promise<EditorialProjectModel | null> => {
       const created = await editorialService.createProject({
         name: input.name.trim(),
+        brandId: input.brandId,
         brandOrClientName: input.brandOrClientName.trim() || workspaceName,
         niche: input.niche.trim(),
         subniche: input.subniche.trim() || 'Especialidade Principal',
@@ -943,6 +1002,8 @@ export function EditorialWorkspaceProvider({
       activityEvents,
       derivedPanelState,
       topPriorityProject,
+      isLoadingProjects,
+      refreshProjects,
       createProject,
       updateProject,
       duplicateProject,
@@ -968,6 +1029,8 @@ export function EditorialWorkspaceProvider({
       activityEvents,
       derivedPanelState,
       topPriorityProject,
+      isLoadingProjects,
+      refreshProjects,
       createProject,
       updateProject,
       duplicateProject,

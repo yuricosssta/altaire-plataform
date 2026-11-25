@@ -4,11 +4,14 @@
 import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
+import { useDispatch, useSelector } from "react-redux";
 import { AnimatePresence, motion } from "motion/react";
+import { toast } from "sonner";
 import {
   AlertTriangle,
   Archive,
   ArrowRight,
+  Building2,
   Check,
   ChevronDown,
   Clock,
@@ -16,12 +19,28 @@ import {
   Edit3,
   FolderKanban,
   MoreVertical,
+  Pencil,
   Plus,
   Search,
   SlidersHorizontal,
+  Tag,
+  Trash2,
   X,
 } from "lucide-react";
 import { clsx } from "clsx";
+import { BrandFormModal } from "@/components/company/BrandFormModal";
+import { ConfirmActionDialog } from "@/components/ui/ConfirmActionDialog";
+import {
+  removeBrandFromList,
+  selectCompanyBrands,
+  selectCurrentCompany,
+  selectSelectedBrandId,
+  setSelectedBrandId,
+} from "@/lib/redux/slices/companySlice";
+import { AppDispatch } from "@/lib/redux/store";
+import { apiDeleteBrand } from "@/lib/services/brandService";
+import { editorialService } from "@/lib/services/editorialService";
+import { IBrand } from "@/types/company";
 import {
   useEditorialWorkspace,
   type EditorialProjectModel,
@@ -219,15 +238,34 @@ function DarkCustomSelect<T extends string>({
 export default function CentralEstrategicaPage() {
   const searchParams = useSearchParams();
   const router = useRouter();
+  const dispatch = useDispatch<AppDispatch>();
+  const currentCompany = useSelector(selectCurrentCompany);
+  const brands = useSelector(selectCompanyBrands);
+  const selectedBrandId = useSelector(selectSelectedBrandId);
   const {
     workspaceName,
     projects,
     activityEvents,
+    refreshProjects,
     createProject,
     updateProject,
     duplicateProject,
     toggleArchiveProject,
   } = useEditorialWorkspace();
+
+  const canManageCompany = Boolean(currentCompany?.isCompanyManager);
+  const selectedBrandObj = useMemo(
+    () => brands.find((b) => b._id === selectedBrandId) || null,
+    [brands, selectedBrandId]
+  );
+
+  const [brandModalState, setBrandModalState] = useState<{
+    open: boolean;
+    mode: "create" | "edit";
+    brand: IBrand | null;
+  }>({ open: false, mode: "create", brand: null });
+  const [brandPendingDelete, setBrandPendingDelete] = useState<IBrand | null>(null);
+  const [isDeletingBrand, setIsDeletingBrand] = useState(false);
 
   const [searchQuery, setSearchQuery] = useState<string>("");
   const [statusFilter, setStatusFilter] = useState<"all" | ProjectStatus>("all");
@@ -237,13 +275,23 @@ export default function CentralEstrategicaPage() {
   /* Modal 1: Criar Novo Projeto Editorial */
   const [isCreateModalOpen, setIsCreateModalOpen] = useState<boolean>(false);
   const [newName, setNewName] = useState<string>("");
-  const [newBrand, setNewBrand] = useState<string>(workspaceName);
+  const [newBrandId, setNewBrandId] = useState<string>("");
   const [newNiche, setNewNiche] = useState<string>("");
   const [newSubniche, setNewSubniche] = useState<string>("");
   const [newOpType, setNewOpType] = useState<string>("Orgânico");
   const [newObjective, setNewObjective] = useState<string>("Conversão");
   const [newPhase, setNewPhase] = useState<string>("Estruturação Inicial");
   const [createError, setCreateError] = useState<string | null>(null);
+  const [isCreatingProject, setIsCreatingProject] = useState<boolean>(false);
+
+  useEffect(() => {
+    const preferred = selectedBrandId || brands[0]?._id || "";
+    if (preferred && (!newBrandId || !brands.some((b) => b._id === newBrandId))) {
+      setNewBrandId(preferred);
+    } else if (brands.length === 0) {
+      setNewBrandId("");
+    }
+  }, [brands, selectedBrandId, newBrandId, isCreateModalOpen]);
 
   /* Abre modal automaticamente se vier de "+ Criar -> Novo Projeto" no Header
      OU se vier do fluxo de onboarding pós-login/cadastro (?onboarding=true / ?novo=true) */
@@ -342,7 +390,29 @@ export default function CentralEstrategicaPage() {
     );
   }, [editingProject, editNiche, editObjective]);
 
-  /* Conclusão do Ponto C: Cria o projeto e redireciona canonicamente para a Linha Editorial */
+  const handleConfirmDeleteBrand = async () => {
+    if (!brandPendingDelete) return;
+    const brand = brandPendingDelete;
+
+    try {
+      setIsDeletingBrand(true);
+      await apiDeleteBrand(brand._id);
+      dispatch(removeBrandFromList(brand._id));
+      toast.success(`Marca "${brand.name}" removida com sucesso.`);
+      setBrandPendingDelete(null);
+    } catch (err: any) {
+      const msg =
+        err?.response?.data?.error?.message ||
+        err?.response?.data?.message ||
+        err?.message ||
+        "Não foi possível excluir a marca.";
+      toast.error(msg);
+    } finally {
+      setIsDeletingBrand(false);
+    }
+  };
+
+  /* Conclusão do Ponto C: Cria o projeto via BFF vinculado à Marca e redireciona para a Linha Editorial */
   const handleCreateProjectSubmit = async (
     event: FormEvent<HTMLFormElement>,
   ) => {
@@ -350,20 +420,24 @@ export default function CentralEstrategicaPage() {
     setCreateError(null);
 
     const trimmedName = newName.trim();
-    const trimmedBrand = newBrand.trim();
     const trimmedNiche = newNiche.trim();
 
-    if (!trimmedName || !trimmedBrand || !trimmedNiche) {
+    if (!trimmedName || !newBrandId || !trimmedNiche) {
       setCreateError(
-        "Informe obrigatoriamente o Nome do Projeto, a Marca/Especialista e o Nicho principal."
+        "Informe obrigatoriamente o Nome do Projeto, a Marca vinculada e o Nicho principal.",
       );
       return;
     }
 
+    const brandObj = brands.find((b) => b._id === newBrandId);
+
     try {
+      setIsCreatingProject(true);
       const created = await createProject({
         name: trimmedName,
-        brandOrClientName: trimmedBrand,
+        brandId: newBrandId,
+        brandOrClientName:
+          brandObj?.name || currentCompany?.name || workspaceName,
         niche: trimmedNiche,
         subniche: newSubniche.trim() || "Geral",
         operationTypeLabel: newOpType,
@@ -371,6 +445,9 @@ export default function CentralEstrategicaPage() {
         currentPhaseLabel: newPhase.trim() || "Estruturação Inicial",
       });
 
+      toast.success(
+        `Projeto "${created?.name || trimmedName}" criado com sucesso.`,
+      );
       setIsCreateModalOpen(false);
       setNewName("");
       setNewNiche("");
@@ -379,10 +456,16 @@ export default function CentralEstrategicaPage() {
       if (created && created.id) {
         router.push(`/dashboard/editorial/${created.id}?aba=linha-editorial`);
       }
-    } catch {
-      setCreateError(
-        "Não foi possível criar o projeto agora. Tente novamente em instantes.",
-      );
+    } catch (err: any) {
+      const msg =
+        err?.response?.data?.error?.message ||
+        err?.response?.data?.message ||
+        err?.message ||
+        "Não foi possível criar o projeto agora. Tente novamente em instantes.";
+      setCreateError(msg);
+      toast.error(msg);
+    } finally {
+      setIsCreatingProject(false);
     }
   };
 
@@ -489,6 +572,95 @@ export default function CentralEstrategicaPage() {
           </button>
         </div>
       </section>
+
+      {/* 1.5. BARRA DE MARCAS DA EMPRESA ATIVA */}
+      {currentCompany ? (
+        <section className="flex flex-wrap items-center justify-between gap-3 rounded-la-xl border border-la-border-gold/30 bg-[#080B12]/95 px-4 py-3">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="inline-flex items-center gap-1.5 pr-2 font-la-mono text-[0.6875rem] font-semibold uppercase tracking-[0.06em] text-la-gold-light">
+              <Building2 aria-hidden="true" className="h-3.5 w-3.5 text-la-gold" />
+              <span>{currentCompany.name}</span>
+              <span className="text-la-text-muted">· Marcas:</span>
+            </span>
+
+            <button
+              type="button"
+              onClick={() => dispatch(setSelectedBrandId(null))}
+              className={clsx(
+                "min-h-[2.75rem] rounded-la-md border px-3.5 py-2 font-la-mono text-[0.6875rem] font-medium transition-colors",
+                selectedBrandId === null
+                  ? "border-la-gold bg-la-gold text-la-text-inverse font-semibold"
+                  : "border-white/10 bg-black/40 text-la-text-secondary hover:border-la-border-gold/60 hover:text-la-text-primary"
+              )}
+            >
+              Todas as marcas ({brands.length})
+            </button>
+
+            {brands.map((brand) => {
+              const active = selectedBrandId === brand._id;
+              return (
+                <button
+                  key={brand._id}
+                  type="button"
+                  onClick={() => dispatch(setSelectedBrandId(brand._id))}
+                  className={clsx(
+                    "inline-flex min-h-[2.75rem] items-center gap-2 rounded-la-md border px-3.5 py-2 font-la-sans text-[0.75rem] font-medium transition-colors",
+                    active
+                      ? "border-la-gold bg-la-gold-faint text-la-gold-light font-semibold"
+                      : "border-white/10 bg-black/40 text-la-text-secondary hover:border-la-border-gold/60 hover:text-la-text-primary"
+                  )}
+                >
+                  <Tag aria-hidden="true" className="h-3.5 w-3.5 text-la-gold" />
+                  <span>{brand.name}</span>
+                </button>
+              );
+            })}
+          </div>
+
+          {canManageCompany ? (
+            <div className="flex flex-wrap items-center gap-2">
+              {selectedBrandObj ? (
+                <>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setBrandModalState({
+                        open: true,
+                        mode: "edit",
+                        brand: selectedBrandObj,
+                      })
+                    }
+                    className="inline-flex min-h-[2.75rem] items-center gap-1.5 rounded-la-md border border-white/12 bg-black/50 px-3.5 py-2 font-la-mono text-[0.6875rem] text-la-text-secondary transition-colors hover:border-la-border-gold hover:text-la-gold-light"
+                  >
+                    <Pencil aria-hidden="true" className="h-3.5 w-3.5" />
+                    <span>Editar Marca</span>
+                  </button>
+                  <button
+                    type="button"
+                    disabled={isDeletingBrand}
+                    onClick={() => setBrandPendingDelete(selectedBrandObj)}
+                    className="inline-flex min-h-[2.75rem] items-center gap-1.5 rounded-la-md border border-red-500/30 bg-red-500/10 px-3.5 py-2 font-la-mono text-[0.6875rem] text-red-300 transition-colors hover:bg-red-500/20 disabled:opacity-50"
+                  >
+                    <Trash2 aria-hidden="true" className="h-3.5 w-3.5" />
+                    <span>Excluir Marca</span>
+                  </button>
+                </>
+              ) : null}
+
+              <button
+                type="button"
+                onClick={() =>
+                  setBrandModalState({ open: true, mode: "create", brand: null })
+                }
+                className="inline-flex min-h-[2.75rem] items-center gap-1.5 rounded-la-md border border-la-border-gold/60 bg-la-gold-faint px-3.5 py-2 font-la-mono text-[0.6875rem] font-semibold text-la-gold-light transition-colors hover:bg-la-gold hover:text-la-text-inverse"
+              >
+                <Plus aria-hidden="true" className="h-3.5 w-3.5" />
+                <span>Nova Marca</span>
+              </button>
+            </div>
+          ) : null}
+        </section>
+      ) : null}
 
       {/* 2. BARRA DE BUSCA, FILTRO DARK-FIRST CUSTOMIZADO E CONTAGEM */}
       {!accountHasZeroProjects ? (
@@ -953,14 +1125,40 @@ export default function CentralEstrategicaPage() {
                 <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                   <div className="flex flex-col gap-1">
                     <label className="font-la-mono text-[0.6875rem] font-semibold uppercase text-la-text-secondary">
-                      Marca, Especialista ou Empresa *
+                      Marca Vinculada *
                     </label>
-                    <input
-                      type="text"
-                      value={newBrand}
-                      onChange={(e) => setNewBrand(e.target.value)}
-                      className="min-h-[2.625rem] rounded-la-md border border-white/14 bg-black/60 px-3.5 py-2 font-la-sans text-[0.875rem] text-la-text-primary"
-                    />
+                    {brands.length === 0 ? (
+                      <div className="flex flex-col gap-2 rounded-la-md border border-amber-400/40 bg-amber-950/30 p-2.5 text-xs text-amber-200">
+                        <span>Nenhuma marca disponível nesta empresa.</span>
+                        {canManageCompany ? (
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setBrandModalState({
+                                open: true,
+                                mode: "create",
+                                brand: null,
+                              })
+                            }
+                            className="inline-flex w-fit items-center gap-1 rounded-la-xs bg-la-gold px-2.5 py-1 font-la-mono text-[0.6875rem] font-semibold text-la-text-inverse"
+                          >
+                            <Plus className="h-3 w-3" /> Criar 1ª Marca
+                          </button>
+                        ) : null}
+                      </div>
+                    ) : (
+                      <select
+                        value={newBrandId}
+                        onChange={(e) => setNewBrandId(e.target.value)}
+                        className="min-h-[2.625rem] rounded-la-md border border-white/14 bg-black/60 px-3.5 py-2 font-la-sans text-[0.875rem] text-la-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-la-gold-light"
+                      >
+                        {brands.map((b) => (
+                          <option key={b._id} value={b._id}>
+                            {b.name}
+                          </option>
+                        ))}
+                      </select>
+                    )}
                   </div>
 
                   <div className="flex flex-col gap-1">
@@ -1045,9 +1243,14 @@ export default function CentralEstrategicaPage() {
                     </button>
                     <button
                       type="submit"
-                      className="inline-flex items-center gap-2 rounded-la-md bg-la-gold px-5 py-2 font-la-sans text-[0.875rem] font-semibold text-la-text-inverse hover:bg-la-gold-light"
+                      disabled={isCreatingProject || brands.length === 0}
+                      className="inline-flex items-center gap-2 rounded-la-md bg-la-gold px-5 py-2 font-la-sans text-[0.875rem] font-semibold text-la-text-inverse hover:bg-la-gold-light disabled:opacity-50"
                     >
-                      <span>Salvar e Criar Base Estratégica</span>
+                      <span>
+                        {isCreatingProject
+                          ? "Criando Projeto..."
+                          : "Salvar e Criar Base Estratégica"}
+                      </span>
                       <ArrowRight className="h-4 w-4" />
                     </button>
                   </div>
@@ -1057,6 +1260,30 @@ export default function CentralEstrategicaPage() {
           </div>
         ) : null}
       </AnimatePresence>
+
+      {currentCompany ? (
+        <BrandFormModal
+          open={brandModalState.open}
+          mode={brandModalState.mode}
+          companyId={currentCompany._id}
+          brand={brandModalState.brand}
+          onClose={() =>
+            setBrandModalState({ open: false, mode: "create", brand: null })
+          }
+        />
+      ) : null}
+
+      <ConfirmActionDialog
+        open={Boolean(brandPendingDelete)}
+        onOpenChange={(open) => {
+          if (!open) setBrandPendingDelete(null);
+        }}
+        title={`Excluir marca "${brandPendingDelete?.name || ""}"?`}
+        description="Esta ação remove a marca da empresa. Só é possível excluir marcas que não possuem projetos editoriais ativos."
+        confirmLabel="Excluir Marca"
+        isLoading={isDeletingBrand}
+        onConfirm={handleConfirmDeleteBrand}
+      />
 
       {/* MODAL 2: EDITAR INFORMAÇÕES DO PROJETO */}
       <AnimatePresence>
