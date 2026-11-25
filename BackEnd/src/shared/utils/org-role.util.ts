@@ -8,6 +8,16 @@ export const ALTAIRE_ORG_ROLES = [
 
 export type AltaireOrgRole = (typeof ALTAIRE_ORG_ROLES)[number];
 
+export const USER_PLANS = ['FREE', 'PRO', 'ENTERPRISE'] as const;
+
+export type UserPlanType = (typeof USER_PLANS)[number];
+
+export function isProUserPlan(plan?: string | null): boolean {
+  if (!plan) return false;
+  const upper = plan.trim().toUpperCase();
+  return upper === 'PRO' || upper === 'ENTERPRISE';
+}
+
 function parseEmailList(envValue?: string): string[] {
   if (!envValue) return [];
   return envValue

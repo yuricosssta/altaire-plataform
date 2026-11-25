@@ -23,11 +23,22 @@ export interface ProvisionedUser {
   email: string;
   fullName: string;
   role: AltaireUserRole;
+  plan?: 'FREE' | 'PRO' | 'ENTERPRISE';
   allowedProjects?: string[];
   permissions?: string[];
   invitedBy?: string;
   avatarUrl?: string;
   isNewUser: boolean;
+}
+
+export function normalizeUserPlan(
+  plan?: string | null,
+): 'FREE' | 'PRO' | 'ENTERPRISE' {
+  const upper = String(plan || '').trim().toUpperCase();
+  if (upper === 'PRO' || upper === 'ENTERPRISE') {
+    return upper;
+  }
+  return 'FREE';
 }
 
 interface CazuaProfilePayload {
@@ -173,6 +184,7 @@ async function syncCazuaUserWithAltaireBackend(params: {
         email?: string;
         name?: string;
         role?: string;
+        plan?: string;
         allowedProjects?: string[];
         permissions?: string[];
         invitedBy?: string;
@@ -186,6 +198,7 @@ async function syncCazuaUserWithAltaireBackend(params: {
           email: localUser.email || email,
           fullName: localUser.name || fullName,
           role: resolvedRole,
+          plan: normalizeUserPlan(localUser.plan),
           allowedProjects: Array.isArray(localUser.allowedProjects)
             ? localUser.allowedProjects.map(String)
             : [],
@@ -210,6 +223,7 @@ async function syncCazuaUserWithAltaireBackend(params: {
     email,
     fullName,
     role: fallbackRole,
+    plan: 'FREE',
     allowedProjects: [],
     permissions: [],
     avatarUrl: params.avatarUrl,
@@ -344,6 +358,7 @@ export async function authenticateBackendUser(params: {
           email?: string;
           name?: string;
           role?: string;
+          plan?: string;
           allowedProjects?: string[];
           permissions?: string[];
           invitedBy?: string;
@@ -356,6 +371,7 @@ export async function authenticateBackendUser(params: {
           email: localUser.email || email,
           fullName: localUser.name || formatDefaultNameFromEmail(email),
           role: resolvedRole,
+          plan: normalizeUserPlan(localUser.plan),
           allowedProjects: Array.isArray(localUser.allowedProjects)
             ? localUser.allowedProjects.map(String)
             : [],
@@ -547,6 +563,7 @@ export async function upsertOAuthBackendUser(params: {
         email?: string;
         name?: string;
         role?: string;
+        plan?: string;
         allowedProjects?: string[];
         permissions?: string[];
         invitedBy?: string;
@@ -558,6 +575,7 @@ export async function upsertOAuthBackendUser(params: {
           email: user.email || email,
           fullName: user.name || defaultName,
           role: resolveAltaireRoleByEmail(email, user.role),
+          plan: normalizeUserPlan(user.plan),
           allowedProjects: Array.isArray(user.allowedProjects)
             ? user.allowedProjects.map(String)
             : [],
@@ -579,6 +597,7 @@ export async function upsertOAuthBackendUser(params: {
     email,
     fullName: defaultName,
     role: targetRole,
+    plan: 'FREE',
     avatarUrl: params.avatarUrl || undefined,
     isNewUser: false,
   };

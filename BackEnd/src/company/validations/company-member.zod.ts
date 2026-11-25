@@ -17,6 +17,7 @@ export const addCompanyMemberSchema = z.object({
   brandIds: z.array(objectIdSchema).optional().default([]),
   allowedProjects: z.array(objectIdSchema).optional().default([]),
   permissions: z.array(z.string()).optional().default([]),
+  additionalCompanyIds: z.array(objectIdSchema).optional().default([]),
 });
 
 export const updateCompanyMemberSchema = z.object({

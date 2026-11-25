@@ -2,7 +2,12 @@
 
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import { Document, SchemaTypes, Types } from 'mongoose';
-import { UserRoleType, UserRule, IUserPreferences } from './models/user.interface';
+import {
+  UserPlanType,
+  UserRoleType,
+  UserRule,
+  IUserPreferences,
+} from './models/user.interface';
 
 @Schema({ timestamps: true })
 export class User extends Document {
@@ -34,6 +39,17 @@ export class User extends Document {
     required: true,
   })
   role: UserRoleType;
+
+  @Prop({
+    type: String,
+    enum: ['FREE', 'PRO', 'ENTERPRISE'],
+    default: 'FREE',
+    required: true,
+  })
+  plan: UserPlanType;
+
+  @Prop({ type: Boolean, default: false })
+  preRegistered?: boolean;
 
   @Prop({
     type: [{ type: Types.ObjectId, ref: 'EditorialProject' }],

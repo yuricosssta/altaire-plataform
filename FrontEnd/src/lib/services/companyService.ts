@@ -123,6 +123,7 @@ export const apiAddCompanyMember = async (
     brandIds?: string[];
     allowedProjects?: string[];
     permissions?: string[];
+    additionalCompanyIds?: string[];
   },
 ) => {
   const response = await localClient.post(
@@ -141,6 +142,7 @@ export const apiUpdateCompanyMember = async (
     brandIds?: string[];
     allowedProjects?: string[];
     permissions?: string[];
+    additionalCompanyIds?: string[];
   },
 ) => {
   const response = await localClient.patch(

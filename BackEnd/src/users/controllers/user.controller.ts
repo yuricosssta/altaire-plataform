@@ -28,6 +28,8 @@ import {
   oauthUserSchema,
   UpdateUser,
   updateUserSchema,
+  UpdateUserPlan,
+  updateUserPlanSchema,
 } from '../validations/users.zod';
 import { GetUser } from '../../shared/decorators/get-user-decorator';
 import { AuthGuard } from '../../auth/auth.guard';
@@ -112,6 +114,21 @@ export class UsersController {
     @Body(new ZodValidationPipe(oauthUserSchema)) oauthUser: OAuthUser,
   ) {
     return this.userService.upsertOAuthUser(oauthUser);
+  }
+
+  @UseGuards(AuthGuard)
+  @Patch(':userId/plan')
+  async updateUserPlan(
+    @Param('userId') userId: string,
+    @Body(new ZodValidationPipe(updateUserPlanSchema)) body: UpdateUserPlan,
+    @Req() req: any,
+  ) {
+    if (!isAltaireOwnerOrAdmin(req.user?.email, req.user?.role)) {
+      throw new ForbiddenException(
+        'Apenas administradores da Altaire podem alterar o plano de usuários.',
+      );
+    }
+    return this.userService.updateUserPlan(userId, body.plan);
   }
 
   @UseGuards(AuthGuard)

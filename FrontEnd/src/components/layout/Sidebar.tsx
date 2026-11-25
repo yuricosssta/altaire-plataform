@@ -24,6 +24,7 @@ import {
   Plus,
   Radar,
   Settings,
+  ShieldAlert,
   Sparkles,
   Users,
   X,
@@ -226,12 +227,14 @@ export function Sidebar({
   const isClientRole = normalizedRole === "CLIENT";
   const isExternalRole = normalizedRole === "EXTERNAL";
   const isRestrictedRole = isClientRole || isExternalRole;
-
-  const isManager =
+  const isAltaireAdmin =
     normalizedRole === "OWNER" ||
     normalizedRole === "ADMIN" ||
-    normalizedRole === "MEMBER" ||
     Boolean(profileRecord?.isAdmin);
+  const userPlan = String(profileRecord?.plan || "FREE").toUpperCase();
+  const canCreateCompany =
+    !isRestrictedRole &&
+    (isAltaireAdmin || userPlan === "PRO" || userPlan === "ENTERPRISE");
 
   const visibleSidebarGroups = useMemo((): readonly SidebarSectionGroup[] => {
     if (isClientRole) {
@@ -307,7 +310,8 @@ export function Sidebar({
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
+    await fetch("/api/auth/logout", { method: "POST" }).catch(() => undefined);
     try {
       window.localStorage.removeItem("la-session-active");
       window.localStorage.removeItem("token");
@@ -535,7 +539,7 @@ export function Sidebar({
                   </div>
 
                   <div className="mt-1.5 flex flex-col gap-1 border-t border-white/10 pt-1.5">
-                    {!isRestrictedRole ? (
+                    {canCreateCompany ? (
                       <button
                         type="button"
                         onClick={() => {
@@ -549,7 +553,7 @@ export function Sidebar({
                       </button>
                     ) : null}
 
-                    {(canManageActiveCompany || isManager) && !isRestrictedRole ? (
+                    {canManageActiveCompany && !isRestrictedRole ? (
                       <Link
                         href="/dashboard/people"
                         onClick={() => {
@@ -580,6 +584,23 @@ export function Sidebar({
                           className="h-3.5 w-3.5 text-la-gold"
                         />
                         <span>Configurações da Empresa</span>
+                      </Link>
+                    ) : null}
+
+                    {isAltaireAdmin ? (
+                      <Link
+                        href="/dashboard/master-admin"
+                        onClick={() => {
+                          setIsAccountMenuOpen(false);
+                          if (mobileMode && onCloseMobile) onCloseMobile();
+                        }}
+                        className="flex items-center gap-2.5 rounded-la-md px-2.5 py-2 font-la-sans text-[0.75rem] font-medium text-la-gold-light transition-colors hover:bg-la-gold-faint"
+                      >
+                        <ShieldAlert
+                          aria-hidden="true"
+                          className="h-3.5 w-3.5 text-la-gold"
+                        />
+                        <span>Painel Master Admin</span>
                       </Link>
                     ) : null}
                   </div>
@@ -862,10 +883,12 @@ export function Sidebar({
       </AnimatePresence>
 
       {/* 4. MODAL PARA CRIAR NOVA EMPRESA */}
-      <CreateCompanyModal
-        open={isCreateCompanyOpen}
-        onClose={() => setIsCreateCompanyOpen(false)}
-      />
+      {canCreateCompany ? (
+        <CreateCompanyModal
+          open={isCreateCompanyOpen}
+          onClose={() => setIsCreateCompanyOpen(false)}
+        />
+      ) : null}
 
       {/* 3. MODAL RÁPIDO DE AJUDA & MÉTODO LEGION ALTAIRE */}
       <AnimatePresence>

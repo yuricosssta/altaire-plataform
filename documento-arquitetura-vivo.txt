@@ -1,3 +1,24 @@
+## GOVERNANÇA PRO PARA EMPRESAS, CADASTRO PRÉVIO E FLUXO SEM EMPRESA - 25/11/2026 ##
+Resumo Técnico — Restrição de Criação de Empresas e Gestão ao Plano PRO/Enterprise, Tela `/sem-empresa`, Pré-cadastro Multi-Empresa e Painel Master Admin:
+
+1. Plano no Usuário (`BackEnd/src/users/*`, `BackEnd/src/shared/utils/org-role.util.ts`):
+   - Adicionado `plan: 'FREE' | 'PRO' | 'ENTERPRISE'` (default `'FREE'`) e `preRegistered?: boolean` ao schema `User` (desacoplado da `role`, onde `OWNER` e `ADMIN` da Altaire mantêm acesso total por governança de plataforma).
+   - `UsersService.createPreRegisteredUser`: permite pré-cadastro sem senha obrigatória (se omitida, não grava senha aleatória; o usuário pode concluir via `/cadastro` ou Google OAuth usando o mesmo e-mail e herda os vínculos).
+   - `UsersService.updateUserPlan` e `PATCH /users/:userId/plan`: endpoint exclusivo de `OWNER`/`ADMIN` para alterar o plano do usuário sem permitir autopromoção via `POST /users` ou `PATCH /users/profile`.
+
+2. Governança PRO nas Empresas (`BackEnd/src/company/*`):
+   - `CompanyAccessService.resolveUserPlanAndProStatus`: consulta o plano atual do usuário no MongoDB em tempo real.
+   - `CompanyService.create`: bloqueado (`403 Forbidden`) para usuários `FREE`, `CLIENT` e `EXTERNAL`; empresas criadas herdam o plano do criador (`PRO` ou `ENTERPRISE`, ou `PRO` para `OWNER`/`ADMIN`).
+   - Downgrade para `FREE`: `CompanyAccessService.resolveCompanyContext` e `findAllForUser` mantêm acesso de leitura/operação às empresas existentes, mas revogam `isCompanyManager` (`false`) até reativar o plano `PRO`/`ENTERPRISE`.
+   - `CompanyService.addMember` + `addCompanyMemberSchema`: suporta `additionalCompanyIds[]` para pré-cadastrar/vincular usuário a múltiplas empresas geridas pelo usuário PRO no mesmo envio (validando `isCompanyManager` em todas antes de gravar).
+
+3. Fluxo Sem Empresa, BFF, Sidebar e Master Admin (`FrontEnd/*`):
+   - Criada rota BFF `POST /api/auth/logout` (limpa cookies HTTP-Only e `active_company_id`) e rotas `/api/users` + `/api/users/[userId]/plan`.
+   - Sessão e provisionamento (`userProvision.ts`, `/api/auth/login`, `/api/auth/register`, `/api/auth/session`) propagam o `plan` real do usuário.
+   - `FrontEnd/src/app/(main)/layout.tsx`: redireciona qualquer usuário autenticado sem empresas associadas para `/sem-empresa` (exceto `OWNER`/`ADMIN` em `/dashboard/master-admin`), incluindo `CLIENT`/`EXTERNAL`.
+   - Criada página em tela cheia `FrontEnd/src/app/(main)/sem-empresa/page.tsx`: usuários `PRO`/`ENTERPRISE` ou `OWNER`/`ADMIN` executam o onboarding em 2 passos (1ª Empresa → 1ª Marca); usuários `FREE` visualizam o estado **"Aguardando vinculação"** com seu e-mail, botão **"Verificar novamente"** e CTA convidando para assinatura em `/precos`.
+   - `Sidebar.tsx`, `OrganizationPeople.tsx` e `dashboard/master-admin/page.tsx`: botão `+ Nova Empresa` visível apenas para PRO/Admin, `Membros & Funções` apenas para gestores efetivos com seletor de múltiplas empresas geridas no pré-cadastro, e aba **"Usuários & Planos"** no Master Admin.
+
 ## REFINAMENTOS DE USABILIDADE E ROBUSTEZ (AUDITORIA UX BELEZURA) - 25/11/2026 ##
 Resumo Técnico — Aplicadas as correções da auditoria baseada nas Leis de Fitts, Postel e Jakob/Estética:
 

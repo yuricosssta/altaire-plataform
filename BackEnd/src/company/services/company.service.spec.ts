@@ -53,6 +53,7 @@ describe('CompanyService', () => {
         .fn()
         .mockResolvedValue({ _id: 'cm1', companyId, userId: creatorId }),
       findActiveByUser: jest.fn().mockResolvedValue([]),
+      findByCompanyAndUser: jest.fn().mockResolvedValue(null),
       countActiveByFunction: jest.fn().mockResolvedValue(0),
     };
     functionRepo = {
@@ -67,6 +68,13 @@ describe('CompanyService', () => {
       softDelete: jest.fn().mockResolvedValue(null),
     };
     companyAccessService = {
+      resolveUserPlanAndProStatus: jest.fn().mockResolvedValue({
+        userId: creatorId,
+        userRole: 'MEMBER',
+        plan: 'PRO',
+        isAltaireAdmin: false,
+        isProOrAdmin: true,
+      }),
       resolveCompanyContext: jest.fn().mockResolvedValue({
         companyId,
         organizationId: orgId,
@@ -96,6 +104,7 @@ describe('CompanyService', () => {
       findOne: jest.fn(),
       findById: jest.fn(),
       createUser: jest.fn(),
+      createPreRegisteredUser: jest.fn(),
       updateUser: jest.fn(),
     };
     brandRepo = {
@@ -119,7 +128,7 @@ describe('CompanyService', () => {
     service = module.get<CompanyService>(CompanyService);
   });
 
-  it('should allow MEMBER to create company under canonical Altaire and auto-link creator', async () => {
+  it('should allow PRO user to create company under canonical Altaire inheriting PRO plan and auto-link creator', async () => {
     const result = await service.create(
       { name: 'Empresa Alpha', acronym: 'ALP' },
       { sub: creatorId, role: 'MEMBER' },
@@ -129,12 +138,155 @@ describe('CompanyService', () => {
     expect(orgService.getCanonicalAltaireOrganization).toHaveBeenCalledWith(
       creatorId,
     );
+    expect(companyRepo.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        plan: 'PRO',
+        createdBy: creatorId,
+      }),
+    );
     expect(memberRepo.upsertActive).toHaveBeenCalledWith(
       expect.objectContaining({
         companyId,
         userId: creatorId,
       }),
     );
+  });
+
+  it('should inherit ENTERPRISE plan when user has ENTERPRISE plan', async () => {
+    companyAccessService.resolveUserPlanAndProStatus = jest
+      .fn()
+      .mockResolvedValue({
+        userId: creatorId,
+        userRole: 'MEMBER',
+        plan: 'ENTERPRISE',
+        isAltaireAdmin: false,
+        isProOrAdmin: true,
+      });
+
+    await service.create(
+      { name: 'Empresa Enterprise', acronym: 'ENT' },
+      { sub: creatorId, role: 'MEMBER' },
+    );
+
+    expect(companyRepo.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        plan: 'ENTERPRISE',
+      }),
+    );
+  });
+
+  it('should block FREE user from creating a company', async () => {
+    companyAccessService.resolveUserPlanAndProStatus = jest
+      .fn()
+      .mockResolvedValue({
+        userId: creatorId,
+        userRole: 'MEMBER',
+        plan: 'FREE',
+        isAltaireAdmin: false,
+        isProOrAdmin: false,
+      });
+
+    await expect(
+      service.create(
+        { name: 'Empresa Bloqueada', acronym: 'BLK' },
+        { sub: creatorId, role: 'MEMBER' },
+      ),
+    ).rejects.toThrow(ForbiddenException);
+    expect(companyRepo.create).not.toHaveBeenCalled();
+  });
+
+  it('should allow OWNER/ADMIN to create company with PRO plan even when user plan is FREE', async () => {
+    companyAccessService.resolveUserPlanAndProStatus = jest
+      .fn()
+      .mockResolvedValue({
+        userId: creatorId,
+        userRole: 'ADMIN',
+        plan: 'FREE',
+        isAltaireAdmin: true,
+        isProOrAdmin: true,
+      });
+
+    await service.create(
+      { name: 'Empresa Admin', acronym: 'ADM' },
+      { sub: creatorId, role: 'ADMIN' },
+    );
+
+    expect(companyRepo.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        plan: 'PRO',
+      }),
+    );
+  });
+
+  it('should pre-register user without password and link to multiple managed companies', async () => {
+    const secondCompanyId = '507f1f77bcf86cd799439055';
+    const preRegUserId = '507f1f77bcf86cd799439088';
+    usersService.findOne = jest.fn().mockResolvedValue(undefined);
+    usersService.createPreRegisteredUser = jest.fn().mockResolvedValue({
+      _id: preRegUserId,
+      email: 'convidado@altaire.com',
+      name: 'Convidado',
+      role: 'member',
+      plan: 'FREE',
+      preRegistered: true,
+    }) as any;
+
+    const result = await service.addMember(
+      companyId,
+      {
+        name: 'Convidado',
+        email: 'convidado@altaire.com',
+        role: 'MEMBER',
+        brandIds: [],
+        allowedProjects: [],
+        permissions: [],
+        additionalCompanyIds: [secondCompanyId],
+      },
+      { sub: creatorId, role: 'MEMBER' },
+    );
+
+    expect(usersService.createPreRegisteredUser).toHaveBeenCalledWith(
+      expect.objectContaining({
+        email: 'convidado@altaire.com',
+        password: undefined,
+      }),
+    );
+    expect(memberRepo.upsertActive).toHaveBeenCalledTimes(2);
+    expect(result.linkedCompanyIds).toEqual([companyId, secondCompanyId]);
+  });
+
+  it('should reject addMember when user is not manager of an additional company', async () => {
+    const unmanagedCompanyId = '507f1f77bcf86cd799439077';
+    companyAccessService.resolveCompanyContext = jest
+      .fn()
+      .mockImplementation(async (_u, cid) => ({
+        companyId: cid,
+        organizationId: orgId,
+        userId: creatorId,
+        userRole: 'MEMBER',
+        isAltaireAdmin: false,
+        isCompanyCreator: cid === companyId,
+        isCompanyManager: cid === companyId,
+        allowedBrandIds: null,
+        allowedProjectIds: null,
+      }));
+
+    await expect(
+      service.addMember(
+        companyId,
+        {
+          name: 'Convidado',
+          email: 'convidado@altaire.com',
+          role: 'MEMBER',
+          brandIds: [],
+          allowedProjects: [],
+          permissions: [],
+          additionalCompanyIds: [unmanagedCompanyId],
+        },
+        { sub: creatorId, role: 'MEMBER' },
+      ),
+    ).rejects.toThrow(ForbiddenException);
+    expect(usersService.createPreRegisteredUser).not.toHaveBeenCalled();
   });
 
   it('should block softDelete when active brands exist', async () => {

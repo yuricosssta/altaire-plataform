@@ -8,6 +8,7 @@ import {
   NotFoundException,
   UnauthorizedException,
 } from '@nestjs/common';
+import { Types } from 'mongoose';
 import { UsersRepository } from '../repositories/user.repository';
 import { CreateUser, OAuthUser, UpdateUser } from '../validations/users.zod';
 import * as bcrypt from 'bcrypt';
@@ -20,6 +21,7 @@ import {
 import { MailService } from '../../shared/services/mail.service';
 import {
   AltaireOrgRole,
+  UserPlanType,
   resolveAltaireRoleByEmail,
 } from '../../shared/utils/org-role.util';
 
@@ -71,6 +73,8 @@ export class UsersService {
         authProvider: 'local',
         isAdmin,
         role: orgRole as UserRoleType,
+        plan: 'FREE',
+        preRegistered: false,
         rule: mapRoleToUserRule(orgRole),
         allowedProjects: user.allowedProjects || [],
         permissions: user.permissions || [],
@@ -78,13 +82,75 @@ export class UsersService {
         functionId: validFunctionId,
       } as Partial<IUser>);
       const { password: _, ...safeUser } = created;
-      return { ...safeUser, role: orgRole.toLowerCase() };
+      return {
+        ...safeUser,
+        plan: safeUser.plan || 'FREE',
+        role: orgRole.toLowerCase(),
+      };
     } catch (e: any) {
       console.error('Erro ao criar usuário:', e);
       if (e.code === 11000) {
         throw new ConflictException('Este e-mail já está em uso.');
       }
       throw new InternalServerErrorException('Erro ao criar usuário');
+    }
+  }
+
+  async createPreRegisteredUser(input: {
+    name: string;
+    email: string;
+    password?: string;
+    role: UserRoleType;
+    allowedProjects?: string[];
+    permissions?: string[];
+    invitedBy?: string;
+    functionId?: string | null;
+  }) {
+    const normalizedEmail = input.email.trim().toLowerCase();
+    const existing = await this.userRepository.findOneByEmail(normalizedEmail);
+    if (existing) {
+      throw new ConflictException('Este e-mail já está em uso.');
+    }
+
+    const orgRole = resolveAltaireRoleByEmail(normalizedEmail, input.role);
+    const isAdmin = orgRole === 'OWNER' || orgRole === 'ADMIN';
+    const hashedPassword =
+      input.password && input.password.trim().length > 0
+        ? await bcrypt.hash(input.password.trim(), 10)
+        : undefined;
+    const validFunctionId =
+      input.functionId && /^[a-f\d]{24}$/i.test(String(input.functionId))
+        ? String(input.functionId)
+        : null;
+
+    try {
+      const created = await this.userRepository.createUser({
+        name: input.name.trim(),
+        email: normalizedEmail,
+        ...(hashedPassword ? { password: hashedPassword } : {}),
+        authProvider: 'local',
+        isAdmin,
+        role: orgRole as UserRoleType,
+        plan: 'FREE',
+        preRegistered: true,
+        rule: mapRoleToUserRule(orgRole),
+        allowedProjects: input.allowedProjects || [],
+        permissions: input.permissions || [],
+        invitedBy: input.invitedBy,
+        functionId: validFunctionId,
+      } as Partial<IUser>);
+      const { password: _, ...safeUser } = created;
+      return {
+        ...safeUser,
+        plan: safeUser.plan || 'FREE',
+        role: orgRole.toLowerCase(),
+      };
+    } catch (e: any) {
+      console.error('Erro ao pré-cadastrar usuário:', e);
+      if (e.code === 11000) {
+        throw new ConflictException('Este e-mail já está em uso.');
+      }
+      throw new InternalServerErrorException('Erro ao pré-cadastrar usuário');
     }
   }
 
@@ -97,6 +163,11 @@ export class UsersService {
     }
 
     if (!user.password) {
+      if (user.preRegistered) {
+        throw new UnauthorizedException(
+          'Esta conta foi pré-cadastrada sem senha. Conclua seu cadastro na aba "Criar conta" ou entre com o Google usando este e-mail.',
+        );
+      }
       throw new UnauthorizedException(
         'Esta conta foi criada com o Google. Use o botão "Entrar com o Google" ou redefina sua senha.',
       );
@@ -110,7 +181,12 @@ export class UsersService {
     const orgRole = resolveAltaireRoleByEmail(normalizedEmail, user.role);
     const isAdmin = orgRole === 'OWNER' || orgRole === 'ADMIN';
     const { password: _, ...safeUser } = user;
-    return { ...safeUser, isAdmin, role: orgRole.toLowerCase() };
+    return {
+      ...safeUser,
+      plan: user.plan || 'FREE',
+      isAdmin,
+      role: orgRole.toLowerCase(),
+    };
   }
 
   async upsertOAuthUser(data: OAuthUser) {
@@ -125,7 +201,8 @@ export class UsersService {
         (data.googleId && existing.googleId !== data.googleId) ||
         (data.avatarUrl && !existing.avatarUrl) ||
         existing.isAdmin !== isAdmin ||
-        existing.role !== orgRole;
+        existing.role !== orgRole ||
+        Boolean(existing.preRegistered);
 
       if (shouldUpdate) {
         const updated = await this.userRepository.updateUser(userId, {
@@ -134,14 +211,25 @@ export class UsersService {
           isAdmin,
           role: orgRole as UserRoleType,
           rule: mapRoleToUserRule(orgRole),
+          ...(existing.preRegistered ? { preRegistered: false } : {}),
         });
         if (updated) {
-          return { ...updated, isAdmin, role: orgRole.toLowerCase() };
+          return {
+            ...updated,
+            plan: updated.plan || existing.plan || 'FREE',
+            isAdmin,
+            role: orgRole.toLowerCase(),
+          };
         }
       }
 
       const { password: _, ...safeExisting } = existing;
-      return { ...safeExisting, isAdmin, role: orgRole.toLowerCase() };
+      return {
+        ...safeExisting,
+        plan: existing.plan || 'FREE',
+        isAdmin,
+        role: orgRole.toLowerCase(),
+      };
     }
 
     try {
@@ -153,19 +241,31 @@ export class UsersService {
         authProvider: 'google',
         isAdmin,
         role: orgRole as UserRoleType,
+        plan: 'FREE',
+        preRegistered: false,
         rule: mapRoleToUserRule(orgRole),
         allowedProjects: [],
         permissions: [],
       } as Partial<IUser>);
       const { password: _, ...safeCreated } = created;
-      return { ...safeCreated, isAdmin, role: orgRole.toLowerCase() };
+      return {
+        ...safeCreated,
+        plan: safeCreated.plan || 'FREE',
+        isAdmin,
+        role: orgRole.toLowerCase(),
+      };
     } catch (e: any) {
       if (e.code === 11000) {
         const raceUser =
           await this.userRepository.findOneByEmail(normalizedEmail);
         if (raceUser) {
           const { password: _, ...safeRaceUser } = raceUser;
-          return { ...safeRaceUser, isAdmin, role: orgRole.toLowerCase() };
+          return {
+            ...safeRaceUser,
+            plan: raceUser.plan || 'FREE',
+            isAdmin,
+            role: orgRole.toLowerCase(),
+          };
         }
       }
       throw new InternalServerErrorException(
@@ -175,7 +275,11 @@ export class UsersService {
   }
 
   async getAllUsers() {
-    return this.userRepository.getAllUsers();
+    const users = await this.userRepository.getAllUsers();
+    return users.map((u) => ({
+      ...u,
+      plan: u.plan || 'FREE',
+    }));
   }
 
   async searchUser(term: string) {
@@ -185,7 +289,24 @@ export class UsersService {
   async getUser(userId: string) {
     const user = await this.userRepository.getUser(userId);
     if (!user) throw new NotFoundException('Usuário não encontrado');
-    return user;
+    return {
+      ...user,
+      plan: user.plan || 'FREE',
+    };
+  }
+
+  async updateUserPlan(userId: string, plan: UserPlanType) {
+    if (!Types.ObjectId.isValid(String(userId))) {
+      throw new BadRequestException('ID do usuário inválido.');
+    }
+    const updated = await this.userRepository.updateUser(userId, { plan });
+    if (!updated) {
+      throw new NotFoundException('Usuário não encontrado.');
+    }
+    return {
+      ...updated,
+      plan: updated.plan || plan,
+    };
   }
 
   async findById(id: string) {
