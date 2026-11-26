@@ -158,15 +158,21 @@ export class OrganizationService {
           ? new (Types.ObjectId as any)(String(userDoc.functionId))
           : undefined;
 
-      await this.memberModel.create({
-        organizationId: new (Types.ObjectId as any)(String(altaireOrg._id)),
-        userId: userObjectId,
-        role: targetRole,
-        allowedProjects,
-        permissions,
-        ...(invitedBy ? { invitedBy } : {}),
-        ...(functionId ? { functionId } : {}),
-      });
+      try {
+        await this.memberModel.create({
+          organizationId: new (Types.ObjectId as any)(String(altaireOrg._id)),
+          userId: userObjectId,
+          role: targetRole,
+          allowedProjects,
+          permissions,
+          ...(invitedBy ? { invitedBy } : {}),
+          ...(functionId ? { functionId } : {}),
+        });
+      } catch (err: any) {
+        if (err?.code !== 11000) {
+          throw err;
+        }
+      }
     } else if (existingMembership.role !== targetRole) {
       existingMembership.role = targetRole;
       await existingMembership.save();

@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { createAuthToken } from "@/lib/auth/token.service";
 import {
+  fetchUserCompaniesCount,
   fetchUserEditorialProjects,
   resolvePostLoginRedirectByRole,
   upsertOAuthBackendUser,
@@ -62,19 +63,27 @@ export async function GET(request: Request) {
       });
     }
 
-    const userProjects = await fetchUserEditorialProjects(
-      internalToken,
-      userId,
-      userRole,
-      allowedProjects,
-    );
+    const companiesCount = await fetchUserCompaniesCount(internalToken);
+
+    const userProjects =
+      companiesCount === 0
+        ? []
+        : await fetchUserEditorialProjects(
+            internalToken,
+            userId,
+            userRole,
+            allowedProjects,
+          );
     const activeProject = userProjects[0] ?? null;
 
-    const redirectPath = resolvePostLoginRedirectByRole(
-      userRole,
-      activeProject?.id,
-      false,
-    );
+    const redirectPath =
+      companiesCount === 0
+        ? "/sem-empresa"
+        : resolvePostLoginRedirectByRole(
+            userRole,
+            activeProject?.id,
+            false,
+          );
 
     const response = NextResponse.redirect(new URL(redirectPath, origin));
     const maxAge = 60 * 60 * 24 * 30; // 30 dias

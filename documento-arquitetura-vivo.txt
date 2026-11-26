@@ -1,3 +1,17 @@
+## GUARDA FAIL-CLOSED SEM EMPRESA, IDEMPOTÊNCIA DE 1º ACESSO E RESOLUÇÃO BFF EM DOCKER - 26/11/2026 ##
+Resumo Técnico — Blindagem do Redirecionamento para `/sem-empresa` e Correção de `502 Bad Gateway` entre Containers:
+
+1. Idempotência de 1º Acesso e Guarda Fail-Closed (`BackEnd/src/organization`, `company`, `FrontEnd/src/app`):
+   - `OrganizationService.ensureDefaultOrganizationForUser`: tratado erro de corrida `E11000` na criação simultânea do vínculo na organização canônica Altaire (coberto por teste unitário em `organization.service.spec.ts`); `CompanyService.findAllForUser` protegido contra falha colateral dessa sincronização.
+   - `FrontEnd/src/app/(main)/layout.tsx`: guarda convertida para *fail-closed* — exibe tela de carregamento limpa enquanto `companyStatus` está `'idle'` ou `'loading'` e bloqueia/redireciona para `/sem-empresa` em `'succeeded'` ou `'failed'` quando `companies.length === 0` (exceto `OWNER`/`ADMIN` em `/dashboard/master-admin`).
+   - `FrontEnd/src/app/(main)/sem-empresa/page.tsx`: adicionado banner de retry quando `companyStatus === 'failed'` e `useCallback` em `getDestinationByRole`.
+   - `userProvision.ts` (`fetchUserCompaniesCount`), `/api/auth/login`, `/api/auth/register` e `/api/auth/oauth-success`: retornam `/sem-empresa` diretamente quando `companiesCount === 0`; adicionada rota `/sem-empresa` na allowlist de `sanitizeReturnTo` em `routes.ts`; `login/page.tsx` e `cadastro/page.tsx` executam `clearCompanyState()` e `fetchMyCompanies()` logo após autenticar.
+
+2. Resolução de URL do BackEnd no BFF em Docker (`FrontEnd/src/lib/api/serverUtils.ts`, `api/companies/_proxy.ts`, `docker-compose.dev.yml`, `FrontEnd/.env`):
+   - `getNestApiUrl()` detecta ambiente container (`/.dockerenv`) e prioriza `INTERNAL_API_URL` (`http://backend:3001`) quando `BACKEND_API_URL` estiver vazio ou apontando para `localhost`/`127.0.0.1`, eliminando `502 Bad Gateway (fetch failed)` em `POST /api/companies` no Docker e preservando `localhost` fora de containers.
+   - `proxyCompanyRequest` aprimorado com log e mensagem diagnóstica clara para falhas de conexão (`ECONNREFUSED`, `ENOTFOUND`, `ECONNRESET`).
+   - `docker-compose.dev.yml` atualizado com `BACKEND_API_URL=http://backend:3001` e `INTERNAL_API_URL=http://backend:3001` no serviço `frontend`; `FrontEnd/.env` alinhado com `BACKEND_API_URL=` vazio.
+
 ## GOVERNANÇA PRO PARA EMPRESAS, CADASTRO PRÉVIO E FLUXO SEM EMPRESA - 25/11/2026 ##
 Resumo Técnico — Restrição de Criação de Empresas e Gestão ao Plano PRO/Enterprise, Tela `/sem-empresa`, Pré-cadastro Multi-Empresa e Painel Master Admin:
 

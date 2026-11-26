@@ -50,6 +50,8 @@ services:
     environment:
       - NODE_OPTIONS=--max-old-space-size=1024
       - NEXT_TELEMETRY_DISABLED=1
+      - BACKEND_API_URL=http://backend:3001
+      - INTERNAL_API_URL=http://backend:3001
     cpus: 1.5
     mem_limit: 1536m
     memswap_limit: 1536m

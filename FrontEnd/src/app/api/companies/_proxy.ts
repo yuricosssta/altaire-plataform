@@ -62,8 +62,21 @@ export async function proxyCompanyRequest(
 
     return { ok: true, status: response.status, data };
   } catch (err: unknown) {
-    const message =
+    const causeCode = (err as { cause?: { code?: string } } | null)?.cause?.code;
+    const rawMessage =
       err instanceof Error ? err.message : 'Falha ao conectar com o backend';
+    console.error(
+      `[proxyCompanyRequest] Falha ao conectar em ${backendUrl}/companies${path}:`,
+      causeCode || rawMessage,
+    );
+    const isConnectionFailure =
+      rawMessage === 'fetch failed' ||
+      causeCode === 'ECONNREFUSED' ||
+      causeCode === 'ENOTFOUND' ||
+      causeCode === 'ECONNRESET';
+    const message = isConnectionFailure
+      ? `Não foi possível conectar ao servidor BackEnd (${backendUrl}). Verifique se o serviço backend está ativo.`
+      : rawMessage;
     return {
       ...error(ERROR_CODES.INTERNAL_ERROR, message),
       status: 502,

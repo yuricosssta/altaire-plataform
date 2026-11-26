@@ -1,9 +1,44 @@
+import { existsSync } from 'fs';
 import { cookies } from 'next/headers';
 
+let cachedInDocker: boolean | null = null;
+
+function isRunningInDocker(): boolean {
+  if (cachedInDocker !== null) return cachedInDocker;
+  try {
+    cachedInDocker = existsSync('/.dockerenv');
+  } catch {
+    cachedInDocker = false;
+  }
+  return cachedInDocker;
+}
+
+function isLocalhostUrl(url: string): boolean {
+  return /^https?:\/\/(localhost|127\.0\.0\.1|\[::1\])(:\d+)?(\/|$)/i.test(
+    url.trim(),
+  );
+}
+
+function normalizeBaseUrl(raw?: string): string {
+  return (raw || '').trim().replace(/\/+$/, '');
+}
+
 export function getNestApiUrl() {
-  if (process.env.BACKEND_API_URL) return process.env.BACKEND_API_URL;
-  if (process.env.INTERNAL_API_URL) return process.env.INTERNAL_API_URL;
-  if (process.env.NEXT_PUBLIC_API_BASE_URL) return process.env.NEXT_PUBLIC_API_BASE_URL;
+  const backendUrl = normalizeBaseUrl(process.env.BACKEND_API_URL);
+  const internalUrl = normalizeBaseUrl(process.env.INTERNAL_API_URL);
+  const publicUrl = normalizeBaseUrl(process.env.NEXT_PUBLIC_API_BASE_URL);
+  const inDocker = isRunningInDocker();
+
+  if (inDocker && internalUrl && (!backendUrl || isLocalhostUrl(backendUrl))) {
+    return internalUrl;
+  }
+
+  if (backendUrl) return backendUrl;
+
+  if (!inDocker && publicUrl) return publicUrl;
+
+  if (internalUrl) return internalUrl;
+  if (publicUrl) return publicUrl;
   return 'http://localhost:3001';
 }
 

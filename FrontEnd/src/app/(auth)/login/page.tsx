@@ -19,6 +19,10 @@ import { setAuthState } from "@/lib/redux/slices/authSlice";
 import { fetchUserProfile } from "@/lib/redux/slices/userSlice";
 import { fetchMyOrganizations } from "@/lib/redux/slices/organizationSlice";
 import {
+  clearCompanyState,
+  fetchMyCompanies,
+} from "@/lib/redux/slices/companySlice";
+import {
   AlertCircle,
   ArrowLeft,
   ArrowRight,
@@ -285,16 +289,20 @@ export default function LoginPage() {
 
     if (data.token) {
       localStorage.setItem("token", data.token);
+      dispatch(clearCompanyState());
       dispatch(setAuthState({ token: data.token }));
       dispatch(fetchUserProfile());
       dispatch(fetchMyOrganizations());
+      dispatch(fetchMyCompanies());
     }
 
     const destination = sanitizeReturnTo(data.redirectUrl, "/dashboard/editorial");
     setAuthSuccessMessage(
-      data.user?.hasActiveProject
-        ? "Sessão autenticada. Carregando seu Projeto Editorial ativo..."
-        : "Sessão autenticada. Redirecionando para a criação do seu primeiro Projeto Editorial..."
+      destination === "/sem-empresa"
+        ? "Sessão autenticada. Encaminhando para configuração ou vinculação de empresa..."
+        : data.user?.hasActiveProject
+          ? "Sessão autenticada. Carregando seu Projeto Editorial ativo..."
+          : "Sessão autenticada. Redirecionando para a criação do seu primeiro Projeto Editorial..."
     );
 
     window.setTimeout(() => {
