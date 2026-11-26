@@ -6,6 +6,7 @@ import { createAuthToken } from "@/lib/auth/token.service";
 import {
   AuthBackendError,
   authenticateBackendUser,
+  fetchUserCompaniesCount,
   fetchUserEditorialProjects,
   resolvePostLoginRedirectByRole,
 } from "@/lib/auth/userProvision";
@@ -50,9 +51,11 @@ export async function POST(request: Request) {
       permissions: provisioned.permissions || [],
     });
 
+    const companiesCount = await fetchUserCompaniesCount(token);
+
     // Verifica se o usuário já possui projetos editoriais ativos/permitidos no BackEnd
     const userProjects =
-      normalizedEmail === "novo@legionaltaire.com.br"
+      companiesCount === 0 || normalizedEmail === "novo@legionaltaire.com.br"
         ? []
         : await fetchUserEditorialProjects(
             token,
@@ -96,12 +99,15 @@ export async function POST(request: Request) {
       });
     }
 
-    // Redireciona CLIENT -> /dashboard/cliente, EXTERNAL -> /dashboard/externo, demais -> Workspace Editorial
-    const redirectUrl = resolvePostLoginRedirectByRole(
-      provisioned.role,
-      activeProject?.id,
-      true
-    );
+    // Sem empresa vinculada -> /sem-empresa; caso contrário roteia pelo papel/projeto
+    const redirectUrl =
+      companiesCount === 0
+        ? "/sem-empresa"
+        : resolvePostLoginRedirectByRole(
+            provisioned.role,
+            activeProject?.id,
+            true
+          );
 
     const responsePayload: AuthResponse = {
       success: true,

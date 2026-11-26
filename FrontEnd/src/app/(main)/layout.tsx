@@ -6,7 +6,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useDispatch, useSelector } from "react-redux";
 import { AnimatePresence, motion } from "motion/react";
-import { ArrowRight, Sparkles, X } from "lucide-react";
+import { ArrowRight, Loader2, Sparkles, X } from "lucide-react";
 import { Header } from "@/components/layout/Header";
 import { Sidebar } from "@/components/layout/Sidebar";
 import {
@@ -68,10 +68,15 @@ function MainDashboardShellInner({
   const isNoCompanyPage =
     pathname === "/sem-empresa" || pathname.startsWith("/sem-empresa/");
   const isMasterAdminPage = pathname.startsWith("/dashboard/master-admin");
+  const isCheckingCompanies =
+    !isNoCompanyPage &&
+    !(isAltaireAdmin && isMasterAdminPage) &&
+    (companyStatus === "idle" || companyStatus === "loading");
   const mustBlockWithoutCompany =
-    companyStatus === "succeeded" &&
-    !hasCompanies &&
-    !(isAltaireAdmin && isMasterAdminPage);
+    !isNoCompanyPage &&
+    !(isAltaireAdmin && isMasterAdminPage) &&
+    (companyStatus === "succeeded" || companyStatus === "failed") &&
+    !hasCompanies;
 
   useEffect(() => {
     if (isAuthenticated && userStatus === "idle") {
@@ -175,6 +180,22 @@ function MainDashboardShellInner({
 
   if (isNoCompanyPage) {
     return <>{children}</>;
+  }
+
+  if (isCheckingCompanies) {
+    return (
+      <div
+        data-la-surface="dark"
+        className="flex min-h-screen items-center justify-center bg-background text-foreground"
+      >
+        <div className="flex flex-col items-center gap-3 rounded-md border border-border bg-card px-8 py-6 text-center">
+          <Loader2 className="h-7 w-7 animate-spin text-primary" />
+          <p className="text-sm font-medium text-foreground">
+            Carregando suas empresas...
+          </p>
+        </div>
+      </div>
+    );
   }
 
   if (mustBlockWithoutCompany) {

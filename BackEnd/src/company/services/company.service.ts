@@ -116,10 +116,19 @@ export class CompanyService {
       return [];
     }
 
-    await this.organizationService.ensureDefaultOrganizationForUser(
-      userId,
-      user?.email,
-    );
+    try {
+      await this.organizationService.ensureDefaultOrganizationForUser(
+        userId,
+        user?.email,
+      );
+    } catch (err: any) {
+      if (err?.code !== 11000) {
+        console.warn(
+          '[CompanyService.findAllForUser] Falha ao sincronizar organização padrão:',
+          err?.message || err,
+        );
+      }
+    }
 
     const { isAltaireAdmin, isProOrAdmin } =
       await this.companyAccessService.resolveUserPlanAndProStatus(user);

@@ -5,6 +5,7 @@ import { registerSchema } from "@/lib/validations/auth";
 import { createAuthToken } from "@/lib/auth/token.service";
 import {
   AuthBackendError,
+  fetchUserCompaniesCount,
   fetchUserEditorialProjects,
   registerBackendUser,
 } from "@/lib/auth/userProvision";
@@ -56,9 +57,12 @@ export async function POST(request: Request) {
       role: provisioned.role,
     });
 
-    const userProjects = provisioned.isNewUser
-      ? []
-      : await fetchUserEditorialProjects(token, provisioned.id);
+    const companiesCount = await fetchUserCompaniesCount(token);
+
+    const userProjects =
+      companiesCount === 0 || provisioned.isNewUser
+        ? []
+        : await fetchUserEditorialProjects(token, provisioned.id);
     const activeProject = userProjects[0] ?? null;
     const hasActiveProject = Boolean(activeProject);
 
@@ -89,9 +93,12 @@ export async function POST(request: Request) {
       });
     }
 
-    const redirectUrl = activeProject
-      ? `/dashboard/editorial/${activeProject.id}`
-      : "/dashboard/editorial?newProject=true&onboarding=true";
+    const redirectUrl =
+      companiesCount === 0
+        ? "/sem-empresa"
+        : activeProject
+          ? `/dashboard/editorial/${activeProject.id}`
+          : "/dashboard/editorial?newProject=true&onboarding=true";
 
     const responsePayload: AuthResponse = {
       success: true,

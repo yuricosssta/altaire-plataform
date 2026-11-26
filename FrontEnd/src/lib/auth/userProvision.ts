@@ -792,3 +792,25 @@ export async function fetchUserEditorialProjects(
   }
 }
 
+export async function fetchUserCompaniesCount(token: string): Promise<number> {
+  const backendUrl = getBackendApiUrl();
+
+  try {
+    const res = await fetch(`${backendUrl}/companies/my`, {
+      method: 'GET',
+      headers: {
+        Authorization: `Bearer ${token}`,
+        Accept: 'application/json',
+      },
+      cache: 'no-store',
+    });
+
+    if (!res.ok) return 0;
+
+    const data = await res.json().catch(() => []);
+    return Array.isArray(data) ? data.length : 0;
+  } catch {
+    return 0;
+  }
+}
+

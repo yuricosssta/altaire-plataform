@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, type FormEvent } from "react";
+import { useCallback, useEffect, useState, type FormEvent } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useDispatch, useSelector } from "react-redux";
@@ -98,11 +98,11 @@ export default function SemEmpresaPage() {
     userProfile?.name || authUser?.name || authUser?.fullName || ""
   );
 
-  const getDestinationByRole = () => {
+  const getDestinationByRole = useCallback(() => {
     if (isClientRole) return ROUTES.portalCliente;
     if (isExternalRole) return ROUTES.portalExterno;
     return ROUTES.centralEstrategica;
-  };
+  }, [isClientRole, isExternalRole]);
 
   useEffect(() => {
     if (
@@ -113,7 +113,14 @@ export default function SemEmpresaPage() {
     ) {
       router.replace(getDestinationByRole());
     }
-  }, [companyStatus, companies.length, step, createdCompany, router]);
+  }, [
+    companyStatus,
+    companies.length,
+    step,
+    createdCompany,
+    router,
+    getDestinationByRole,
+  ]);
 
   const handleRefreshAccess = async () => {
     try {
@@ -281,6 +288,25 @@ export default function SemEmpresaPage() {
       </header>
 
       <main className="mx-auto flex w-full max-w-5xl flex-1 flex-col justify-center px-4 py-10 sm:px-6">
+        {companyStatus === "failed" ? (
+          <div className="mb-6 flex flex-wrap items-center justify-between gap-3 rounded-md border border-destructive/40 bg-destructive/10 px-4 py-3 text-xs text-destructive">
+            <span>
+              Não foi possível confirmar suas empresas no servidor neste momento.
+            </span>
+            <button
+              type="button"
+              onClick={handleRefreshAccess}
+              disabled={isRefreshing}
+              className="inline-flex min-h-[2.25rem] items-center gap-1.5 rounded-md border border-destructive/40 bg-background px-3 py-1 font-semibold text-foreground transition-colors hover:border-primary hover:text-primary"
+            >
+              <RefreshCw
+                className={`h-3.5 w-3.5 ${isRefreshing ? "animate-spin" : ""}`}
+              />
+              <span>Tentar novamente</span>
+            </button>
+          </div>
+        ) : null}
+
         {isBootstrapping ? (
           <div className="mx-auto flex max-w-md flex-col items-center gap-3 rounded-md border border-border bg-card p-8 text-center">
             <Loader2 className="h-7 w-7 animate-spin text-primary" />

@@ -49,6 +49,10 @@ import { AppDispatch } from "@/lib/redux/store";
 import { setAuthState } from "@/lib/redux/slices/authSlice";
 import { fetchUserProfile } from "@/lib/redux/slices/userSlice";
 import { fetchMyOrganizations } from "@/lib/redux/slices/organizationSlice";
+import {
+  clearCompanyState,
+  fetchMyCompanies,
+} from "@/lib/redux/slices/companySlice";
 
 type RegistrationStep = 1 | 2 | 3;
 
@@ -429,9 +433,11 @@ export default function CadastroPage() {
 
       if (data.token) {
         localStorage.setItem("token", data.token);
+        dispatch(clearCompanyState());
         dispatch(setAuthState({ token: data.token }));
         dispatch(fetchUserProfile());
         dispatch(fetchMyOrganizations());
+        dispatch(fetchMyCompanies());
       }
 
       /* Salva apenas os dados do perfil do cliente (sem criar projeto automático no cadastro) */

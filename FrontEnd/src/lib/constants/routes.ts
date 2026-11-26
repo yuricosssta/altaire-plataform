@@ -482,6 +482,7 @@ const INTERNAL_RETURN_TO_ALLOWLIST: ReadonlySet<string> = new Set([
   WORKSPACE_ROUTES.configuracoesAlternativa,
   WORKSPACE_ROUTES.portalCliente,
   WORKSPACE_ROUTES.portalExterno,
+  WORKSPACE_ROUTES.semEmpresa,
   ACTIVATION_ROUTES.plans,
   ACTIVATION_ROUTES.checkoutProcessing,
   PUBLIC_ROUTES.pricing,
@@ -532,6 +533,8 @@ export function sanitizeReturnTo(
     pathname.startsWith("/dashboard/settings") ||
     pathname.startsWith("/dashboard/configuracoes") ||
     pathname === "/dashboard" ||
+    pathname === "/sem-empresa" ||
+    pathname.startsWith("/sem-empresa/") ||
     INTERNAL_RETURN_TO_ALLOWLIST.has(pathname)
   ) {
     return trimmed;

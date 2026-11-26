@@ -186,4 +186,25 @@ describe('OrganizationService', () => {
       );
     });
   });
+
+  describe('ensureDefaultOrganizationForUser concurrency', () => {
+    it('should ignore E11000 duplicate key error when concurrent request creates Altaire membership', async () => {
+      orgModel.findOne.mockReturnValueOnce({
+        exec: jest.fn().mockResolvedValue({
+          _id: orgId,
+          name: 'Altaire',
+          slug: 'altaire',
+          acronym: 'ALT',
+        }),
+      });
+      memberModel.findOne.mockReturnValueOnce({
+        exec: jest.fn().mockResolvedValue(null),
+      });
+      memberModel.create.mockRejectedValueOnce({ code: 11000 });
+
+      await expect(
+        service.ensureDefaultOrganizationForUser(memberId, 'member@altaire.com'),
+      ).resolves.toBeUndefined();
+    });
+  });
 });
